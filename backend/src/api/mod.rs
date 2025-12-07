@@ -15,6 +15,7 @@ use tokio::sync::broadcast;
 #[derive(Clone)]
 pub struct AppState {
     pub db: Database,
+    #[allow(dead_code)]
     pub config: Config,
     pub event_tx: broadcast::Sender<Event>,
 }
@@ -31,6 +32,7 @@ impl AppState {
 }
 
 /// Events broadcasted via WebSocket
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "type", content = "data")]
 pub enum Event {

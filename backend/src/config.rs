@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct Config {
     #[serde(default = "default_port")]
     pub port: u16,

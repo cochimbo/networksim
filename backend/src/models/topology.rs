@@ -110,6 +110,7 @@ pub struct UpdateTopologyRequest {
 }
 
 impl Topology {
+    #[allow(dead_code)]
     pub fn new(name: String, description: Option<String>) -> Self {
         let now = Utc::now();
         Self {
@@ -149,6 +150,7 @@ impl Topology {
 }
 
 impl Node {
+    #[allow(dead_code)]
     pub fn new(name: String, node_type: NodeType, x: f64, y: f64) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -161,6 +163,7 @@ impl Node {
 }
 
 impl Link {
+    #[allow(dead_code)]
     pub fn new(source: String, target: String) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -216,7 +219,7 @@ mod tests {
     fn test_duplicate_node_ids() {
         let mut topology = Topology::new("Test".to_string(), None);
 
-        let mut node1 = Node::new("Node1".to_string(), NodeType::Server, 0.0, 0.0);
+        let node1 = Node::new("Node1".to_string(), NodeType::Server, 0.0, 0.0);
         let mut node2 = Node::new("Node2".to_string(), NodeType::Client, 100.0, 100.0);
 
         // Force same ID

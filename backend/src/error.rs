@@ -14,6 +14,7 @@ pub enum AppError {
     #[error("Bad request: {0}")]
     BadRequest(String),
 
+    #[allow(dead_code)]
     #[error("Conflict: {0}")]
     Conflict(String),
 
