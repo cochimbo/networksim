@@ -46,9 +46,7 @@ mod tests {
     #[tokio::test]
     async fn test_database_connection() {
         let db = Database::new("sqlite::memory:").await.unwrap();
-        let result = sqlx::query("SELECT 1")
-            .fetch_one(db.pool())
-            .await;
+        let result = sqlx::query("SELECT 1").fetch_one(db.pool()).await;
         assert!(result.is_ok());
     }
 }

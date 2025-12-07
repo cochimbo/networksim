@@ -5,16 +5,16 @@ use serde::Deserialize;
 pub struct Config {
     #[serde(default = "default_port")]
     pub port: u16,
-    
+
     #[serde(default = "default_database_url")]
     pub database_url: String,
-    
+
     #[serde(default = "default_kubeconfig")]
     pub kubeconfig: Option<String>,
-    
+
     #[serde(default = "default_k8s_namespace_system")]
     pub k8s_namespace_system: String,
-    
+
     #[serde(default = "default_k8s_namespace_sim")]
     pub k8s_namespace_sim: String,
 }
@@ -48,8 +48,10 @@ impl Config {
             .add_source(config::Environment::default())
             .build()?;
 
-        let settings: Config = config.try_deserialize().unwrap_or_else(|_| Config::default());
-        
+        let settings: Config = config
+            .try_deserialize()
+            .unwrap_or_else(|_| Config::default());
+
         Ok(settings)
     }
 }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::{
-    routing::{get, post, put, delete},
+    routing::{delete, get, post, put},
     Router,
 };
 use std::net::SocketAddr;
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     tracing::info!("Listening on {}", addr);
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 

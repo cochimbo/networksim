@@ -13,16 +13,13 @@ use crate::api::AppState;
 use crate::api::Event;
 
 /// WebSocket handler
-pub async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> Response {
+pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
 async fn handle_socket(socket: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
-    
+
     // Subscribe to events
     let mut event_rx = state.event_tx.subscribe();
 

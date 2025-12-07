@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn test_validate_topology() {
         let mut topology = Topology::new("Test".to_string(), None);
-        
+
         // Empty topology is valid
         assert!(topology.validate().is_ok());
 
@@ -195,29 +195,33 @@ mod tests {
         let node2 = Node::new("Node2".to_string(), NodeType::Client, 100.0, 100.0);
         let node1_id = node1.id.clone();
         let node2_id = node2.id.clone();
-        
+
         topology.nodes.push(node1);
         topology.nodes.push(node2);
 
         // Add valid link
-        topology.links.push(Link::new(node1_id.clone(), node2_id.clone()));
+        topology
+            .links
+            .push(Link::new(node1_id.clone(), node2_id.clone()));
         assert!(topology.validate().is_ok());
 
         // Add invalid link (non-existent target)
-        topology.links.push(Link::new(node1_id, "non-existent".to_string()));
+        topology
+            .links
+            .push(Link::new(node1_id, "non-existent".to_string()));
         assert!(topology.validate().is_err());
     }
 
     #[test]
     fn test_duplicate_node_ids() {
         let mut topology = Topology::new("Test".to_string(), None);
-        
+
         let mut node1 = Node::new("Node1".to_string(), NodeType::Server, 0.0, 0.0);
         let mut node2 = Node::new("Node2".to_string(), NodeType::Client, 100.0, 100.0);
-        
+
         // Force same ID
         node2.id = node1.id.clone();
-        
+
         topology.nodes.push(node1);
         topology.nodes.push(node2);
 

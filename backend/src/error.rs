@@ -39,11 +39,17 @@ impl IntoResponse for AppError {
             AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg.clone()),
             AppError::Database(e) => {
                 tracing::error!("Database error: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Database error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Database error".to_string(),
+                )
             }
             AppError::Kubernetes(e) => {
                 tracing::error!("Kubernetes error: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Kubernetes error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Kubernetes error".to_string(),
+                )
             }
             AppError::Serialization(e) => {
                 tracing::error!("Serialization error: {:?}", e);

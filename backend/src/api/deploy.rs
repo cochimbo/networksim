@@ -30,7 +30,7 @@ pub async fn deploy(
 ) -> AppResult<Json<DeploymentStatus>> {
     // TODO: Implement K3s deployment in Phase 3
     tracing::info!("Deploy topology: {}", id);
-    
+
     Ok(Json(DeploymentStatus {
         topology_id: id,
         status: "pending".to_string(),
@@ -45,7 +45,7 @@ pub async fn destroy(
 ) -> AppResult<Json<serde_json::Value>> {
     // TODO: Implement K3s cleanup in Phase 3
     tracing::info!("Destroy deployment: {}", id);
-    
+
     Ok(Json(serde_json::json!({ "destroyed": id })))
 }
 
@@ -56,7 +56,7 @@ pub async fn status(
 ) -> AppResult<Json<DeploymentStatus>> {
     // TODO: Implement status check in Phase 3
     tracing::info!("Get deployment status: {}", id);
-    
+
     Ok(Json(DeploymentStatus {
         topology_id: id,
         status: "not_deployed".to_string(),

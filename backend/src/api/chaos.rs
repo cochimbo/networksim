@@ -38,7 +38,7 @@ pub async fn create(
 ) -> AppResult<Json<ChaosCondition>> {
     // TODO: Implement Chaos Mesh integration in Phase 4
     tracing::info!("Create chaos: {:?}", req);
-    
+
     Ok(Json(ChaosCondition {
         id: uuid::Uuid::new_v4().to_string(),
         target_type: req.target_type,
@@ -56,6 +56,6 @@ pub async fn delete(
 ) -> AppResult<Json<serde_json::Value>> {
     // TODO: Implement in Phase 4
     tracing::info!("Delete chaos: {}", id);
-    
+
     Ok(Json(serde_json::json!({ "deleted": id })))
 }

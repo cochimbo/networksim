@@ -99,7 +99,7 @@ pub async fn get(
     Path(id): Path<String>,
 ) -> AppResult<Json<Topology>> {
     let row: Option<TopologyRow> = sqlx::query_as(
-        "SELECT id, name, description, data, created_at, updated_at FROM topologies WHERE id = ?"
+        "SELECT id, name, description, data, created_at, updated_at FROM topologies WHERE id = ?",
     )
     .bind(&id)
     .fetch_optional(state.db.pool())
@@ -115,8 +115,14 @@ pub async fn get(
         description: row.description,
         nodes: serde_json::from_value(data.get("nodes").cloned().unwrap_or_default())?,
         links: serde_json::from_value(data.get("links").cloned().unwrap_or_default())?,
-        created_at: row.created_at.parse().map_err(|_| AppError::Internal("Invalid date".to_string()))?,
-        updated_at: row.updated_at.parse().map_err(|_| AppError::Internal("Invalid date".to_string()))?,
+        created_at: row
+            .created_at
+            .parse()
+            .map_err(|_| AppError::Internal("Invalid date".to_string()))?,
+        updated_at: row
+            .updated_at
+            .parse()
+            .map_err(|_| AppError::Internal("Invalid date".to_string()))?,
     };
 
     Ok(Json(topology))
@@ -153,7 +159,7 @@ pub async fn update(
     let now_str = now.to_rfc3339();
 
     sqlx::query(
-        "UPDATE topologies SET name = ?, description = ?, data = ?, updated_at = ? WHERE id = ?"
+        "UPDATE topologies SET name = ?, description = ?, data = ?, updated_at = ? WHERE id = ?",
     )
     .bind(&topology.name)
     .bind(&topology.description)
@@ -184,7 +190,9 @@ pub async fn delete(
     }
 
     // Broadcast event
-    let _ = state.event_tx.send(Event::TopologyDeleted { id: id.clone() });
+    let _ = state
+        .event_tx
+        .send(Event::TopologyDeleted { id: id.clone() });
 
     Ok(Json(serde_json::json!({ "deleted": id })))
 }

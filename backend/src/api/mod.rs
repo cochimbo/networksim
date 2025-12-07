@@ -1,15 +1,15 @@
-pub mod health;
-pub mod topologies;
-pub mod deploy;
 pub mod chaos;
-pub mod ws;
+pub mod deploy;
+pub mod health;
 pub mod metrics;
+pub mod topologies;
+pub mod ws;
 
+use crate::config::Config;
+use crate::db::Database;
 #[allow(unused_imports)]
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use crate::config::Config;
-use crate::db::Database;
 
 /// Shared application state
 #[derive(Clone)]
@@ -22,7 +22,11 @@ pub struct AppState {
 impl AppState {
     pub fn new(db: Database, config: Config) -> Self {
         let (event_tx, _) = broadcast::channel(100);
-        Self { db, config, event_tx }
+        Self {
+            db,
+            config,
+            event_tx,
+        }
     }
 }
 

@@ -9,9 +9,6 @@ pub async fn metrics_handler() -> impl IntoResponse {
 # TYPE networksim_info gauge
 networksim_info{version="0.1.0"} 1
 "#;
-    
-    (
-        [("content-type", "text/plain; charset=utf-8")],
-        metrics,
-    )
+
+    ([("content-type", "text/plain; charset=utf-8")], metrics)
 }

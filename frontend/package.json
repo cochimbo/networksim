@@ -12,17 +12,19 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.8.0",
+    "axios": "^1.6.2",
+    "clsx": "^2.0.0",
+    "cytoscape": "^3.27.0",
+    "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0",
-    "cytoscape": "^3.27.0",
-    "@tanstack/react-query": "^5.8.0",
-    "zustand": "^4.4.7",
-    "axios": "^1.6.2",
-    "clsx": "^2.0.0",
-    "lucide-react": "^0.294.0"
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.0",
     "@types/cytoscape": "^3.19.15",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
@@ -33,14 +35,12 @@
     "eslint": "^8.53.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4",
+    "jsdom": "^22.1.0",
+    "msw": "^2.0.8",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
     "typescript": "^5.2.2",
     "vite": "^5.0.0",
-    "vitest": "^0.34.6",
-    "@testing-library/react": "^14.1.0",
-    "@testing-library/jest-dom": "^6.1.5",
-    "jsdom": "^22.1.0",
-    "msw": "^2.0.8"
+    "vitest": "^0.34.6"
   }
 }
