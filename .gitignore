@@ -1,0 +1,77 @@
+# ====================
+# Rust / Backend
+# ====================
+backend/target/
+backend/**/*.rs.bk
+backend/Cargo.lock
+
+# ====================
+# Node / Frontend
+# ====================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
+# ====================
+# IDEs and Editors
+# ====================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ====================
+# Environment
+# ====================
+.env
+.env.local
+.env.*.local
+*.env
+
+# ====================
+# Database
+# ====================
+*.db
+*.sqlite
+*.sqlite3
+
+# ====================
+# Logs
+# ====================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ====================
+# Testing
+# ====================
+coverage/
+.nyc_output/
+*.lcov
+
+# ====================
+# Build artifacts
+# ====================
+*.exe
+*.dll
+*.so
+*.dylib
+
+# ====================
+# Kubernetes / K3s
+# ====================
+kubeconfig
+*.kubeconfig
+k3s.yaml
+
+# ====================
+# Misc
+# ====================
+*.bak
+*.tmp
+*.temp

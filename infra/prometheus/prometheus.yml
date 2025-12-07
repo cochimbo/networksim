@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Backend metrics
+  - job_name: 'networksim-backend'
+    static_configs:
+      - targets: ['backend:8080']
+    metrics_path: '/metrics'
+
+  # K3s metrics (if available)
+  - job_name: 'k3s'
+    static_configs:
+      - targets: ['k3s:10250']
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

@@ -1,0 +1,41 @@
+---
+# Deny all ingress to system namespace from simulation namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-from-simulation
+  namespace: networksim-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from anywhere except networksim-sim
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: name
+                operator: NotIn
+                values:
+                  - networksim-sim
+---
+# Default deny all in simulation namespace (will be overridden by topology-specific policies)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: networksim-sim
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    # Allow DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

@@ -1,0 +1,35 @@
+FROM rust:1.74-bookworm
+
+WORKDIR /app
+
+# Install development tools
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cargo-watch for hot reload
+RUN cargo install cargo-watch
+
+# Install sqlx-cli for migrations
+RUN cargo install sqlx-cli --no-default-features --features sqlite
+
+# Copy cargo files for dependency caching
+COPY Cargo.toml Cargo.lock* ./
+
+# Create dummy main.rs to cache dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build 2>/dev/null || true
+RUN rm -rf src
+
+# Copy the rest of the source
+COPY . .
+
+# Create data directory
+RUN mkdir -p /app/data
+
+# Expose port
+EXPOSE 8080
+
+# Run with hot reload
+CMD ["cargo", "watch", "-x", "run"]

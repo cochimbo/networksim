@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # ===================
+  # Backend (Rust/Axum)
+  # ===================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - backend-cargo-cache:/usr/local/cargo/registry
+      - backend-target:/app/target
+    environment:
+      - RUST_LOG=debug
+      - DATABASE_URL=sqlite:///app/data/networksim.db
+      - KUBECONFIG=/app/.kube/config
+    depends_on:
+      - k3s
+    networks:
+      - networksim
+
+  # ===================
+  # Frontend (React)
+  # ===================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080
+      - VITE_WS_URL=ws://localhost:8080
+    networks:
+      - networksim
+
+  # ===================
+  # K3s (Kubernetes)
+  # ===================
+  k3s:
+    image: rancher/k3s:v1.28.4-k3s1
+    command: server --disable traefik
+    privileged: true
+    ports:
+      - "6443:6443"
+    volumes:
+      - k3s-data:/var/lib/rancher/k3s
+      - ./infra/k8s:/manifests
+    environment:
+      - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig
+      - K3S_KUBECONFIG_MODE=666
+    networks:
+      - networksim
+
+  # ===================
+  # Observabilidad
+  # ===================
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - networksim
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - networksim
+
+networks:
+  networksim:
+    driver: bridge
+
+volumes:
+  backend-cargo-cache:
+  backend-target:
+  frontend-node-modules:
+  k3s-data:
+  prometheus-data:
+  grafana-data:
