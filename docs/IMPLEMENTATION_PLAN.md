@@ -50,8 +50,8 @@ Establecer la estructura del proyecto, herramientas de desarrollo y pipeline de 
 #### 0.2 Entorno de desarrollo
 - [x] Crear docker-compose.yml para desarrollo local
 - [x] Script de instalación de dependencias
-- [ ] Configurar K3s local (k3d o similar)
-- [ ] Instalar Chaos Mesh en cluster de desarrollo
+- [x] Configurar K3s local (k3d o similar)
+- [x] Instalar Chaos Mesh en cluster de desarrollo
 - [x] Documentar setup en README.md
 
 #### 0.3 CI/CD
@@ -71,7 +71,7 @@ Establecer la estructura del proyecto, herramientas de desarrollo y pipeline de 
 - [x] `cargo build` compila sin errores
 - [x] `npm run build` compila sin errores
 - [x] CI pasa en verde
-- [ ] K3s local funcionando con Chaos Mesh
+- [x] K3s local funcionando con Chaos Mesh
 
 ### Tests
 - [x] Smoke test: backend arranca
