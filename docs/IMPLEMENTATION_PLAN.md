@@ -70,7 +70,7 @@ Establecer la estructura del proyecto, herramientas de desarrollo y pipeline de 
 ### Criterios de aceptación
 - [x] `cargo build` compila sin errores
 - [x] `npm run build` compila sin errores
-- [ ] CI pasa en verde
+- [x] CI pasa en verde
 - [ ] K3s local funcionando con Chaos Mesh
 
 ### Tests
