@@ -7,7 +7,10 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 
-use crate::api::{AppState, Event};
+use crate::api::AppState;
+
+#[allow(unused_imports)]
+use crate::api::Event;
 
 /// WebSocket handler
 pub async fn ws_handler(

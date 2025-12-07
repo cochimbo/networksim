@@ -3,16 +3,27 @@ use axum::{
     Json,
 };
 use chrono::Utc;
+use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::api::{AppState, Event};
 use crate::error::{AppError, AppResult};
 use crate::models::{CreateTopologyRequest, Topology, UpdateTopologyRequest};
 
+#[derive(FromRow)]
+struct TopologyRow {
+    id: String,
+    name: String,
+    description: Option<String>,
+    data: String,
+    created_at: String,
+    updated_at: String,
+}
+
 /// List all topologies
 pub async fn list(State(state): State<AppState>) -> AppResult<Json<Vec<Topology>>> {
-    let rows = sqlx::query!(
-        r#"SELECT id, name, description, data, created_at, updated_at FROM topologies ORDER BY updated_at DESC"#
+    let rows: Vec<TopologyRow> = sqlx::query_as(
+        "SELECT id, name, description, data, created_at, updated_at FROM topologies ORDER BY updated_at DESC"
     )
     .fetch_all(state.db.pool())
     .await?;
@@ -61,16 +72,18 @@ pub async fn create(
         "nodes": topology.nodes,
         "links": topology.links,
     });
+    let data_str = data.to_string();
+    let now_str = now.to_rfc3339();
 
-    sqlx::query!(
-        r#"INSERT INTO topologies (id, name, description, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"#,
-        topology.id,
-        topology.name,
-        topology.description,
-        data,
-        now,
-        now,
+    sqlx::query(
+        "INSERT INTO topologies (id, name, description, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
     )
+    .bind(&topology.id)
+    .bind(&topology.name)
+    .bind(&topology.description)
+    .bind(&data_str)
+    .bind(&now_str)
+    .bind(&now_str)
     .execute(state.db.pool())
     .await?;
 
@@ -85,13 +98,14 @@ pub async fn get(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<Topology>> {
-    let row = sqlx::query!(
-        r#"SELECT id, name, description, data, created_at, updated_at FROM topologies WHERE id = ?"#,
-        id
+    let row: Option<TopologyRow> = sqlx::query_as(
+        "SELECT id, name, description, data, created_at, updated_at FROM topologies WHERE id = ?"
     )
+    .bind(&id)
     .fetch_optional(state.db.pool())
-    .await?
-    .ok_or_else(|| AppError::NotFound(format!("Topology not found: {}", id)))?;
+    .await?;
+
+    let row = row.ok_or_else(|| AppError::NotFound(format!("Topology not found: {}", id)))?;
 
     let data: serde_json::Value = serde_json::from_str(&row.data)?;
 
@@ -135,15 +149,17 @@ pub async fn update(
         "nodes": topology.nodes,
         "links": topology.links,
     });
+    let data_str = data.to_string();
+    let now_str = now.to_rfc3339();
 
-    sqlx::query!(
-        r#"UPDATE topologies SET name = ?, description = ?, data = ?, updated_at = ? WHERE id = ?"#,
-        topology.name,
-        topology.description,
-        data,
-        now,
-        id,
+    sqlx::query(
+        "UPDATE topologies SET name = ?, description = ?, data = ?, updated_at = ? WHERE id = ?"
     )
+    .bind(&topology.name)
+    .bind(&topology.description)
+    .bind(&data_str)
+    .bind(&now_str)
+    .bind(&id)
     .execute(state.db.pool())
     .await?;
 
@@ -158,7 +174,8 @@ pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> AppResult<Json<serde_json::Value>> {
-    let result = sqlx::query!(r#"DELETE FROM topologies WHERE id = ?"#, id)
+    let result = sqlx::query("DELETE FROM topologies WHERE id = ?")
+        .bind(&id)
         .execute(state.db.pool())
         .await?;
 

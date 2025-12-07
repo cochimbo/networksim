@@ -32,7 +32,7 @@ Establecer la estructura del proyecto, herramientas de desarrollo y pipeline de 
 ### Tareas
 
 #### 0.1 Estructura de repositorio
-- [ ] Crear estructura de monorepo
+- [x] Crear estructura de monorepo
   ```
   networksim/
   ├── backend/           # Rust/Axum
@@ -43,39 +43,39 @@ Establecer la estructura del proyecto, herramientas de desarrollo y pipeline de 
   ├── .github/           # CI/CD workflows
   └── docker-compose.yml # Entorno de desarrollo
   ```
-- [ ] Inicializar proyecto Rust (cargo new)
-- [ ] Inicializar proyecto React (vite + typescript)
-- [ ] Configurar .gitignore
+- [x] Inicializar proyecto Rust (cargo new)
+- [x] Inicializar proyecto React (vite + typescript)
+- [x] Configurar .gitignore
 
 #### 0.2 Entorno de desarrollo
-- [ ] Crear docker-compose.yml para desarrollo local
-- [ ] Script de instalación de dependencias
+- [x] Crear docker-compose.yml para desarrollo local
+- [x] Script de instalación de dependencias
 - [ ] Configurar K3s local (k3d o similar)
 - [ ] Instalar Chaos Mesh en cluster de desarrollo
-- [ ] Documentar setup en README.md
+- [x] Documentar setup en README.md
 
 #### 0.3 CI/CD
-- [ ] GitHub Actions: build backend
-- [ ] GitHub Actions: build frontend
-- [ ] GitHub Actions: tests unitarios
-- [ ] GitHub Actions: linting (clippy, eslint)
-- [ ] GitHub Actions: formato (rustfmt, prettier)
+- [x] GitHub Actions: build backend
+- [x] GitHub Actions: build frontend
+- [x] GitHub Actions: tests unitarios
+- [x] GitHub Actions: linting (clippy, eslint)
+- [x] GitHub Actions: formato (rustfmt, prettier)
 
 #### 0.4 Herramientas de calidad
-- [ ] Configurar clippy (Rust linter)
-- [ ] Configurar rustfmt
-- [ ] Configurar eslint + prettier (frontend)
-- [ ] Pre-commit hooks
+- [x] Configurar clippy (Rust linter)
+- [x] Configurar rustfmt
+- [x] Configurar eslint + prettier (frontend)
+- [x] Pre-commit hooks
 
 ### Criterios de aceptación
-- [ ] `cargo build` compila sin errores
-- [ ] `npm run build` compila sin errores
+- [x] `cargo build` compila sin errores
+- [x] `npm run build` compila sin errores
 - [ ] CI pasa en verde
 - [ ] K3s local funcionando con Chaos Mesh
 
 ### Tests
-- [ ] Smoke test: backend arranca
-- [ ] Smoke test: frontend arranca
+- [x] Smoke test: backend arranca
+- [x] Smoke test: frontend arranca
 
 ---
 

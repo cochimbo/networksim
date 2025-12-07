@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import cytoscape, { Core } from 'cytoscape';
-import { Save, Play, Trash2, Plus, Circle, ArrowRight } from 'lucide-react';
+import { Save, Trash2, Circle, ArrowRight } from 'lucide-react';
 import { topologyApi, Topology, Node, Link } from '../services/api';
 
 export default function TopologyEditor() {

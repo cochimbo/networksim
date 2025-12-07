@@ -5,6 +5,7 @@ pub mod chaos;
 pub mod ws;
 pub mod metrics;
 
+#[allow(unused_imports)]
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use crate::config::Config;
