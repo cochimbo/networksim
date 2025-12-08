@@ -31,6 +31,20 @@ pub enum AppError {
     Serialization(#[from] serde_json::Error),
 }
 
+impl AppError {
+    pub fn not_found(msg: &str) -> Self {
+        AppError::NotFound(msg.to_string())
+    }
+
+    pub fn bad_request(msg: &str) -> Self {
+        AppError::BadRequest(msg.to_string())
+    }
+
+    pub fn internal(msg: &str) -> Self {
+        AppError::Internal(msg.to_string())
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match &self {

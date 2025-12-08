@@ -1,11 +1,24 @@
 use anyhow::Result;
-use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
+use chrono::{DateTime, Utc};
+use sqlx::{sqlite::SqlitePoolOptions, FromRow, Pool, Sqlite};
+
+use crate::models::Topology;
 
 pub type DbPool = Pool<Sqlite>;
 
 #[derive(Clone)]
 pub struct Database {
     pool: DbPool,
+}
+
+#[derive(FromRow)]
+struct TopologyRow {
+    id: String,
+    name: String,
+    description: Option<String>,
+    data: String,
+    created_at: String,
+    updated_at: String,
 }
 
 impl Database {
@@ -36,6 +49,39 @@ impl Database {
 
     pub fn pool(&self) -> &DbPool {
         &self.pool
+    }
+
+    /// Get a topology by ID
+    pub async fn get_topology(&self, id: &str) -> Result<Option<Topology>, sqlx::Error> {
+        let row: Option<TopologyRow> = sqlx::query_as(
+            "SELECT id, name, description, data, created_at, updated_at FROM topologies WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(row) => {
+                let data: serde_json::Value = serde_json::from_str(&row.data)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                let topology = Topology {
+                    id: row.id,
+                    name: row.name,
+                    description: row.description,
+                    nodes: serde_json::from_value(data.get("nodes").cloned().unwrap_or_default())
+                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+                    links: serde_json::from_value(data.get("links").cloned().unwrap_or_default())
+                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+                    created_at: row.created_at.parse::<DateTime<Utc>>()
+                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+                    updated_at: row.updated_at.parse::<DateTime<Utc>>()
+                        .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+                };
+                Ok(Some(topology))
+            }
+            None => Ok(None),
+        }
     }
 }
 

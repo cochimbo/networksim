@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use networksim_backend::{api::AppState, config::Config, create_router, db::Database};
+use networksim_backend::{api::AppState, config::Config, create_router, db::Database, k8s::K8sClient};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -27,7 +27,25 @@ async fn main() -> Result<()> {
     tracing::info!("Database initialized");
 
     // Build application state
-    let state = AppState::new(db, config.clone());
+    let mut state = AppState::new(db, config.clone());
+
+    // Try to connect to Kubernetes (optional)
+    match K8sClient::new().await {
+        Ok(k8s) => {
+            match k8s.health_check().await {
+                Ok(_) => {
+                    tracing::info!("Kubernetes client connected");
+                    state = state.with_k8s(k8s);
+                }
+                Err(e) => {
+                    tracing::warn!("Kubernetes health check failed: {}. K8s features disabled.", e);
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Failed to connect to Kubernetes: {}. K8s features disabled.", e);
+        }
+    }
 
     // Build router
     let app = create_router(state);

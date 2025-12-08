@@ -6,6 +6,7 @@ pub mod api;
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod k8s;
 pub mod models;
 
 use axum::{

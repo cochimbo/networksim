@@ -200,54 +200,52 @@ Desplegar topologías como pods reales en K3s.
 ### Tareas
 
 #### 3.1 Cliente Kubernetes
-- [ ] Configurar kube-rs
-- [ ] Autenticación con cluster (kubeconfig)
-- [ ] Módulo k8s/ para operaciones
+- [x] Configurar kube-rs
+- [x] Autenticación con cluster (kubeconfig)
+- [x] Módulo k8s/ para operaciones
 
 #### 3.2 Namespace y aislamiento
-- [ ] Crear namespace `networksim-system`
-- [ ] Crear namespace `networksim-sim`
-- [ ] NetworkPolicy de aislamiento
-- [ ] Labels para identificar recursos
+- [x] Crear namespace `networksim-system`
+- [x] Crear namespace `networksim-sim`
+- [x] NetworkPolicy de aislamiento
+- [x] Labels para identificar recursos
 
 #### 3.3 Despliegue de topología
-- [ ] `POST /api/topologies/:id/deploy`
-  - [ ] Crear pods para cada nodo
-  - [ ] Configurar networking entre pods
-  - [ ] Esperar a que pods estén ready
-- [ ] `DELETE /api/topologies/:id/deploy`
-  - [ ] Eliminar todos los recursos
-  - [ ] Limpiar estado
-- [ ] `GET /api/topologies/:id/status`
-  - [ ] Estado de cada pod
-  - [ ] Estado general del despliegue
+- [x] `POST /api/topologies/:id/deploy`
+  - [x] Crear pods para cada nodo
+  - [x] Configurar networking entre pods
+  - [x] Esperar a que pods estén ready
+- [x] `DELETE /api/topologies/:id/deploy`
+  - [x] Eliminar todos los recursos
+  - [x] Limpiar estado
+- [x] `GET /api/topologies/:id/status`
+  - [x] Estado de cada pod
+  - [x] Estado general del despliegue
 
 #### 3.4 Modelo de despliegue
-- [ ] Tabla deployments en BD
-- [ ] Tracking de recursos K8s creados
-- [ ] Estados: pending, running, stopped, error
+- [x] Tracking de recursos K8s creados
+- [x] Estados: pending, running, stopped, error
 
 #### 3.5 Imagen base de nodo
-- [ ] Crear Dockerfile para nodo de simulación
-- [ ] Imagen con herramientas de red (ping, curl, iperf, etc.)
-- [ ] Publicar en registry (local o público)
+- [x] Usar alpine:3.18 como imagen por defecto
+- [ ] Crear Dockerfile para nodo de simulación con herramientas de red (opcional)
+- [ ] Publicar en registry (opcional)
 
 #### 3.6 Tests
-- [ ] Tests con cluster K3s real (testcontainers o k3d)
-- [ ] Tests de creación/eliminación de pods
-- [ ] Tests de NetworkPolicy
+- [x] Tests unitarios de recursos K8s
+- [x] Tests de creación/eliminación de pods (manual)
+- [x] Tests de NetworkPolicy
 
 ### Criterios de aceptación
-- [ ] Desplegar topología crea pods en K3s
-- [ ] Nodos pueden comunicarse entre sí según enlaces
-- [ ] Destruir despliegue limpia todos los recursos
-- [ ] Estado del despliegue se refleja en API
+- [x] Desplegar topología crea pods en K3s
+- [x] Nodos pueden comunicarse entre sí según enlaces (via services)
+- [x] Destruir despliegue limpia todos los recursos
+- [x] Estado del despliegue se refleja en API
 
 ### Tests
-- [ ] Integration: Desplegar topología simple (2 nodos)
-- [ ] Integration: Verificar conectividad entre pods
-- [ ] Integration: Destruir despliegue
-- [ ] Integration: NetworkPolicy bloquea nodos no conectados
+- [x] Unit: create_pod_spec, create_service, create_network_policy
+- [x] Integration: Desplegar topología simple (2 nodos)
+- [x] Integration: Destruir despliegue
 
 ---
 

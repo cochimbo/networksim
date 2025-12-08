@@ -38,6 +38,17 @@ pub enum NodeType {
     Custom,
 }
 
+impl std::fmt::Display for NodeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NodeType::Server => write!(f, "server"),
+            NodeType::Router => write!(f, "router"),
+            NodeType::Client => write!(f, "client"),
+            NodeType::Custom => write!(f, "custom"),
+        }
+    }
+}
+
 /// Position of a node on the canvas
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Position {
@@ -55,7 +66,7 @@ pub struct NodeConfig {
     #[serde(default)]
     pub memory: Option<String>,
     #[serde(default)]
-    pub env: Vec<EnvVar>,
+    pub env: Option<Vec<EnvVar>>,
 }
 
 /// Environment variable

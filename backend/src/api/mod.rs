@@ -7,6 +7,7 @@ pub mod ws;
 
 use crate::config::Config;
 use crate::db::Database;
+use crate::k8s::K8sClient;
 #[allow(unused_imports)]
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -18,6 +19,7 @@ pub struct AppState {
     #[allow(dead_code)]
     pub config: Config,
     pub event_tx: broadcast::Sender<Event>,
+    pub k8s: Option<K8sClient>,
 }
 
 impl AppState {
@@ -27,7 +29,13 @@ impl AppState {
             db,
             config,
             event_tx,
+            k8s: None,
         }
+    }
+
+    pub fn with_k8s(mut self, k8s: K8sClient) -> Self {
+        self.k8s = Some(k8s);
+        self
     }
 }
 
