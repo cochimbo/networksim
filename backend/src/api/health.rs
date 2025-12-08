@@ -29,7 +29,7 @@ pub async fn cluster_status(State(state): State<AppState>) -> Json<ClusterStatus
     } else {
         "Kubernetes cluster not available".to_string()
     };
-    
+
     Json(ClusterStatusResponse { connected, message })
 }
 

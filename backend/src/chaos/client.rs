@@ -3,16 +3,16 @@
 //! Handles creating, listing, and deleting NetworkChaos CRDs
 
 use kube::{
-    api::{Api, DeleteParams, ListParams, PostParams, DynamicObject},
+    api::{Api, DeleteParams, DynamicObject, ListParams, PostParams},
     discovery::ApiResource,
     Client,
 };
 use serde_json::Value;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
-use crate::error::{AppError, AppResult};
 use super::conditions::create_network_chaos;
 use super::types::*;
+use crate::error::{AppError, AppResult};
 
 /// Chaos Mesh API client wrapper
 #[derive(Clone)]
@@ -27,7 +27,7 @@ impl ChaosClient {
         let client = Client::try_default()
             .await
             .map_err(|e| AppError::internal(&format!("Failed to create K8s client: {}", e)))?;
-        
+
         Ok(Self {
             client,
             namespace: namespace.to_string(),
@@ -35,6 +35,7 @@ impl ChaosClient {
     }
 
     /// Create a NetworkChaos resource
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_chaos(
         &self,
         topology_id: &str,
@@ -77,7 +78,8 @@ impl ChaosClient {
             plural: "networkchaos".to_string(),
         };
 
-        let api: Api<DynamicObject> = Api::namespaced_with(self.client.clone(), &self.namespace, &ar);
+        let api: Api<DynamicObject> =
+            Api::namespaced_with(self.client.clone(), &self.namespace, &ar);
 
         // Convert to DynamicObject
         let obj: DynamicObject = serde_json::from_value(chaos_manifest)
@@ -92,7 +94,10 @@ impl ChaosClient {
             }
             Err(e) => {
                 error!("Failed to create NetworkChaos: {}", e);
-                Err(AppError::internal(&format!("Failed to create chaos: {}", e)))
+                Err(AppError::internal(&format!(
+                    "Failed to create chaos: {}",
+                    e
+                )))
             }
         }
     }
@@ -112,7 +117,8 @@ impl ChaosClient {
             plural: "networkchaos".to_string(),
         };
 
-        let api: Api<DynamicObject> = Api::namespaced_with(self.client.clone(), &self.namespace, &ar);
+        let api: Api<DynamicObject> =
+            Api::namespaced_with(self.client.clone(), &self.namespace, &ar);
 
         match api.delete(&name, &DeleteParams::default()).await {
             Ok(_) => {
@@ -125,7 +131,10 @@ impl ChaosClient {
             }
             Err(e) => {
                 error!("Failed to delete NetworkChaos: {}", e);
-                Err(AppError::internal(&format!("Failed to delete chaos: {}", e)))
+                Err(AppError::internal(&format!(
+                    "Failed to delete chaos: {}",
+                    e
+                )))
             }
         }
     }
@@ -142,58 +151,65 @@ impl ChaosClient {
             plural: "networkchaos".to_string(),
         };
 
-        let api: Api<DynamicObject> = Api::namespaced_with(self.client.clone(), &self.namespace, &ar);
-        
+        let api: Api<DynamicObject> =
+            Api::namespaced_with(self.client.clone(), &self.namespace, &ar);
+
         let label_selector = format!("networksim.io/topology={}", topology_id);
         let lp = ListParams::default().labels(&label_selector);
 
         match api.list(&lp).await {
             Ok(list) => {
-                let statuses: Vec<ChaosStatus> = list.items.into_iter().map(|obj| {
-                    let name = obj.metadata.name.unwrap_or_default();
-                    let data = obj.data;
-                    
-                    // Extract condition from spec
-                    let spec = data.get("spec").cloned().unwrap_or(Value::Null);
-                    let status_obj = data.get("status").cloned().unwrap_or(Value::Null);
-                    
-                    // Determine chaos type from action
-                    let action = spec.get("action")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("unknown");
-                    
-                    let chaos_type = match action {
-                        "delay" => ChaosType::Delay,
-                        "loss" => ChaosType::Loss,
-                        "bandwidth" => ChaosType::Bandwidth,
-                        "corrupt" => ChaosType::Corrupt,
-                        "duplicate" => ChaosType::Duplicate,
-                        "partition" => ChaosType::Partition,
-                        _ => ChaosType::Delay, // fallback
-                    };
+                let statuses: Vec<ChaosStatus> = list
+                    .items
+                    .into_iter()
+                    .map(|obj| {
+                        let name = obj.metadata.name.unwrap_or_default();
+                        let data = obj.data;
 
-                    // Check if it's running
-                    let conditions = status_obj.get("conditions")
-                        .and_then(|c| c.as_array())
-                        .cloned()
-                        .unwrap_or_default();
-                    
-                    let is_running = conditions.iter().any(|c| {
-                        c.get("type").and_then(|t| t.as_str()) == Some("AllInjected") &&
-                        c.get("status").and_then(|s| s.as_str()) == Some("True")
-                    });
+                        // Extract condition from spec
+                        let spec = data.get("spec").cloned().unwrap_or(Value::Null);
+                        let status_obj = data.get("status").cloned().unwrap_or(Value::Null);
 
-                    let phase = if is_running { "Running" } else { "Pending" };
+                        // Determine chaos type from action
+                        let action = spec
+                            .get("action")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown");
 
-                    ChaosStatus {
-                        name: name.clone(),
-                        condition_id: name.split('-').last().unwrap_or(&name).to_string(),
-                        chaos_type,
-                        phase: phase.to_string(),
-                        target_pods: extract_target_pods(&spec),
-                        message: extract_message(&status_obj),
-                    }
-                }).collect();
+                        let chaos_type = match action {
+                            "delay" => ChaosType::Delay,
+                            "loss" => ChaosType::Loss,
+                            "bandwidth" => ChaosType::Bandwidth,
+                            "corrupt" => ChaosType::Corrupt,
+                            "duplicate" => ChaosType::Duplicate,
+                            "partition" => ChaosType::Partition,
+                            _ => ChaosType::Delay, // fallback
+                        };
+
+                        // Check if it's running
+                        let conditions = status_obj
+                            .get("conditions")
+                            .and_then(|c| c.as_array())
+                            .cloned()
+                            .unwrap_or_default();
+
+                        let is_running = conditions.iter().any(|c| {
+                            c.get("type").and_then(|t| t.as_str()) == Some("AllInjected")
+                                && c.get("status").and_then(|s| s.as_str()) == Some("True")
+                        });
+
+                        let phase = if is_running { "Running" } else { "Pending" };
+
+                        ChaosStatus {
+                            name: name.clone(),
+                            condition_id: name.split('-').next_back().unwrap_or(&name).to_string(),
+                            chaos_type,
+                            phase: phase.to_string(),
+                            target_pods: extract_target_pods(&spec),
+                            message: extract_message(&status_obj),
+                        }
+                    })
+                    .collect();
 
                 Ok(statuses)
             }
@@ -209,7 +225,7 @@ impl ChaosClient {
         info!("Cleaning up all chaos for topology {}", topology_id);
 
         let statuses = self.list_chaos(topology_id).await?;
-        
+
         for status in statuses {
             if let Err(e) = self.delete_chaos(topology_id, &status.condition_id).await {
                 warn!("Failed to delete chaos {}: {}", status.name, e);
@@ -223,7 +239,7 @@ impl ChaosClient {
 /// Extract target pod names from spec
 fn extract_target_pods(spec: &Value) -> Vec<String> {
     let mut pods = Vec::new();
-    
+
     if let Some(selector) = spec.get("selector") {
         if let Some(labels) = selector.get("labelSelectors") {
             if let Some(node) = labels.get("networksim.io/node").and_then(|v| v.as_str()) {
@@ -231,7 +247,7 @@ fn extract_target_pods(spec: &Value) -> Vec<String> {
             }
         }
     }
-    
+
     if let Some(target) = spec.get("target") {
         if let Some(labels) = target.get("labelSelectors") {
             if let Some(node) = labels.get("networksim.io/node").and_then(|v| v.as_str()) {
@@ -239,13 +255,14 @@ fn extract_target_pods(spec: &Value) -> Vec<String> {
             }
         }
     }
-    
+
     pods
 }
 
 /// Extract status message
 fn extract_message(status: &Value) -> Option<String> {
-    status.get("conditions")
+    status
+        .get("conditions")
         .and_then(|c| c.as_array())
         .and_then(|arr| arr.first())
         .and_then(|c| c.get("message"))

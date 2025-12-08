@@ -41,6 +41,12 @@ vi.mock('../services/api', () => ({
     update: vi.fn(),
     list: vi.fn(() => Promise.resolve([])),
   },
+  clusterApi: {
+    status: vi.fn(() => Promise.resolve({ status: 'running' })),
+  },
+  deploymentApi: {
+    getActive: vi.fn(() => Promise.resolve(null)),
+  },
 }));
 
 const createWrapper = () => {

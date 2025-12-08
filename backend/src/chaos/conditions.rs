@@ -36,6 +36,7 @@ impl From<&ChaosType> for ChaosAction {
 /// NetworkChaos spec structure matching Chaos Mesh CRD
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct NetworkChaosSpec {
     pub action: String,
     pub mode: String,
@@ -60,6 +61,7 @@ pub struct NetworkChaosSpec {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct PodSelector {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespaces: Option<Vec<String>>,
@@ -69,6 +71,7 @@ pub struct PodSelector {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct DelaySpec {
     pub latency: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -78,6 +81,7 @@ pub struct DelaySpec {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct LossSpec {
     pub loss: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -85,6 +89,7 @@ pub struct LossSpec {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct BandwidthSpec {
     pub rate: String,
     pub buffer: u32,
@@ -92,6 +97,7 @@ pub struct BandwidthSpec {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct CorruptSpec {
     pub corrupt: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -99,6 +105,7 @@ pub struct CorruptSpec {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct DuplicateSpec {
     pub duplicate: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -106,6 +113,7 @@ pub struct DuplicateSpec {
 }
 
 /// Create a NetworkChaos manifest
+#[allow(clippy::too_many_arguments)]
 pub fn create_network_chaos(
     name: &str,
     namespace: &str,
@@ -128,7 +136,10 @@ pub fn create_network_chaos(
 
     // Source selector
     let mut source_labels = BTreeMap::new();
-    source_labels.insert("networksim.io/topology".to_string(), topology_id.to_string());
+    source_labels.insert(
+        "networksim.io/topology".to_string(),
+        topology_id.to_string(),
+    );
     source_labels.insert("networksim.io/node".to_string(), source_node_id.to_string());
 
     // Build spec based on chaos type
@@ -146,9 +157,12 @@ pub fn create_network_chaos(
     // Add target if specified
     if let Some(target_id) = target_node_id {
         let mut target_labels = BTreeMap::new();
-        target_labels.insert("networksim.io/topology".to_string(), topology_id.to_string());
+        target_labels.insert(
+            "networksim.io/topology".to_string(),
+            topology_id.to_string(),
+        );
         target_labels.insert("networksim.io/node".to_string(), target_id.to_string());
-        
+
         // Chaos Mesh requires target.selector structure
         spec["target"] = json!({
             "selector": {
@@ -167,8 +181,8 @@ pub fn create_network_chaos(
     // Add type-specific parameters
     match chaos_type {
         ChaosType::Delay => {
-            let delay_params: DelayParams = serde_json::from_value(params.clone())
-                .unwrap_or_else(|_| DelayParams {
+            let delay_params: DelayParams =
+                serde_json::from_value(params.clone()).unwrap_or_else(|_| DelayParams {
                     latency: "100ms".to_string(),
                     jitter: None,
                     correlation: None,
@@ -185,8 +199,8 @@ pub fn create_network_chaos(
             spec["delay"] = delay;
         }
         ChaosType::Loss => {
-            let loss_params: LossParams = serde_json::from_value(params.clone())
-                .unwrap_or_else(|_| LossParams {
+            let loss_params: LossParams =
+                serde_json::from_value(params.clone()).unwrap_or_else(|_| LossParams {
                     loss: "10".to_string(),
                     correlation: None,
                 });
@@ -199,8 +213,8 @@ pub fn create_network_chaos(
             spec["loss"] = loss;
         }
         ChaosType::Bandwidth => {
-            let bw_params: BandwidthParams = serde_json::from_value(params.clone())
-                .unwrap_or_else(|_| BandwidthParams {
+            let bw_params: BandwidthParams =
+                serde_json::from_value(params.clone()).unwrap_or_else(|_| BandwidthParams {
                     rate: "1mbps".to_string(),
                     buffer: Some(10000),
                     limit: Some(10000),

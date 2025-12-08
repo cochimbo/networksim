@@ -1,5 +1,5 @@
 //! Kubernetes resource builders for NetworkSim
-//! 
+//!
 //! Functions to create Pod, Service, and NetworkPolicy specs from topology data
 
 use k8s_openapi::api::core::v1::{
@@ -7,7 +7,7 @@ use k8s_openapi::api::core::v1::{
     ServiceSpec,
 };
 use k8s_openapi::api::networking::v1::{
-    NetworkPolicy, NetworkPolicyEgressRule, NetworkPolicyIngressRule, NetworkPolicyPeer, 
+    NetworkPolicy, NetworkPolicyEgressRule, NetworkPolicyIngressRule, NetworkPolicyPeer,
     NetworkPolicyPort, NetworkPolicySpec,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
@@ -23,8 +23,14 @@ pub const DEFAULT_NODE_IMAGE: &str = "alpine:3.18";
 /// Create labels for a topology resource
 pub fn topology_labels(topology_id: &str, node_id: &str) -> BTreeMap<String, String> {
     [
-        ("app.kubernetes.io/managed-by".to_string(), "networksim".to_string()),
-        ("networksim.io/topology".to_string(), topology_id.to_string()),
+        (
+            "app.kubernetes.io/managed-by".to_string(),
+            "networksim".to_string(),
+        ),
+        (
+            "networksim.io/topology".to_string(),
+            topology_id.to_string(),
+        ),
         ("networksim.io/node".to_string(), node_id.to_string()),
     ]
     .into_iter()
@@ -56,11 +62,9 @@ pub fn create_pod_spec(topology_id: &str, node: &Node) -> Pod {
             namespace: Some("networksim-sim".to_string()),
             labels: Some(labels.clone()),
             annotations: Some(
-                [
-                    ("networksim.io/node-name".to_string(), node.name.clone()),
-                ]
-                .into_iter()
-                .collect(),
+                [("networksim.io/node-name".to_string(), node.name.clone())]
+                    .into_iter()
+                    .collect(),
             ),
             ..Default::default()
         },
@@ -77,14 +81,12 @@ pub fn create_pod_spec(topology_id: &str, node: &Node) -> Pod {
                 ]),
                 resources: Some(resources),
                 env: Some(env_vars),
-                ports: Some(vec![
-                    ContainerPort {
-                        container_port: 8080,
-                        name: Some("http".to_string()),
-                        protocol: Some("TCP".to_string()),
-                        ..Default::default()
-                    },
-                ]),
+                ports: Some(vec![ContainerPort {
+                    container_port: 8080,
+                    name: Some("http".to_string()),
+                    protocol: Some("TCP".to_string()),
+                    ..Default::default()
+                }]),
                 ..Default::default()
             }],
             restart_policy: Some("Always".to_string()),
@@ -180,7 +182,7 @@ pub fn create_service(topology_id: &str, node: &Node) -> Service {
 }
 
 /// Create a NetworkPolicy that allows traffic only between connected nodes
-/// 
+///
 /// This implements the topology links as network policies:
 /// - Each node gets a policy that allows ingress only from nodes it's connected to
 /// - Each node gets a policy that allows egress only to nodes it's connected to
@@ -236,7 +238,7 @@ pub fn create_network_policy(
 
     // Build egress rules - allow traffic only to connected nodes + DNS
     let mut egress_rules = vec![];
-    
+
     // Always allow DNS (UDP 53) for service discovery
     egress_rules.push(NetworkPolicyEgressRule {
         to: None, // Any destination
@@ -281,7 +283,6 @@ pub fn create_network_policy(
             ingress: Some(ingress_rules),
             egress: Some(egress_rules),
             policy_types: Some(vec!["Ingress".to_string(), "Egress".to_string()]),
-            ..Default::default()
         }),
     }
 }
@@ -318,10 +319,19 @@ mod tests {
     #[test]
     fn test_topology_labels() {
         let labels = topology_labels("topo-123", "node-1");
-        
-        assert_eq!(labels.get("networksim.io/topology"), Some(&"topo-123".to_string()));
-        assert_eq!(labels.get("networksim.io/node"), Some(&"node-1".to_string()));
-        assert_eq!(labels.get("app.kubernetes.io/managed-by"), Some(&"networksim".to_string()));
+
+        assert_eq!(
+            labels.get("networksim.io/topology"),
+            Some(&"topo-123".to_string())
+        );
+        assert_eq!(
+            labels.get("networksim.io/node"),
+            Some(&"node-1".to_string())
+        );
+        assert_eq!(
+            labels.get("app.kubernetes.io/managed-by"),
+            Some(&"networksim".to_string())
+        );
     }
 
     #[test]
@@ -332,21 +342,24 @@ mod tests {
         // DNS-safe name with ns- prefix and short topology id
         assert_eq!(pod.metadata.name, Some("ns-topo-123-node-1".to_string()));
         assert_eq!(pod.metadata.namespace, Some("networksim-sim".to_string()));
-        
+
         let spec = pod.spec.unwrap();
         assert_eq!(spec.containers.len(), 1);
         assert_eq!(spec.containers[0].name, "main");
-        assert_eq!(spec.containers[0].image, Some(DEFAULT_NODE_IMAGE.to_string()));
+        assert_eq!(
+            spec.containers[0].image,
+            Some(DEFAULT_NODE_IMAGE.to_string())
+        );
     }
 
     #[test]
     fn test_create_pod_with_custom_image() {
         let mut node = create_test_node();
         node.config.image = Some("nginx:latest".to_string());
-        
+
         let pod = create_pod_spec("topo-123", &node);
         let spec = pod.spec.unwrap();
-        
+
         assert_eq!(spec.containers[0].image, Some("nginx:latest".to_string()));
     }
 
@@ -356,8 +369,11 @@ mod tests {
         let service = create_service("topo-123", &node);
 
         // DNS-safe name with ns- prefix
-        assert_eq!(service.metadata.name, Some("ns-topo-123-node-1".to_string()));
-        
+        assert_eq!(
+            service.metadata.name,
+            Some("ns-topo-123-node-1".to_string())
+        );
+
         let spec = service.spec.unwrap();
         assert_eq!(spec.type_, Some("ClusterIP".to_string()));
     }
@@ -365,9 +381,21 @@ mod tests {
     #[test]
     fn test_get_connected_nodes() {
         let links = vec![
-            ("link-1".to_string(), "node-1".to_string(), "node-2".to_string()),
-            ("link-2".to_string(), "node-1".to_string(), "node-3".to_string()),
-            ("link-3".to_string(), "node-2".to_string(), "node-3".to_string()),
+            (
+                "link-1".to_string(),
+                "node-1".to_string(),
+                "node-2".to_string(),
+            ),
+            (
+                "link-2".to_string(),
+                "node-1".to_string(),
+                "node-3".to_string(),
+            ),
+            (
+                "link-3".to_string(),
+                "node-2".to_string(),
+                "node-3".to_string(),
+            ),
         ];
 
         let connected = get_connected_nodes("node-1", &links);
@@ -385,15 +413,21 @@ mod tests {
     fn test_create_network_policy() {
         let node = create_test_node();
         let connected = vec!["node-2".to_string(), "node-3".to_string()];
-        
+
         let policy = create_network_policy("topo-123", &node, &connected);
-        
+
         // DNS-safe name with ns- prefix
-        assert_eq!(policy.metadata.name, Some("ns-topo-123-node-1-netpol".to_string()));
-        
+        assert_eq!(
+            policy.metadata.name,
+            Some("ns-topo-123-node-1-netpol".to_string())
+        );
+
         let spec = policy.spec.unwrap();
-        assert_eq!(spec.policy_types, Some(vec!["Ingress".to_string(), "Egress".to_string()]));
-        
+        assert_eq!(
+            spec.policy_types,
+            Some(vec!["Ingress".to_string(), "Egress".to_string()])
+        );
+
         let ingress = spec.ingress.unwrap();
         assert_eq!(ingress.len(), 1);
         assert_eq!(ingress[0].from.as_ref().unwrap().len(), 2);

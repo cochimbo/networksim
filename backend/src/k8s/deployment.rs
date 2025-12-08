@@ -1,5 +1,5 @@
 //! Deployment manager for topology deployments
-//! 
+//!
 //! Handles the lifecycle of topology deployments in Kubernetes
 
 use anyhow::{Context, Result};
@@ -9,7 +9,9 @@ use std::collections::HashMap;
 use tracing::{info, instrument, warn};
 
 use super::client::K8sClient;
-use super::resources::{create_network_policy, create_pod_spec, create_service, get_connected_nodes};
+use super::resources::{
+    create_network_policy, create_pod_spec, create_service, get_connected_nodes,
+};
 use crate::models::{Node, Topology};
 
 /// Status of a deployed node
@@ -181,10 +183,7 @@ impl DeploymentManager {
             .map(String::as_str)
             .unwrap_or("Unknown");
 
-        let pod_ip = pod
-            .status
-            .as_ref()
-            .and_then(|s| s.pod_ip.clone());
+        let pod_ip = pod.status.as_ref().and_then(|s| s.pod_ip.clone());
 
         Ok(NodeStatusInfo {
             node_id: node.id.clone(),
@@ -228,10 +227,7 @@ impl DeploymentManager {
                 .map(String::as_str)
                 .unwrap_or("Unknown");
 
-            let pod_ip = pod
-                .status
-                .as_ref()
-                .and_then(|s| s.pod_ip.clone());
+            let pod_ip = pod.status.as_ref().and_then(|s| s.pod_ip.clone());
 
             let pod_name = pod.metadata.name.clone();
 
@@ -284,14 +280,26 @@ impl DeploymentManager {
     }
 
     /// Calculate overall deployment state from node statuses
-    fn calculate_deployment_state(&self, nodes: &HashMap<String, NodeStatusInfo>) -> DeploymentState {
+    fn calculate_deployment_state(
+        &self,
+        nodes: &HashMap<String, NodeStatusInfo>,
+    ) -> DeploymentState {
         if nodes.is_empty() {
             return DeploymentState::Stopped;
         }
 
-        let running_count = nodes.values().filter(|n| n.status == NodeStatus::Running).count();
-        let failed_count = nodes.values().filter(|n| n.status == NodeStatus::Failed).count();
-        let pending_count = nodes.values().filter(|n| n.status == NodeStatus::Pending).count();
+        let running_count = nodes
+            .values()
+            .filter(|n| n.status == NodeStatus::Running)
+            .count();
+        let failed_count = nodes
+            .values()
+            .filter(|n| n.status == NodeStatus::Failed)
+            .count();
+        let pending_count = nodes
+            .values()
+            .filter(|n| n.status == NodeStatus::Pending)
+            .count();
 
         if failed_count == nodes.len() {
             DeploymentState::Failed

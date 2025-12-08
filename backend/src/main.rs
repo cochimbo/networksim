@@ -3,11 +3,11 @@ use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use networksim_backend::{
-    api::AppState, 
-    config::Config, 
-    create_router, 
-    db::Database, 
-    k8s::{K8sClient, start_pod_watcher, start_chaos_watcher}
+    api::AppState,
+    config::Config,
+    create_router,
+    db::Database,
+    k8s::{start_chaos_watcher, start_pod_watcher, K8sClient},
 };
 
 #[tokio::main]
@@ -37,21 +37,25 @@ async fn main() -> Result<()> {
 
     // Try to connect to Kubernetes (optional)
     let k8s_connected = match K8sClient::new().await {
-        Ok(k8s) => {
-            match k8s.health_check().await {
-                Ok(_) => {
-                    tracing::info!("Kubernetes client connected");
-                    state = state.with_k8s(k8s);
-                    true
-                }
-                Err(e) => {
-                    tracing::warn!("Kubernetes health check failed: {}. K8s features disabled.", e);
-                    false
-                }
+        Ok(k8s) => match k8s.health_check().await {
+            Ok(_) => {
+                tracing::info!("Kubernetes client connected");
+                state = state.with_k8s(k8s);
+                true
             }
-        }
+            Err(e) => {
+                tracing::warn!(
+                    "Kubernetes health check failed: {}. K8s features disabled.",
+                    e
+                );
+                false
+            }
+        },
         Err(e) => {
-            tracing::warn!("Failed to connect to Kubernetes: {}. K8s features disabled.", e);
+            tracing::warn!(
+                "Failed to connect to Kubernetes: {}. K8s features disabled.",
+                e
+            );
             false
         }
     };

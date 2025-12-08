@@ -107,9 +107,9 @@ pub async fn run_diagnostic(
     info!(topology_id = %id, "Running network diagnostic");
 
     // Check if K8s client is available
-    let k8s = state.k8s.ok_or_else(|| {
-        AppError::internal("Kubernetes client not configured")
-    })?;
+    let k8s = state
+        .k8s
+        .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     // Get the topology from database to know expected connections
     let topology = state
@@ -138,12 +138,9 @@ pub async fn run_diagnostic(
     // Get deployed pods
     let client: &Client = k8s.inner();
     let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
-    
+
     let pod_list = pods
-        .list(&kube::api::ListParams::default().labels(&format!(
-            "networksim.io/topology={}",
-            id
-        )))
+        .list(&kube::api::ListParams::default().labels(&format!("networksim.io/topology={}", id)))
         .await
         .map_err(|e| AppError::internal(&format!("Failed to list pods: {}", e)))?;
 
@@ -154,7 +151,7 @@ pub async fn run_diagnostic(
     // Build pod info map
     let mut pod_info: HashMap<String, (String, String)> = HashMap::new(); // node_id -> (pod_name, pod_ip)
     let mut node_names: HashMap<String, String> = HashMap::new(); // node_id -> node_name
-    
+
     for pod in &pod_list.items {
         let node_id = pod
             .metadata
@@ -163,14 +160,14 @@ pub async fn run_diagnostic(
             .and_then(|l| l.get("networksim.io/node"))
             .cloned()
             .unwrap_or_default();
-        
+
         let pod_name = pod.metadata.name.clone().unwrap_or_default();
         let pod_ip = pod
             .status
             .as_ref()
             .and_then(|s| s.pod_ip.clone())
             .unwrap_or_default();
-        
+
         let node_name = pod
             .metadata
             .annotations
@@ -188,57 +185,59 @@ pub async fn run_diagnostic(
     // Run connectivity tests
     let mut connectivity_tests = Vec::new();
     let mut connectivity_matrix: HashMap<String, HashMap<String, bool>> = HashMap::new();
-    
+
     let node_ids: Vec<String> = pod_info.keys().cloned().collect();
-    
+
     for from_node in &node_ids {
         let (from_pod, _from_ip) = match pod_info.get(from_node) {
             Some(info) => info,
             None => continue,
         };
-        
+
         connectivity_matrix.insert(from_node.clone(), HashMap::new());
-        
+
         for to_node in &node_ids {
             if from_node == to_node {
                 continue;
             }
-            
+
             let (_to_pod, to_ip) = match pod_info.get(to_node) {
                 Some(info) => info,
                 None => continue,
             };
-            
+
             // Determine expected connectivity
             let should_connect = expected_connections
                 .get(from_node)
                 .map(|s| s.contains(to_node))
                 .unwrap_or(false);
-            
+
             let expected = if should_connect {
                 ConnectivityExpectation::Allow
             } else {
                 ConnectivityExpectation::Deny
             };
-            
+
             // Test actual connectivity using kubectl exec
             let (actual, latency) = test_pod_connectivity(client, from_pod, to_ip).await;
-            
+
             // Determine test status
             let status = match (&expected, &actual) {
                 (ConnectivityExpectation::Allow, ConnectivityStatus::Connected) => TestStatus::Pass,
                 (ConnectivityExpectation::Deny, ConnectivityStatus::Blocked) => TestStatus::Pass,
                 (ConnectivityExpectation::Allow, ConnectivityStatus::Blocked) => TestStatus::Fail,
-                (ConnectivityExpectation::Deny, ConnectivityStatus::Connected) => TestStatus::Warning,
+                (ConnectivityExpectation::Deny, ConnectivityStatus::Connected) => {
+                    TestStatus::Warning
+                }
                 _ => TestStatus::Skipped,
             };
-            
+
             // Update matrix
             connectivity_matrix
                 .get_mut(from_node)
                 .unwrap()
                 .insert(to_node.clone(), actual == ConnectivityStatus::Connected);
-            
+
             connectivity_tests.push(ConnectivityResult {
                 from_node: from_node.clone(),
                 to_node: to_node.clone(),
@@ -268,7 +267,7 @@ pub async fn run_diagnostic(
         .iter()
         .filter(|t| t.status == TestStatus::Fail && t.expected == ConnectivityExpectation::Allow)
         .count() as u32;
-    
+
     let success_rate = if total_tests > 0 {
         (passed_tests as f64 / total_tests as f64) * 100.0
     } else {
@@ -287,7 +286,7 @@ pub async fn run_diagnostic(
                 .iter()
                 .filter(|t| &t.from_node == node_id && t.actual == ConnectivityStatus::Connected)
                 .count() as u32;
-            
+
             NodeNetworkStats {
                 node_id: node_id.clone(),
                 node_name: node_names.get(node_id).cloned().unwrap_or_default(),
@@ -339,7 +338,7 @@ async fn test_pod_connectivity(
     use tokio::io::AsyncWriteExt;
 
     let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
-    
+
     // Try to exec into the pod and test connectivity
     let ap = AttachParams {
         stdin: true,
@@ -348,7 +347,7 @@ async fn test_pod_connectivity(
         tty: false,
         ..Default::default()
     };
-    
+
     // Simple ping test command
     let command = vec![
         "sh".to_string(),
@@ -358,14 +357,14 @@ async fn test_pod_connectivity(
             to_ip
         ),
     ];
-    
+
     match pods.exec(from_pod, command, &ap).await {
         Ok(mut attached) => {
             // Close stdin
-            if let Some(mut stdin) = attached.stdin().take() {
+            if let Some(mut stdin) = attached.stdin() {
                 let _ = stdin.shutdown().await;
             }
-            
+
             // Read stdout
             let mut stdout_str = String::new();
             if let Some(mut stdout) = attached.stdout() {
@@ -375,7 +374,7 @@ async fn test_pod_connectivity(
                     stdout_str = String::from_utf8_lossy(&buf[..n]).to_string();
                 }
             }
-            
+
             if stdout_str.contains("OK") {
                 // Could measure latency here with more sophisticated ping parsing
                 (ConnectivityStatus::Connected, Some(1.0))
@@ -399,17 +398,24 @@ pub async fn get_node_containers(
 ) -> AppResult<Json<Vec<ContainerInfo>>> {
     info!(topology_id = %topology_id, node_id = %node_id, "Getting container info for node");
 
-    let k8s = state.k8s.ok_or_else(|| {
-        AppError::internal("Kubernetes client not configured")
-    })?;
+    let k8s = state
+        .k8s
+        .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     let client: &Client = k8s.inner();
     let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
 
     // Find the pod for this node
-    let pod_name = format!("ns-{}-{}", &topology_id[..8.min(topology_id.len())], node_id).to_lowercase();
-    
-    let pod = pods.get(&pod_name).await
+    let pod_name = format!(
+        "ns-{}-{}",
+        &topology_id[..8.min(topology_id.len())],
+        node_id
+    )
+    .to_lowercase();
+
+    let pod = pods
+        .get(&pod_name)
+        .await
         .map_err(|e| AppError::internal(&format!("Failed to get pod {}: {}", &pod_name, e)))?;
 
     let mut containers = Vec::new();
@@ -419,7 +425,9 @@ pub async fn get_node_containers(
             for container_status in container_statuses {
                 let ready = container_status.ready;
                 let restart_count = container_status.restart_count;
-                let started_at = container_status.state.as_ref()
+                let started_at = container_status
+                    .state
+                    .as_ref()
                     .and_then(|state| state.running.as_ref())
                     .and_then(|running| running.started_at.as_ref())
                     .map(|time| time.0.to_string());

@@ -22,9 +22,9 @@ impl K8sClient {
     pub async fn new() -> Result<Self> {
         let config = Config::infer().await?;
         let client = Client::try_from(config)?;
-        
+
         info!("Connected to Kubernetes cluster");
-        
+
         Ok(Self {
             client,
             namespace: "networksim-sim".to_string(),
@@ -52,13 +52,16 @@ impl K8sClient {
     #[instrument(skip(self))]
     pub async fn ensure_namespace(&self) -> Result<()> {
         let namespaces: Api<Namespace> = Api::all(self.client.clone());
-        
+
         let ns = Namespace {
             metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                 name: Some(self.namespace.clone()),
                 labels: Some(
                     [
-                        ("app.kubernetes.io/managed-by".to_string(), "networksim".to_string()),
+                        (
+                            "app.kubernetes.io/managed-by".to_string(),
+                            "networksim".to_string(),
+                        ),
                         ("networksim.io/type".to_string(), "simulation".to_string()),
                     ]
                     .into_iter()
@@ -171,7 +174,7 @@ impl K8sClient {
     #[instrument(skip(self))]
     pub async fn cleanup_deployment(&self, topology_id: &str) -> Result<()> {
         let label_selector = format!("networksim.io/topology={}", topology_id);
-        
+
         // Delete pods
         let pods = self.list_pods(&label_selector).await?;
         for pod in pods {

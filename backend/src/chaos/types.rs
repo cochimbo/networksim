@@ -93,6 +93,7 @@ pub struct DuplicateParams {
 /// Union of all chaos parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
+#[derive(Default)]
 pub enum ChaosParams {
     Delay(DelayParams),
     Loss(LossParams),
@@ -100,14 +101,11 @@ pub enum ChaosParams {
     Corrupt(CorruptParams),
     Duplicate(DuplicateParams),
     /// Empty for partition
+    #[default]
     None,
 }
 
-impl Default for ChaosParams {
-    fn default() -> Self {
-        ChaosParams::None
-    }
-}
+
 
 /// Target direction for network chaos
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -54,7 +54,7 @@ impl From<K8sDeploymentStatus> for DeploymentResponse {
 }
 
 /// Deploy a topology to K3s
-/// 
+///
 /// POST /api/topologies/:id/deploy
 pub async fn deploy(
     State(state): State<AppState>,
@@ -63,9 +63,9 @@ pub async fn deploy(
     info!(topology_id = %id, "Deploying topology");
 
     // Check if K8s client is available
-    let k8s = state.k8s.ok_or_else(|| {
-        AppError::internal("Kubernetes client not configured")
-    })?;
+    let k8s = state
+        .k8s
+        .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     // Get the topology from database
     let topology = state
@@ -97,7 +97,7 @@ pub async fn deploy(
 }
 
 /// Destroy a deployment
-/// 
+///
 /// DELETE /api/topologies/:id/deploy
 pub async fn destroy(
     State(state): State<AppState>,
@@ -106,9 +106,9 @@ pub async fn destroy(
     info!(topology_id = %id, "Destroying deployment");
 
     // Check if K8s client is available
-    let k8s = state.k8s.ok_or_else(|| {
-        AppError::internal("Kubernetes client not configured")
-    })?;
+    let k8s = state
+        .k8s
+        .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     // Create deployment manager and destroy
     let manager = DeploymentManager::new(k8s);
@@ -131,7 +131,7 @@ pub async fn destroy(
 }
 
 /// Get deployment status
-/// 
+///
 /// GET /api/topologies/:id/status
 pub async fn status(
     State(state): State<AppState>,
@@ -171,7 +171,7 @@ pub async fn status(
 }
 
 /// Get active deployment (if any)
-/// 
+///
 /// GET /api/deployments/active
 pub async fn get_active_deployment(
     State(state): State<AppState>,
@@ -187,9 +187,11 @@ pub async fn get_active_deployment(
     };
 
     // List all pods in the simulation namespace to find active deployments
-    let pods = k8s.list_pods("app.kubernetes.io/managed-by=networksim").await
+    let pods = k8s
+        .list_pods("app.kubernetes.io/managed-by=networksim")
+        .await
         .map_err(|e| AppError::internal(&format!("Failed to list pods: {}", e)))?;
-    
+
     if pods.is_empty() {
         return Ok(Json(None));
     }
@@ -199,7 +201,9 @@ pub async fn get_active_deployment(
         if let Some(labels) = &pod.metadata.labels {
             if let Some(topology_id) = labels.get("networksim.io/topology") {
                 let manager = DeploymentManager::new(k8s);
-                let status = manager.get_status(topology_id).await
+                let status = manager
+                    .get_status(topology_id)
+                    .await
                     .map_err(|e| AppError::internal(&format!("Failed to get status: {}", e)))?;
                 return Ok(Json(Some(status.into())));
             }

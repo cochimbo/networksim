@@ -10,7 +10,9 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::api::AppState;
-use crate::chaos::{ChaosClient, ChaosCondition, ChaosConditionStatus, CreateChaosRequest, UpdateChaosRequest};
+use crate::chaos::{
+    ChaosClient, ChaosCondition, ChaosConditionStatus, CreateChaosRequest, UpdateChaosRequest,
+};
 use crate::error::{AppError, AppResult};
 
 /// Namespace for chaos resources
@@ -24,7 +26,10 @@ pub async fn list(
     info!("Listing chaos conditions for topology: {}", topology_id);
 
     // Verify topology exists
-    let _ = state.db.get_topology(&topology_id).await?
+    let _ = state
+        .db
+        .get_topology(&topology_id)
+        .await?
         .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
 
     // Get conditions from DB
@@ -44,7 +49,10 @@ pub async fn create(
     );
 
     // Verify topology exists
-    let topology = state.db.get_topology(&req.topology_id).await?
+    let topology = state
+        .db
+        .get_topology(&req.topology_id)
+        .await?
         .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", req.topology_id)))?;
 
     // Verify source node exists in topology
@@ -106,12 +114,17 @@ pub async fn start(
     );
 
     // Get condition from DB
-    let mut condition = state.db.get_chaos_condition(&condition_id).await?
+    let mut condition = state
+        .db
+        .get_chaos_condition(&condition_id)
+        .await?
         .ok_or_else(|| AppError::not_found(&format!("Condition {} not found", condition_id)))?;
 
     // Verify topology matches
     if condition.topology_id != topology_id {
-        return Err(AppError::bad_request("Condition does not belong to this topology"));
+        return Err(AppError::bad_request(
+            "Condition does not belong to this topology",
+        ));
     }
 
     // Check if already active
@@ -137,11 +150,14 @@ pub async fn start(
         .await?;
 
     // Update DB
-    state.db.update_chaos_condition_status(
-        &condition.id,
-        &ChaosConditionStatus::Active,
-        Some(&k8s_name),
-    ).await?;
+    state
+        .db
+        .update_chaos_condition_status(
+            &condition.id,
+            &ChaosConditionStatus::Active,
+            Some(&k8s_name),
+        )
+        .await?;
 
     condition.status = ChaosConditionStatus::Active;
     condition.k8s_name = Some(k8s_name);
@@ -166,12 +182,17 @@ pub async fn stop(
     );
 
     // Get condition from DB
-    let mut condition = state.db.get_chaos_condition(&condition_id).await?
+    let mut condition = state
+        .db
+        .get_chaos_condition(&condition_id)
+        .await?
         .ok_or_else(|| AppError::not_found(&format!("Condition {} not found", condition_id)))?;
 
     // Verify topology matches
     if condition.topology_id != topology_id {
-        return Err(AppError::bad_request("Condition does not belong to this topology"));
+        return Err(AppError::bad_request(
+            "Condition does not belong to this topology",
+        ));
     }
 
     // Check if already paused/pending
@@ -183,22 +204,23 @@ pub async fn stop(
     let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
 
     // Delete from K8s
-    chaos_client.delete_chaos(&topology_id, &condition_id).await?;
+    chaos_client
+        .delete_chaos(&topology_id, &condition_id)
+        .await?;
 
     // Update DB
-    state.db.update_chaos_condition_status(
-        &condition.id,
-        &ChaosConditionStatus::Paused,
-        None,
-    ).await?;
+    state
+        .db
+        .update_chaos_condition_status(&condition.id, &ChaosConditionStatus::Paused, None)
+        .await?;
 
     condition.status = ChaosConditionStatus::Paused;
     condition.k8s_name = None;
 
     // Broadcast event
-    let _ = state.event_tx.send(crate::api::Event::ChaosRemoved {
-        id: condition_id,
-    });
+    let _ = state
+        .event_tx
+        .send(crate::api::Event::ChaosRemoved { id: condition_id });
 
     Ok(Json(condition))
 }
@@ -215,12 +237,17 @@ pub async fn update(
     );
 
     // Get condition from DB
-    let mut condition = state.db.get_chaos_condition(&condition_id).await?
+    let mut condition = state
+        .db
+        .get_chaos_condition(&condition_id)
+        .await?
         .ok_or_else(|| AppError::not_found(&format!("Condition {} not found", condition_id)))?;
 
     // Verify topology matches
     if condition.topology_id != topology_id {
-        return Err(AppError::bad_request("Condition does not belong to this topology"));
+        return Err(AppError::bad_request(
+            "Condition does not belong to this topology",
+        ));
     }
 
     // Update the condition fields
@@ -234,7 +261,10 @@ pub async fn update(
         // Stop the current chaos
         let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
         if let Err(e) = chaos_client.delete_chaos(&topology_id, &condition.id).await {
-            warn!("Failed to delete old chaos {} from K8s: {}", condition.id, e);
+            warn!(
+                "Failed to delete old chaos {} from K8s: {}",
+                condition.id, e
+            );
         }
 
         // Create new chaos with updated parameters
@@ -273,12 +303,15 @@ pub async fn start_all(
     info!("Starting all chaos conditions for topology {}", topology_id);
 
     // Verify topology exists
-    let _ = state.db.get_topology(&topology_id).await?
+    let _ = state
+        .db
+        .get_topology(&topology_id)
+        .await?
         .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
 
     // Get all conditions
     let conditions = state.db.list_chaos_conditions(&topology_id).await?;
-    
+
     let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
     let mut started = 0;
     let mut errors = Vec::new();
@@ -299,17 +332,20 @@ pub async fn start_all(
                 .await
             {
                 Ok(k8s_name) => {
-                    let _ = state.db.update_chaos_condition_status(
-                        &condition.id,
-                        &ChaosConditionStatus::Active,
-                        Some(&k8s_name),
-                    ).await;
-                    
+                    let _ = state
+                        .db
+                        .update_chaos_condition_status(
+                            &condition.id,
+                            &ChaosConditionStatus::Active,
+                            Some(&k8s_name),
+                        )
+                        .await;
+
                     let _ = state.event_tx.send(crate::api::Event::ChaosApplied {
                         id: condition.id.clone(),
                         target: condition.source_node_id.clone(),
                     });
-                    
+
                     started += 1;
                 }
                 Err(e) => {
@@ -335,12 +371,15 @@ pub async fn stop_all(
     info!("Stopping all chaos conditions for topology {}", topology_id);
 
     // Verify topology exists
-    let _ = state.db.get_topology(&topology_id).await?
+    let _ = state
+        .db
+        .get_topology(&topology_id)
+        .await?
         .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
 
     // Get all active conditions
     let conditions = state.db.list_chaos_conditions(&topology_id).await?;
-    
+
     let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
     let mut stopped = 0;
 
@@ -352,11 +391,10 @@ pub async fn stop_all(
             }
 
             // Update DB
-            let _ = state.db.update_chaos_condition_status(
-                &condition.id,
-                &ChaosConditionStatus::Paused,
-                None,
-            ).await;
+            let _ = state
+                .db
+                .update_chaos_condition_status(&condition.id, &ChaosConditionStatus::Paused, None)
+                .await;
 
             let _ = state.event_tx.send(crate::api::Event::ChaosRemoved {
                 id: condition.id.clone(),
@@ -415,12 +453,15 @@ pub async fn delete_all(
     info!("Deleting all chaos conditions for topology {}", topology_id);
 
     // Verify topology exists
-    let _ = state.db.get_topology(&topology_id).await?
+    let _ = state
+        .db
+        .get_topology(&topology_id)
+        .await?
         .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
 
     // Get all conditions to clean up K8s resources
     let conditions = state.db.list_chaos_conditions(&topology_id).await?;
-    
+
     // Clean up K8s resources
     let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
     for condition in &conditions {

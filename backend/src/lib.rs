@@ -35,19 +35,43 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/topologies/:id/deploy", post(api::deploy::deploy))
         .route("/api/topologies/:id/deploy", delete(api::deploy::destroy))
         .route("/api/topologies/:id/status", get(api::deploy::status))
-        .route("/api/deployments/active", get(api::deploy::get_active_deployment))
+        .route(
+            "/api/deployments/active",
+            get(api::deploy::get_active_deployment),
+        )
         // Diagnostic
-        .route("/api/topologies/:id/diagnostic", get(api::diagnostic::run_diagnostic))
-        .route("/api/topologies/:topology_id/nodes/:node_id/containers", get(api::diagnostic::get_node_containers))
+        .route(
+            "/api/topologies/:id/diagnostic",
+            get(api::diagnostic::run_diagnostic),
+        )
+        .route(
+            "/api/topologies/:topology_id/nodes/:node_id/containers",
+            get(api::diagnostic::get_node_containers),
+        )
         // Chaos - per topology
         .route("/api/topologies/:id/chaos", get(api::chaos::list))
         .route("/api/topologies/:id/chaos", delete(api::chaos::delete_all))
-        .route("/api/topologies/:id/chaos/start", post(api::chaos::start_all))
+        .route(
+            "/api/topologies/:id/chaos/start",
+            post(api::chaos::start_all),
+        )
         .route("/api/topologies/:id/chaos/stop", post(api::chaos::stop_all))
-        .route("/api/topologies/:id/chaos/:condition_id", delete(api::chaos::delete))
-        .route("/api/topologies/:id/chaos/:condition_id", put(api::chaos::update))
-        .route("/api/topologies/:id/chaos/:condition_id/start", post(api::chaos::start))
-        .route("/api/topologies/:id/chaos/:condition_id/stop", post(api::chaos::stop))
+        .route(
+            "/api/topologies/:id/chaos/:condition_id",
+            delete(api::chaos::delete),
+        )
+        .route(
+            "/api/topologies/:id/chaos/:condition_id",
+            put(api::chaos::update),
+        )
+        .route(
+            "/api/topologies/:id/chaos/:condition_id/start",
+            post(api::chaos::start),
+        )
+        .route(
+            "/api/topologies/:id/chaos/:condition_id/stop",
+            post(api::chaos::stop),
+        )
         // Chaos - global create
         .route("/api/chaos", post(api::chaos::create))
         // WebSocket

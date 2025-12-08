@@ -2,8 +2,8 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sqlx::{sqlite::SqlitePoolOptions, FromRow, Pool, Sqlite};
 
-use crate::models::Topology;
 use crate::chaos::{ChaosCondition, ChaosConditionStatus, ChaosDirection, ChaosType};
+use crate::models::Topology;
 
 pub type DbPool = Pool<Sqlite>;
 
@@ -90,9 +90,13 @@ impl Database {
                         .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
                     links: serde_json::from_value(data.get("links").cloned().unwrap_or_default())
                         .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
-                    created_at: row.created_at.parse::<DateTime<Utc>>()
+                    created_at: row
+                        .created_at
+                        .parse::<DateTime<Utc>>()
                         .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
-                    updated_at: row.updated_at.parse::<DateTime<Utc>>()
+                    updated_at: row
+                        .updated_at
+                        .parse::<DateTime<Utc>>()
                         .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
                 };
                 Ok(Some(topology))
@@ -104,7 +108,10 @@ impl Database {
     // ==================== Chaos Conditions ====================
 
     /// Create a new chaos condition
-    pub async fn create_chaos_condition(&self, condition: &ChaosCondition) -> Result<(), sqlx::Error> {
+    pub async fn create_chaos_condition(
+        &self,
+        condition: &ChaosCondition,
+    ) -> Result<(), sqlx::Error> {
         let now = Utc::now().to_rfc3339();
         sqlx::query(
             r#"
@@ -131,7 +138,10 @@ impl Database {
     }
 
     /// Get a chaos condition by ID
-    pub async fn get_chaos_condition(&self, id: &str) -> Result<Option<ChaosCondition>, sqlx::Error> {
+    pub async fn get_chaos_condition(
+        &self,
+        id: &str,
+    ) -> Result<Option<ChaosCondition>, sqlx::Error> {
         let row: Option<ChaosConditionRow> = sqlx::query_as(
             "SELECT id, topology_id, source_node_id, target_node_id, chaos_type, direction, duration, params, status, k8s_name, created_at, updated_at FROM chaos_conditions WHERE id = ?",
         )
@@ -143,7 +153,10 @@ impl Database {
     }
 
     /// List all chaos conditions for a topology
-    pub async fn list_chaos_conditions(&self, topology_id: &str) -> Result<Vec<ChaosCondition>, sqlx::Error> {
+    pub async fn list_chaos_conditions(
+        &self,
+        topology_id: &str,
+    ) -> Result<Vec<ChaosCondition>, sqlx::Error> {
         let rows: Vec<ChaosConditionRow> = sqlx::query_as(
             "SELECT id, topology_id, source_node_id, target_node_id, chaos_type, direction, duration, params, status, k8s_name, created_at, updated_at FROM chaos_conditions WHERE topology_id = ? ORDER BY created_at",
         )
@@ -151,9 +164,7 @@ impl Database {
         .fetch_all(&self.pool)
         .await?;
 
-        rows.into_iter()
-            .map(Self::row_to_chaos_condition)
-            .collect()
+        rows.into_iter().map(Self::row_to_chaos_condition).collect()
     }
 
     /// Update chaos condition status and k8s_name
@@ -190,10 +201,10 @@ impl Database {
                 updated_at = ? 
              WHERE id = ?",
         )
-        .bind(&condition.direction.to_string())
+        .bind(condition.direction.to_string())
         .bind(&condition.duration)
         .bind(serde_json::to_string(&condition.params).unwrap_or_default())
-        .bind(&condition.updated_at.to_rfc3339())
+        .bind(condition.updated_at.to_rfc3339())
         .bind(&condition.id)
         .execute(&self.pool)
         .await?;
@@ -240,11 +251,13 @@ impl Database {
             _ => ChaosDirection::To,
         };
 
-        let status = row.status.parse::<ChaosConditionStatus>()
+        let status = row
+            .status
+            .parse::<ChaosConditionStatus>()
             .unwrap_or_default();
 
-        let params: serde_json::Value = serde_json::from_str(&row.params)
-            .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+        let params: serde_json::Value =
+            serde_json::from_str(&row.params).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
         Ok(ChaosCondition {
             id: row.id,
@@ -257,9 +270,13 @@ impl Database {
             params,
             status,
             k8s_name: row.k8s_name,
-            created_at: row.created_at.parse::<DateTime<Utc>>()
+            created_at: row
+                .created_at
+                .parse::<DateTime<Utc>>()
                 .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
-            updated_at: row.updated_at.parse::<DateTime<Utc>>()
+            updated_at: row
+                .updated_at
+                .parse::<DateTime<Utc>>()
                 .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
         })
     }
