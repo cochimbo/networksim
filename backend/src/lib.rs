@@ -36,6 +36,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/topologies/:id/deploy", delete(api::deploy::destroy))
         .route("/api/topologies/:id/status", get(api::deploy::status))
         .route("/api/deployments/active", get(api::deploy::get_active_deployment))
+        // Diagnostic
+        .route("/api/topologies/:id/diagnostic", get(api::diagnostic::run_diagnostic))
         // Chaos - per topology
         .route("/api/topologies/:id/chaos", get(api::chaos::list))
         .route("/api/topologies/:id/chaos", delete(api::chaos::delete_all))

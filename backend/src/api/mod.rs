@@ -1,5 +1,6 @@
 pub mod chaos;
 pub mod deploy;
+pub mod diagnostic;
 pub mod health;
 pub mod metrics;
 pub mod topologies;

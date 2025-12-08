@@ -7,8 +7,8 @@ use k8s_openapi::api::core::v1::{
     ServiceSpec,
 };
 use k8s_openapi::api::networking::v1::{
-    NetworkPolicy, NetworkPolicyIngressRule, NetworkPolicyPeer, NetworkPolicyPort,
-    NetworkPolicySpec,
+    NetworkPolicy, NetworkPolicyEgressRule, NetworkPolicyIngressRule, NetworkPolicyPeer, 
+    NetworkPolicyPort, NetworkPolicySpec,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
@@ -184,7 +184,10 @@ pub fn create_service(topology_id: &str, node: &Node) -> Service {
 /// 
 /// This implements the topology links as network policies:
 /// - Each node gets a policy that allows ingress only from nodes it's connected to
-/// - If a node has no links, it can only receive traffic from itself
+/// - Each node gets a policy that allows egress only to nodes it's connected to
+/// - DNS egress is always allowed for service discovery
+/// - All protocols (TCP, UDP, ICMP) are controlled
+/// - If a node has no links, it's isolated (only DNS egress allowed)
 pub fn create_network_policy(
     topology_id: &str,
     node: &Node,
@@ -196,44 +199,69 @@ pub fn create_network_policy(
     let short_id = &topology_id[..8.min(topology_id.len())];
     let policy_name = format!("ns-{}-{}-netpol", short_id, node.id).to_lowercase();
 
-    // Build ingress rules - allow traffic from connected nodes
+    // Build peer list for connected nodes
+    let connected_peers: Vec<NetworkPolicyPeer> = connected_node_ids
+        .iter()
+        .map(|connected_id| NetworkPolicyPeer {
+            pod_selector: Some(LabelSelector {
+                match_labels: Some(
+                    [("networksim.io/node".to_string(), connected_id.clone())]
+                        .into_iter()
+                        .collect(),
+                ),
+                ..Default::default()
+            }),
+            namespace_selector: Some(LabelSelector {
+                match_labels: Some(
+                    [("networksim.io/type".to_string(), "simulation".to_string())]
+                        .into_iter()
+                        .collect(),
+                ),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .collect();
+
+    // Build ingress rules - allow ALL traffic from connected nodes (TCP, UDP, ICMP)
     let ingress_rules = if connected_node_ids.is_empty() {
-        // No connections - only allow traffic from same pod
+        // No connections - block all ingress
         vec![]
     } else {
-        // Allow traffic from each connected node
-        let peers: Vec<NetworkPolicyPeer> = connected_node_ids
-            .iter()
-            .map(|connected_id| NetworkPolicyPeer {
-                pod_selector: Some(LabelSelector {
-                    match_labels: Some(
-                        [("networksim.io/node".to_string(), connected_id.clone())]
-                            .into_iter()
-                            .collect(),
-                    ),
-                    ..Default::default()
-                }),
-                namespace_selector: Some(LabelSelector {
-                    match_labels: Some(
-                        [("networksim.io/type".to_string(), "simulation".to_string())]
-                            .into_iter()
-                            .collect(),
-                    ),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            })
-            .collect();
-
+        // Allow all traffic from connected nodes (no port restriction = all protocols)
         vec![NetworkPolicyIngressRule {
-            from: Some(peers),
-            ports: Some(vec![NetworkPolicyPort {
-                port: Some(IntOrString::Int(8080)),
-                protocol: Some("TCP".to_string()),
-                ..Default::default()
-            }]),
+            from: Some(connected_peers.clone()),
+            ports: None, // None = allow all ports and protocols including ICMP
         }]
     };
+
+    // Build egress rules - allow traffic only to connected nodes + DNS
+    let mut egress_rules = vec![];
+    
+    // Always allow DNS (UDP 53) for service discovery
+    egress_rules.push(NetworkPolicyEgressRule {
+        to: None, // Any destination
+        ports: Some(vec![
+            NetworkPolicyPort {
+                port: Some(IntOrString::Int(53)),
+                protocol: Some("UDP".to_string()),
+                ..Default::default()
+            },
+            NetworkPolicyPort {
+                port: Some(IntOrString::Int(53)),
+                protocol: Some("TCP".to_string()),
+                ..Default::default()
+            },
+        ]),
+    });
+
+    // Allow egress to connected nodes (all protocols)
+    if !connected_node_ids.is_empty() {
+        egress_rules.push(NetworkPolicyEgressRule {
+            to: Some(connected_peers),
+            ports: None, // None = allow all ports and protocols including ICMP
+        });
+    }
 
     NetworkPolicy {
         metadata: ObjectMeta {
@@ -252,7 +280,8 @@ pub fn create_network_policy(
                 ..Default::default()
             },
             ingress: Some(ingress_rules),
-            policy_types: Some(vec!["Ingress".to_string()]),
+            egress: Some(egress_rules),
+            policy_types: Some(vec!["Ingress".to_string(), "Egress".to_string()]),
             ..Default::default()
         }),
     }

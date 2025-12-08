@@ -6,9 +6,9 @@ Simulador de redes con capacidad de crear topologías personalizadas y aplicar c
 
 - **Editor visual de topología** - Drag & drop para crear redes
 - **Despliegue real** - Las topologías se despliegan como pods en K3s
+- **NetworkPolicies reales** - Conectividad basada en el grafo (ICMP + TCP/UDP)
 - **Chaos Engineering** - Inyección de latencia, pérdida de paquetes, particiones
-- **Helm integration** - Despliega aplicaciones en los nodos
-- **Escenarios programables** - Scripts para automatizar pruebas de red
+- **Diagnóstico de red** - Script para verificar conectividad entre nodos
 - **Tiempo real** - Visualización en vivo del estado de la red
 
 ## 📁 Estructura del Proyecto
@@ -19,17 +19,47 @@ networksim/
 ├── frontend/          # UI en React + TypeScript
 ├── infra/             # Manifiestos K8s, Helm charts
 ├── docs/              # Documentación
-├── scripts/           # Scripts de desarrollo
-└── docker-compose.yml # Entorno de desarrollo
+├── scripts/           # Scripts de desarrollo y setup
+└── start.sh           # Script de inicio rápido
 ```
 
-## 🚀 Quick Start
+## 🚀 Instalación Completa (desde cero)
 
-### ⚡ Inicio Rápido (Recomendado)
+El script de setup instala todas las dependencias y configura el entorno completo:
 
 ```bash
-# Iniciar todo con un comando
+# Instalación completa (Docker, k3d, Calico, Chaos Mesh, etc.)
+./scripts/setup.sh
+
+# Solo si ya tienes las dependencias del sistema
+./scripts/setup.sh --skip-deps
+
+# Solo si ya tienes el cluster
+./scripts/setup.sh --skip-cluster
+
+# Desinstalar (elimina el cluster)
+./scripts/setup.sh --uninstall
+```
+
+El setup instala automáticamente:
+- Docker
+- kubectl
+- k3d (K3s en Docker)
+- Helm
+- jq
+- Rust
+- Node.js
+- Cluster K3d con Calico CNI
+- Chaos Mesh
+
+## ⚡ Quick Start (después del setup)
+
+```bash
+# Iniciar backend y frontend
 ./start.sh
+
+# Reiniciar servicios
+./start.sh restart
 
 # Ver estado
 ./start.sh status
@@ -43,30 +73,37 @@ networksim/
 - 🔧 **Backend API**: http://localhost:8080
 - 📊 **Health Check**: http://localhost:8080/health
 
-### Prerrequisitos
+## 🔬 Diagnóstico de Red
 
-- Docker y Docker Compose
-- K3s (o k3d para desarrollo local)
-- Rust 1.70+
-- Node.js 18+
-- Helm 3
-
-### Desarrollo local (Manual)
+Verificar que la conectividad entre nodos coincide con el grafo:
 
 ```bash
-# Backend (terminal 1)
+./scripts/network-diagnostic.sh
+```
+
+Esto muestra:
+- Conectividad esperada vs real
+- Matriz de conexiones
+- Latencia entre nodos
+- Estadísticas de tráfico
+
+## 🛠 Desarrollo Manual
+
+### Backend
+
+```bash
 cd backend
 DATABASE_URL="sqlite://networksim.db?mode=rwc" cargo run
 # → http://localhost:8080
+```
 
-# Frontend (terminal 2)
+### Frontend
+
+```bash
 cd frontend
 npm run dev
 # → http://localhost:3000
 ```
-
-**Nota:** El frontend tiene proxy configurado en `vite.config.ts`:
-- `/api/*` → `http://localhost:8080`
 
 ### Logs
 
@@ -75,7 +112,26 @@ tail -f /tmp/networksim-backend.log   # Backend
 tail -f /tmp/networksim-frontend.log  # Frontend
 ```
 
-### 🐛 Troubleshooting
+## 🔧 Comandos Útiles
+
+```bash
+# Ver pods desplegados
+kubectl get pods -n networksim-sim
+
+# Ver NetworkPolicies
+kubectl get networkpolicies -n networksim-sim
+
+# Ver logs de un pod
+kubectl logs -n networksim-sim <pod-name>
+
+# Verificar Calico
+kubectl get pods -n calico-system
+
+# Verificar Chaos Mesh
+kubectl get pods -n chaos-mesh
+```
+
+## 🐛 Troubleshooting
 
 ```bash
 # Ver puertos ocupados
@@ -85,21 +141,9 @@ ss -tlnp | grep -E "3000|8080"
 pkill -9 -f "networksim-backend"
 pkill -9 -f "vite"
 
-# Si frontend no carga, usar IPv4 explícito
-curl -4 http://127.0.0.1:3000/
-```
-
-### Con K3d (K3s en Docker)
-
-```bash
-# Crear cluster
-k3d cluster create networksim
-
-# Instalar Chaos Mesh
-kubectl apply -f infra/chaos-mesh/
-
-# Aplicar configuración inicial
-kubectl apply -f infra/k8s/
+# Reiniciar cluster desde cero
+./scripts/setup.sh --uninstall
+./scripts/setup.sh --skip-deps
 ```
 
 ## 📖 Documentación
@@ -115,7 +159,8 @@ kubectl apply -f infra/k8s/
 |------|------------|
 | Frontend | React + TypeScript + Cytoscape.js |
 | Backend | Rust + Axum + SQLite |
-| Orquestación | K3s + Calico |
+| Orquestación | K3s + k3d |
+| CNI | Calico (NetworkPolicy + ICMP) |
 | Chaos | Chaos Mesh |
 | Apps | Helm 3 |
 
