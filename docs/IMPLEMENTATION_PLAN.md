@@ -257,43 +257,43 @@ Inyectar condiciones adversas usando Chaos Mesh.
 ### Tareas
 
 #### 4.1 Integración Chaos Mesh
-- [ ] Cliente para CRDs de Chaos Mesh
-- [ ] Módulo chaos/ para operaciones
+- [x] Cliente para CRDs de Chaos Mesh
+- [x] Módulo chaos/ para operaciones
 
 #### 4.2 API de Chaos
-- [ ] `POST /api/chaos` - Crear condición adversa
-- [ ] `GET /api/chaos` - Listar condiciones activas
-- [ ] `DELETE /api/chaos/:id` - Eliminar condición
+- [x] `POST /api/chaos` - Crear condición adversa
+- [x] `GET /api/topologies/:id/chaos` - Listar condiciones activas
+- [x] `DELETE /api/topologies/:id/chaos/:condition_id` - Eliminar condición
 
 #### 4.3 Tipos de condiciones
-- [ ] Latencia (NetworkChaos delay)
-- [ ] Pérdida de paquetes (NetworkChaos loss)
-- [ ] Limitación de ancho de banda (NetworkChaos bandwidth)
-- [ ] Corrupción de paquetes (NetworkChaos corrupt)
-- [ ] Partición de red (NetworkChaos partition)
+- [x] Latencia (NetworkChaos delay)
+- [x] Pérdida de paquetes (NetworkChaos loss)
+- [x] Limitación de ancho de banda (NetworkChaos bandwidth)
+- [x] Corrupción de paquetes (NetworkChaos corrupt)
+- [ ] Partición de red (NetworkChaos partition) - Pendiente
 
 #### 4.4 Modelo de datos
-- [ ] Tabla chaos_conditions en BD
-- [ ] Tracking de recursos NetworkChaos creados
-- [ ] Asociación con deployment activo
+- [x] Tipos en chaos/types.rs
+- [x] Tracking de recursos NetworkChaos creados
+- [x] Asociación con deployment activo (via labels)
 
 #### 4.5 UI de Chaos
-- [ ] Panel de condiciones adversas
-- [ ] Formulario para crear condición
-- [ ] Lista de condiciones activas
-- [ ] Botón para eliminar condición
-- [ ] Indicadores visuales en grafo (colores, iconos)
+- [x] Panel de condiciones adversas (ChaosPanel.tsx)
+- [x] Formulario para crear condición
+- [x] Lista de condiciones activas
+- [x] Botón para eliminar condición
+- [x] Indicadores visuales (iconos, colores por tipo)
 
 #### 4.6 Tests
-- [ ] Tests de creación de NetworkChaos
+- [x] Tests de creación de NetworkChaos
 - [ ] Tests de aplicación real de latencia
 - [ ] Tests de eliminación de condiciones
 
 ### Criterios de aceptación
-- [ ] Usuario puede aplicar latencia a un nodo
-- [ ] Usuario puede aplicar pérdida de paquetes
-- [ ] Condiciones se reflejan visualmente en UI
-- [ ] Eliminar condición restaura comportamiento normal
+- [x] Usuario puede aplicar latencia a un nodo
+- [x] Usuario puede aplicar pérdida de paquetes
+- [x] Condiciones se reflejan visualmente en UI
+- [x] Eliminar condición restaura comportamiento normal
 
 ### Tests
 - [ ] Integration: Aplicar latencia y verificar con ping
@@ -311,27 +311,29 @@ Actualizaciones en tiempo real de estado y eventos.
 ### Tareas
 
 #### 5.1 WebSocket en backend
-- [ ] Endpoint WS `/ws/events`
-- [ ] Gestión de conexiones
-- [ ] Broadcast de eventos
+- [x] Endpoint WS `/ws/events`
+- [x] Gestión de conexiones (tokio broadcast channel)
+- [x] Broadcast de eventos
 
 #### 5.2 Tipos de eventos
-- [ ] deployment:status - Cambio de estado de despliegue
-- [ ] node:status - Cambio de estado de nodo
-- [ ] chaos:applied - Condición aplicada
-- [ ] chaos:removed - Condición eliminada
-- [ ] metrics:update - Actualización de métricas
+- [x] deployment:status - Cambio de estado de despliegue
+- [x] node:status - Cambio de estado de nodo
+- [x] chaos:applied - Condición aplicada
+- [x] chaos:removed - Condición eliminada
+- [x] topology:created/updated/deleted - Eventos de topología
+- [ ] metrics:update - Actualización de métricas (Fase 8)
 
 #### 5.3 Watch de Kubernetes
-- [ ] Watch de pods (estado, eventos)
-- [ ] Watch de NetworkChaos
-- [ ] Transformar eventos K8s a eventos WS
+- [x] Watch de pods (estado, eventos) - k8s/watcher.rs
+- [x] Watch de NetworkChaos
+- [x] Transformar eventos K8s a eventos WS
 
 #### 5.4 Frontend WebSocket
-- [ ] Cliente WebSocket
-- [ ] Reconexión automática
-- [ ] Actualizar estado global con eventos
-- [ ] Actualizar visualización del grafo
+- [x] Cliente WebSocket (useWebSocket hook)
+- [x] Reconexión automática (max 10 intentos)
+- [x] Actualizar estado global con eventos
+- [x] Actualizar visualización del grafo (colores de nodos)
+- [x] ConnectionStatus component (indicador Live/Offline)
 
 #### 5.5 Tests
 - [ ] Tests de conexión WS
@@ -339,9 +341,9 @@ Actualizaciones en tiempo real de estado y eventos.
 - [ ] Tests de reconexión
 
 ### Criterios de aceptación
-- [ ] Cambios de estado se reflejan instantáneamente en UI
-- [ ] No es necesario recargar para ver actualizaciones
-- [ ] Reconexión automática si se pierde conexión
+- [x] Cambios de estado se reflejan instantáneamente en UI
+- [x] No es necesario recargar para ver actualizaciones
+- [x] Reconexión automática si se pierde conexión
 
 ### Tests
 - [ ] Integration: Evento de pod ready llega a UI
