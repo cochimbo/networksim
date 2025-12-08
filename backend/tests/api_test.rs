@@ -137,7 +137,7 @@ async fn test_topology_crud() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/topologies/{}", id))
+                .uri(format!("/api/topologies/{}", id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -156,7 +156,7 @@ async fn test_topology_crud() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(&format!("/api/topologies/{}", id))
+                .uri(format!("/api/topologies/{}", id))
                 .header("content-type", "application/json")
                 .body(Body::from(update_payload.to_string()))
                 .unwrap(),
@@ -179,7 +179,7 @@ async fn test_topology_crud() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(&format!("/api/topologies/{}", id))
+                .uri(format!("/api/topologies/{}", id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -192,7 +192,7 @@ async fn test_topology_crud() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/topologies/{}", id))
+                .uri(format!("/api/topologies/{}", id))
                 .body(Body::empty())
                 .unwrap(),
         )
