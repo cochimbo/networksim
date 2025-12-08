@@ -25,6 +25,24 @@ networksim/
 
 ## 🚀 Quick Start
 
+### ⚡ Inicio Rápido (Recomendado)
+
+```bash
+# Iniciar todo con un comando
+./start.sh
+
+# Ver estado
+./start.sh status
+
+# Detener
+./start.sh stop
+```
+
+**URLs:**
+- 🌐 **Frontend**: http://localhost:3000
+- 🔧 **Backend API**: http://localhost:8080
+- 📊 **Health Check**: http://localhost:8080/health
+
 ### Prerrequisitos
 
 - Docker y Docker Compose
@@ -33,24 +51,42 @@ networksim/
 - Node.js 18+
 - Helm 3
 
-### Desarrollo local
+### Desarrollo local (Manual)
 
 ```bash
-# Clonar repositorio
-git clone <repo-url>
-cd networksim
-
-# Levantar entorno de desarrollo
-docker-compose up -d
-
-# Backend
+# Backend (terminal 1)
 cd backend
-cargo run
+DATABASE_URL="sqlite://networksim.db?mode=rwc" cargo run
+# → http://localhost:8080
 
-# Frontend (en otra terminal)
+# Frontend (terminal 2)
 cd frontend
-npm install
 npm run dev
+# → http://localhost:3000
+```
+
+**Nota:** El frontend tiene proxy configurado en `vite.config.ts`:
+- `/api/*` → `http://localhost:8080`
+
+### Logs
+
+```bash
+tail -f /tmp/networksim-backend.log   # Backend
+tail -f /tmp/networksim-frontend.log  # Frontend
+```
+
+### 🐛 Troubleshooting
+
+```bash
+# Ver puertos ocupados
+ss -tlnp | grep -E "3000|8080"
+
+# Matar servicios
+pkill -9 -f "networksim-backend"
+pkill -9 -f "vite"
+
+# Si frontend no carga, usar IPv4 explícito
+curl -4 http://127.0.0.1:3000/
 ```
 
 ### Con K3d (K3s en Docker)
