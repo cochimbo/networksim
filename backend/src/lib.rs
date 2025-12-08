@@ -3,6 +3,7 @@
 //! This library contains all the core components of the NetworkSim backend.
 
 pub mod api;
+pub mod chaos;
 pub mod config;
 pub mod db;
 pub mod error;
@@ -33,10 +34,12 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/topologies/:id/deploy", post(api::deploy::deploy))
         .route("/api/topologies/:id/deploy", delete(api::deploy::destroy))
         .route("/api/topologies/:id/status", get(api::deploy::status))
-        // Chaos
-        .route("/api/chaos", get(api::chaos::list))
+        // Chaos - per topology
+        .route("/api/topologies/:id/chaos", get(api::chaos::list))
+        .route("/api/topologies/:id/chaos", delete(api::chaos::delete_all))
+        .route("/api/topologies/:id/chaos/:condition_id", delete(api::chaos::delete))
+        // Chaos - global create
         .route("/api/chaos", post(api::chaos::create))
-        .route("/api/chaos/:id", delete(api::chaos::delete))
         // WebSocket
         .route("/ws/events", get(api::ws::ws_handler))
         // Metrics

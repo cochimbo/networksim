@@ -107,19 +107,89 @@ export const topologyApi = {
   },
 };
 
+// Chaos Types
+export type ChaosType = 'delay' | 'loss' | 'bandwidth' | 'corrupt' | 'duplicate' | 'partition';
+export type ChaosDirection = 'to' | 'from' | 'both';
+
+export interface DelayParams {
+  latency: string;
+  jitter?: string;
+  correlation?: string;
+}
+
+export interface LossParams {
+  loss: string;
+  correlation?: string;
+}
+
+export interface BandwidthParams {
+  rate: string;
+  buffer?: number;
+  limit?: number;
+}
+
+export interface CorruptParams {
+  corrupt: string;
+  correlation?: string;
+}
+
+export interface DuplicateParams {
+  duplicate: string;
+  correlation?: string;
+}
+
+export type ChaosParams = DelayParams | LossParams | BandwidthParams | CorruptParams | DuplicateParams | Record<string, unknown>;
+
+export interface CreateChaosRequest {
+  topology_id: string;
+  source_node_id: string;
+  target_node_id?: string;
+  chaos_type: ChaosType;
+  direction: ChaosDirection;
+  duration?: string;
+  params: ChaosParams;
+}
+
+export interface ChaosCondition {
+  id: string;
+  topology_id: string;
+  source_node_id: string;
+  target_node_id?: string;
+  chaos_type: ChaosType;
+  direction: ChaosDirection;
+  duration?: string;
+  params: ChaosParams;
+  k8s_name: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface ChaosStatus {
+  name: string;
+  condition_id: string;
+  chaos_type: ChaosType;
+  phase: string;
+  target_pods: string[];
+  message?: string;
+}
+
 export const chaosApi = {
-  list: async (): Promise<any[]> => {
-    const response = await api.get('/api/chaos');
+  list: async (topologyId: string): Promise<ChaosStatus[]> => {
+    const response = await api.get(`/api/topologies/${topologyId}/chaos`);
     return response.data;
   },
 
-  create: async (data: any): Promise<any> => {
+  create: async (data: CreateChaosRequest): Promise<ChaosCondition> => {
     const response = await api.post('/api/chaos', data);
     return response.data;
   },
 
-  delete: async (id: string): Promise<void> => {
-    await api.delete(`/api/chaos/${id}`);
+  delete: async (topologyId: string, conditionId: string): Promise<void> => {
+    await api.delete(`/api/topologies/${topologyId}/chaos/${conditionId}`);
+  },
+
+  deleteAll: async (topologyId: string): Promise<void> => {
+    await api.delete(`/api/topologies/${topologyId}/chaos`);
   },
 };
 

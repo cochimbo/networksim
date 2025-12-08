@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import cytoscape, { Core } from 'cytoscape';
-import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize, Flame } from 'lucide-react';
 import { topologyApi, Topology, Node, Link } from '../services/api';
+import { ChaosPanel } from '../components/ChaosPanel';
 
 export default function TopologyEditor() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +20,7 @@ export default function TopologyEditor() {
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [tool, setTool] = useState<'select' | 'node' | 'link'>('select');
   const [linkSource, setLinkSource] = useState<string | null>(null);
+  const [showChaosPanel, setShowChaosPanel] = useState(false);
 
   // Load existing topology
   const { data: topology, isLoading } = useQuery({
@@ -340,6 +342,20 @@ export default function TopologyEditor() {
 
         <div className="h-6 w-px bg-gray-200" />
 
+        {/* Chaos Engineering */}
+        {id && (
+          <button
+            onClick={() => setShowChaosPanel(!showChaosPanel)}
+            className={`p-2 rounded flex items-center gap-1 ${showChaosPanel ? 'bg-red-100 text-red-700' : 'hover:bg-gray-100'}`}
+            title="Chaos Engineering"
+          >
+            <Flame className="h-5 w-5" />
+            <span className="text-sm">Chaos</span>
+          </button>
+        )}
+
+        <div className="h-6 w-px bg-gray-200" />
+
         {/* Actions */}
         <button
           onClick={handleDeleteSelected}
@@ -364,9 +380,18 @@ export default function TopologyEditor() {
       </div>
 
       {/* Canvas and properties panel */}
-      <div className="flex-1 flex">
+      <div className="flex-1 flex relative">
         {/* Cytoscape canvas */}
         <div ref={cyRef} className="flex-1 bg-gray-50" />
+
+        {/* Chaos Panel */}
+        {showChaosPanel && id && (
+          <ChaosPanel
+            topologyId={id}
+            nodes={nodes}
+            onClose={() => setShowChaosPanel(false)}
+          />
+        )}
 
         {/* Properties panel */}
         <div className="w-72 bg-white border-l border-gray-200 p-4 overflow-y-auto">

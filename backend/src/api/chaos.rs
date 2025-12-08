@@ -1,61 +1,158 @@
+//! Chaos Engineering API endpoints
+//!
+//! Create, list, and delete chaos conditions on deployed topologies
+
 use axum::{
     extract::{Path, State},
     Json,
 };
-use serde::{Deserialize, Serialize};
+use tracing::info;
+use uuid::Uuid;
 
 use crate::api::AppState;
-use crate::error::AppResult;
+use crate::chaos::{ChaosClient, ChaosCondition, ChaosStatus, CreateChaosRequest};
+use crate::error::{AppError, AppResult};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ChaosCondition {
-    pub id: String,
-    pub target_type: String,
-    pub target_id: String,
-    pub condition_type: String,
-    pub params: serde_json::Value,
-    pub active: bool,
-}
+/// Namespace for chaos resources
+const CHAOS_NAMESPACE: &str = "networksim-sim";
 
-#[derive(Debug, Deserialize)]
-pub struct CreateChaosRequest {
-    pub target_type: String,
-    pub target_id: String,
-    pub condition_type: String,
-    pub params: serde_json::Value,
-}
+/// List active chaos conditions for a topology
+pub async fn list(
+    State(state): State<AppState>,
+    Path(topology_id): Path<String>,
+) -> AppResult<Json<Vec<ChaosStatus>>> {
+    info!("Listing chaos conditions for topology: {}", topology_id);
 
-/// List active chaos conditions
-pub async fn list(State(_state): State<AppState>) -> AppResult<Json<Vec<ChaosCondition>>> {
-    // TODO: Implement in Phase 4
-    Ok(Json(vec![]))
+    // Verify topology exists
+    let _ = state.db.get_topology(&topology_id).await?
+        .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
+
+    // Get chaos client
+    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+
+    // List chaos resources
+    let conditions = chaos_client.list_chaos(&topology_id).await?;
+
+    Ok(Json(conditions))
 }
 
 /// Create a chaos condition
 pub async fn create(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(req): Json<CreateChaosRequest>,
 ) -> AppResult<Json<ChaosCondition>> {
-    // TODO: Implement Chaos Mesh integration in Phase 4
-    tracing::info!("Create chaos: {:?}", req);
+    info!(
+        "Creating chaos condition for topology {} (type={:?}, source={}, target={:?})",
+        req.topology_id, req.chaos_type, req.source_node_id, req.target_node_id
+    );
 
-    Ok(Json(ChaosCondition {
-        id: uuid::Uuid::new_v4().to_string(),
-        target_type: req.target_type,
-        target_id: req.target_id,
-        condition_type: req.condition_type,
+    // Verify topology exists and is deployed
+    let topology = state.db.get_topology(&req.topology_id).await?
+        .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", req.topology_id)))?;
+
+    // Verify source node exists in topology
+    let source_exists = topology.nodes.iter().any(|n| n.id == req.source_node_id);
+    if !source_exists {
+        return Err(AppError::not_found(&format!(
+            "Source node {} not found in topology",
+            req.source_node_id
+        )));
+    }
+
+    // Verify target node if specified
+    if let Some(ref target_id) = req.target_node_id {
+        let target_exists = topology.nodes.iter().any(|n| n.id == *target_id);
+        if !target_exists {
+            return Err(AppError::not_found(&format!(
+                "Target node {} not found in topology",
+                target_id
+            )));
+        }
+    }
+
+    // Generate condition ID
+    let condition_id = Uuid::new_v4().to_string()[..8].to_string();
+
+    // Get chaos client
+    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+
+    // Create the chaos resource
+    let k8s_name = chaos_client
+        .create_chaos(
+            &req.topology_id,
+            &condition_id,
+            &req.source_node_id,
+            req.target_node_id.as_deref(),
+            &req.chaos_type,
+            &req.direction,
+            req.duration.as_deref(),
+            &req.params,
+        )
+        .await?;
+
+    // Build response
+    let condition = ChaosCondition {
+        id: condition_id,
+        topology_id: req.topology_id,
+        source_node_id: req.source_node_id,
+        target_node_id: req.target_node_id,
+        chaos_type: req.chaos_type,
+        direction: req.direction,
+        duration: req.duration,
         params: req.params,
+        k8s_name,
         active: true,
-    }))
+        created_at: chrono::Utc::now(),
+    };
+
+    Ok(Json(condition))
 }
 
 /// Delete a chaos condition
 pub async fn delete(
-    State(_state): State<AppState>,
-    Path(id): Path<String>,
+    State(state): State<AppState>,
+    Path((topology_id, condition_id)): Path<(String, String)>,
 ) -> AppResult<Json<serde_json::Value>> {
-    // TODO: Implement in Phase 4
-    tracing::info!("Delete chaos: {}", id);
+    info!(
+        "Deleting chaos condition {} for topology {}",
+        condition_id, topology_id
+    );
 
-    Ok(Json(serde_json::json!({ "deleted": id })))
+    // Verify topology exists
+    let _ = state.db.get_topology(&topology_id).await?
+        .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
+
+    // Get chaos client
+    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+
+    // Delete the chaos resource
+    chaos_client.delete_chaos(&topology_id, &condition_id).await?;
+
+    Ok(Json(serde_json::json!({
+        "deleted": condition_id,
+        "topology_id": topology_id
+    })))
+}
+
+/// Delete all chaos conditions for a topology
+pub async fn delete_all(
+    State(state): State<AppState>,
+    Path(topology_id): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    info!("Deleting all chaos conditions for topology {}", topology_id);
+
+    // Verify topology exists
+    let _ = state.db.get_topology(&topology_id).await?
+        .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
+
+    // Get chaos client
+    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+
+    // Cleanup all chaos for topology
+    chaos_client.cleanup_topology(&topology_id).await?;
+
+    Ok(Json(serde_json::json!({
+        "cleanup": "complete",
+        "topology_id": topology_id
+    })))
 }
