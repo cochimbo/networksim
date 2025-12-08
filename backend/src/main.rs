@@ -2,7 +2,13 @@ use anyhow::Result;
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use networksim_backend::{api::AppState, config::Config, create_router, db::Database, k8s::K8sClient};
+use networksim_backend::{
+    api::AppState, 
+    config::Config, 
+    create_router, 
+    db::Database, 
+    k8s::{K8sClient, start_pod_watcher, start_chaos_watcher}
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,21 +36,39 @@ async fn main() -> Result<()> {
     let mut state = AppState::new(db, config.clone());
 
     // Try to connect to Kubernetes (optional)
-    match K8sClient::new().await {
+    let k8s_connected = match K8sClient::new().await {
         Ok(k8s) => {
             match k8s.health_check().await {
                 Ok(_) => {
                     tracing::info!("Kubernetes client connected");
                     state = state.with_k8s(k8s);
+                    true
                 }
                 Err(e) => {
                     tracing::warn!("Kubernetes health check failed: {}. K8s features disabled.", e);
+                    false
                 }
             }
         }
         Err(e) => {
             tracing::warn!("Failed to connect to Kubernetes: {}. K8s features disabled.", e);
+            false
         }
+    };
+
+    // Start Kubernetes watchers if connected
+    if k8s_connected {
+        let event_tx = state.event_tx.clone();
+        tokio::spawn(async move {
+            start_pod_watcher(event_tx).await;
+        });
+
+        let event_tx = state.event_tx.clone();
+        tokio::spawn(async move {
+            start_chaos_watcher(event_tx).await;
+        });
+
+        tracing::info!("Kubernetes watchers started");
     }
 
     // Build router

@@ -92,9 +92,9 @@ pub async fn create(
 
     // Build response
     let condition = ChaosCondition {
-        id: condition_id,
-        topology_id: req.topology_id,
-        source_node_id: req.source_node_id,
+        id: condition_id.clone(),
+        topology_id: req.topology_id.clone(),
+        source_node_id: req.source_node_id.clone(),
         target_node_id: req.target_node_id,
         chaos_type: req.chaos_type,
         direction: req.direction,
@@ -104,6 +104,12 @@ pub async fn create(
         active: true,
         created_at: chrono::Utc::now(),
     };
+
+    // Broadcast chaos applied event
+    let _ = state.event_tx.send(crate::api::Event::ChaosApplied {
+        id: condition_id,
+        target: req.source_node_id,
+    });
 
     Ok(Json(condition))
 }
@@ -127,6 +133,11 @@ pub async fn delete(
 
     // Delete the chaos resource
     chaos_client.delete_chaos(&topology_id, &condition_id).await?;
+
+    // Broadcast chaos removed event
+    let _ = state.event_tx.send(crate::api::Event::ChaosRemoved {
+        id: condition_id.clone(),
+    });
 
     Ok(Json(serde_json::json!({
         "deleted": condition_id,

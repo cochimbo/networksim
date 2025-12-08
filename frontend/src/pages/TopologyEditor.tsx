@@ -1,10 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import cytoscape, { Core } from 'cytoscape';
 import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize, Flame } from 'lucide-react';
 import { topologyApi, Topology, Node, Link } from '../services/api';
 import { ChaosPanel } from '../components/ChaosPanel';
+import { useWebSocket, WebSocketEvent } from '../hooks/useWebSocket';
+
+// Node status from K8s
+type NodeStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'unknown';
+const STATUS_COLORS: Record<NodeStatus, string> = {
+  pending: '#f59e0b',    // amber
+  running: '#22c55e',    // green
+  succeeded: '#3b82f6',  // blue
+  failed: '#ef4444',     // red
+  unknown: '#6b7280',    // gray
+};
 
 export default function TopologyEditor() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +32,31 @@ export default function TopologyEditor() {
   const [tool, setTool] = useState<'select' | 'node' | 'link'>('select');
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const [showChaosPanel, setShowChaosPanel] = useState(false);
+  const [nodeStatuses, setNodeStatuses] = useState<Record<string, NodeStatus>>({});
+
+  // Handle real-time WebSocket events
+  const handleWsEvent = useCallback((event: WebSocketEvent) => {
+    if (event.type === 'node:status' && event.data.topology_id === id) {
+      const nodeId = String(event.data.node_id);
+      const status = (event.data.status as NodeStatus) || 'unknown';
+      
+      setNodeStatuses(prev => ({
+        ...prev,
+        [nodeId]: status
+      }));
+      
+      // Update node color in Cytoscape
+      if (cyInstance.current) {
+        const node = cyInstance.current.$(`#${nodeId}`);
+        if (node.length > 0) {
+          const color = STATUS_COLORS[status] || STATUS_COLORS.unknown;
+          node.style('background-color', color);
+        }
+      }
+    }
+  }, [id]);
+
+  useWebSocket({ onEvent: handleWsEvent });
 
   // Load existing topology
   const { data: topology, isLoading } = useQuery({
@@ -479,6 +515,20 @@ export default function TopologyEditor() {
                       className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
                     />
                   </div>
+                  {nodeStatuses[selectedElement.data.id] && (
+                    <div>
+                      <label className="block text-sm text-gray-500 mb-1">K8s Status</label>
+                      <div className="flex items-center gap-2">
+                        <span 
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: STATUS_COLORS[nodeStatuses[selectedElement.data.id]] }}
+                        />
+                        <span className="text-sm font-medium capitalize">
+                          {nodeStatuses[selectedElement.data.id]}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
               {selectedElement.type === 'edge' && (
