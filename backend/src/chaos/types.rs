@@ -105,8 +105,6 @@ pub enum ChaosParams {
     None,
 }
 
-
-
 /// Target direction for network chaos
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
