@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import cytoscape, { Core } from 'cytoscape';
-import { Save, Trash2, Circle, ArrowRight } from 'lucide-react';
+import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { topologyApi, Topology, Node, Link } from '../services/api';
 
 export default function TopologyEditor() {
@@ -18,6 +18,7 @@ export default function TopologyEditor() {
   const [links, setLinks] = useState<Link[]>([]);
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [tool, setTool] = useState<'select' | 'node' | 'link'>('select');
+  const [linkSource, setLinkSource] = useState<string | null>(null);
 
   // Load existing topology
   const { data: topology, isLoading } = useQuery({
@@ -85,6 +86,14 @@ export default function TopologyEditor() {
             'width': 3,
           },
         },
+        {
+          selector: 'node.link-source',
+          style: {
+            'border-width': 3,
+            'border-color': '#22c55e',
+            'border-style': 'dashed',
+          },
+        },
       ],
       layout: { name: 'preset' },
       userPanningEnabled: true,
@@ -114,14 +123,59 @@ export default function TopologyEditor() {
         
         setNodes((prev) => [...prev, newNode]);
         setTool('select');
+      } else if (event.target === cy) {
+        // Click on empty canvas clears link source
+        setLinkSource(null);
       }
     });
 
-    // Select element
-    cy.on('tap', 'node, edge', (event) => {
+    // Handle node clicks for link creation
+    cy.on('tap', 'node', (event) => {
+      const node = event.target;
+      
+      if (tool === 'link') {
+        setLinkSource((prevSource) => {
+          if (prevSource === null) {
+            // First node selected - highlight it
+            node.addClass('link-source');
+            return node.id();
+          } else if (prevSource !== node.id()) {
+            // Second node selected - create link
+            const linkId = `link-${Date.now()}`;
+            const newLink: Link = {
+              id: linkId,
+              source: prevSource,
+              target: node.id(),
+            };
+            
+            cy.add({
+              group: 'edges',
+              data: { id: linkId, source: prevSource, target: node.id() },
+            });
+            
+            // Remove highlight from source
+            cy.$('.link-source').removeClass('link-source');
+            
+            setLinks((prev) => [...prev, newLink]);
+            return null;
+          }
+          return prevSource;
+        });
+        return; // Don't select when creating link
+      }
+
+      // Normal selection
+      setSelectedElement({
+        type: 'node',
+        data: node.data(),
+      });
+    });
+
+    // Select edge
+    cy.on('tap', 'edge', (event) => {
       const element = event.target;
       setSelectedElement({
-        type: element.isNode() ? 'node' : 'edge',
+        type: 'edge',
         data: element.data(),
       });
     });
@@ -230,18 +284,57 @@ export default function TopologyEditor() {
         {/* Tools */}
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setTool('select')}
+            onClick={() => { setTool('select'); setLinkSource(null); }}
             className={`p-2 rounded ${tool === 'select' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'}`}
             title="Select"
           >
             <ArrowRight className="h-5 w-5" />
           </button>
           <button
-            onClick={() => setTool('node')}
+            onClick={() => { setTool('node'); setLinkSource(null); }}
             className={`p-2 rounded ${tool === 'node' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'}`}
             title="Add Node"
           >
             <Circle className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => { setTool('link'); setLinkSource(null); }}
+            className={`p-2 rounded ${tool === 'link' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'}`}
+            title="Add Link (click two nodes)"
+          >
+            <LinkIcon className="h-5 w-5" />
+          </button>
+          {tool === 'link' && (
+            <span className="text-xs text-gray-500 ml-1">
+              {linkSource ? 'Click target node' : 'Click source node'}
+            </span>
+          )}
+        </div>
+
+        <div className="h-6 w-px bg-gray-200" />
+
+        {/* Zoom controls */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => cyInstance.current?.zoom(cyInstance.current.zoom() * 1.2)}
+            className="p-2 rounded hover:bg-gray-100"
+            title="Zoom In"
+          >
+            <ZoomIn className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => cyInstance.current?.zoom(cyInstance.current.zoom() / 1.2)}
+            className="p-2 rounded hover:bg-gray-100"
+            title="Zoom Out"
+          >
+            <ZoomOut className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => cyInstance.current?.fit()}
+            className="p-2 rounded hover:bg-gray-100"
+            title="Fit to View"
+          >
+            <Maximize className="h-5 w-5" />
           </button>
         </div>
 
@@ -276,7 +369,7 @@ export default function TopologyEditor() {
         <div ref={cyRef} className="flex-1 bg-gray-50" />
 
         {/* Properties panel */}
-        <div className="w-64 bg-white border-l border-gray-200 p-4">
+        <div className="w-72 bg-white border-l border-gray-200 p-4 overflow-y-auto">
           <h3 className="font-medium text-gray-900 mb-4">Properties</h3>
 
           {selectedElement ? (
@@ -287,32 +380,131 @@ export default function TopologyEditor() {
               </div>
               <div>
                 <label className="block text-sm text-gray-500 mb-1">ID</label>
-                <p className="text-sm font-mono">{selectedElement.data.id}</p>
+                <p className="text-sm font-mono text-xs break-all">{selectedElement.data.id}</p>
               </div>
               {selectedElement.type === 'node' && (
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Name</label>
-                  <input
-                    type="text"
-                    value={selectedElement.data.name}
-                    onChange={(e) => {
-                      const newName = e.target.value;
-                      setNodes((prev) =>
-                        prev.map((n) =>
-                          n.id === selectedElement.data.id ? { ...n, name: newName } : n
-                        )
-                      );
-                      if (cyInstance.current) {
-                        cyInstance.current.$(`#${selectedElement.data.id}`).data('name', newName);
-                      }
-                      setSelectedElement({
-                        ...selectedElement,
-                        data: { ...selectedElement.data, name: newName },
-                      });
-                    }}
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                  />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={selectedElement.data.name}
+                      onChange={(e) => {
+                        const newName = e.target.value;
+                        setNodes((prev) =>
+                          prev.map((n) =>
+                            n.id === selectedElement.data.id ? { ...n, name: newName } : n
+                          )
+                        );
+                        if (cyInstance.current) {
+                          cyInstance.current.$(`#${selectedElement.data.id}`).data('name', newName);
+                        }
+                        setSelectedElement({
+                          ...selectedElement,
+                          data: { ...selectedElement.data, name: newName },
+                        });
+                      }}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Node Type</label>
+                    <select
+                      value={nodes.find(n => n.id === selectedElement.data.id)?.type || 'server'}
+                      onChange={(e) => {
+                        const newType = e.target.value as Node['type'];
+                        setNodes((prev) =>
+                          prev.map((n) =>
+                            n.id === selectedElement.data.id ? { ...n, type: newType } : n
+                          )
+                        );
+                        // Update node color based on type
+                        if (cyInstance.current) {
+                          const colors: Record<string, string> = {
+                            server: '#0ea5e9',
+                            router: '#8b5cf6',
+                            client: '#22c55e',
+                            custom: '#f59e0b',
+                          };
+                          cyInstance.current.$(`#${selectedElement.data.id}`).style('background-color', colors[newType] || '#0ea5e9');
+                        }
+                      }}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                    >
+                      <option value="server">Server</option>
+                      <option value="router">Router</option>
+                      <option value="client">Client</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Container Image</label>
+                    <input
+                      type="text"
+                      value={nodes.find(n => n.id === selectedElement.data.id)?.config.image || ''}
+                      onChange={(e) => {
+                        const image = e.target.value;
+                        setNodes((prev) =>
+                          prev.map((n) =>
+                            n.id === selectedElement.data.id ? { ...n, config: { ...n.config, image } } : n
+                          )
+                        );
+                      }}
+                      placeholder="nginx:latest"
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                    />
+                  </div>
+                </>
+              )}
+              {selectedElement.type === 'edge' && (
+                <>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Source</label>
+                    <p className="text-sm font-mono text-xs">{selectedElement.data.source}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Target</label>
+                    <p className="text-sm font-mono text-xs">{selectedElement.data.target}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Bandwidth</label>
+                    <input
+                      type="text"
+                      value={links.find(l => l.id === selectedElement.data.id)?.properties?.bandwidth || ''}
+                      onChange={(e) => {
+                        const bandwidth = e.target.value;
+                        setLinks((prev) =>
+                          prev.map((l) =>
+                            l.id === selectedElement.data.id 
+                              ? { ...l, properties: { ...l.properties, bandwidth } } 
+                              : l
+                          )
+                        );
+                      }}
+                      placeholder="100Mbps"
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Latency</label>
+                    <input
+                      type="text"
+                      value={links.find(l => l.id === selectedElement.data.id)?.properties?.latency || ''}
+                      onChange={(e) => {
+                        const latency = e.target.value;
+                        setLinks((prev) =>
+                          prev.map((l) =>
+                            l.id === selectedElement.data.id 
+                              ? { ...l, properties: { ...l.properties, latency } } 
+                              : l
+                          )
+                        );
+                      }}
+                      placeholder="10ms"
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                    />
+                  </div>
+                </>
               )}
             </div>
           ) : (

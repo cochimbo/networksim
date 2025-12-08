@@ -139,55 +139,55 @@ Interfaz de usuario funcional con editor visual de topologías.
 ### Tareas
 
 #### 2.1 Estructura del frontend
-- [ ] Configurar Vite + React + TypeScript
-- [ ] Configurar TanStack Query para API calls
-- [ ] Configurar Zustand para estado local
-- [ ] Estructura de carpetas
+- [x] Configurar Vite + React + TypeScript
+- [x] Configurar TanStack Query para API calls
+- [x] Configurar Zustand para estado local
+- [x] Estructura de carpetas
 
 #### 2.2 Layout y navegación
-- [ ] Layout principal (header, sidebar, main)
-- [ ] Página de lista de topologías
-- [ ] Página de editor de topología
-- [ ] Navegación básica
+- [x] Layout principal (header, sidebar, main)
+- [x] Página de lista de topologías
+- [x] Página de editor de topología
+- [x] Navegación básica
 
 #### 2.3 Editor de topología con Cytoscape.js
-- [ ] Integrar Cytoscape.js
-- [ ] Canvas de edición
-- [ ] Añadir nodos (drag from palette)
-- [ ] Eliminar nodos
-- [ ] Crear enlaces entre nodos
-- [ ] Eliminar enlaces
-- [ ] Mover nodos
-- [ ] Zoom y pan
+- [x] Integrar Cytoscape.js
+- [x] Canvas de edición
+- [x] Añadir nodos (click en canvas)
+- [x] Eliminar nodos
+- [x] Crear enlaces entre nodos
+- [x] Eliminar enlaces
+- [x] Mover nodos
+- [x] Zoom y pan
 
 #### 2.4 Panel de propiedades
-- [ ] Panel lateral para propiedades
-- [ ] Editar propiedades de nodo seleccionado
-- [ ] Editar propiedades de enlace seleccionado
-- [ ] Nombre y descripción de topología
+- [x] Panel lateral para propiedades
+- [x] Editar propiedades de nodo seleccionado
+- [x] Editar propiedades de enlace seleccionado
+- [x] Nombre y descripción de topología
 
 #### 2.5 Conexión con API
-- [ ] Cliente HTTP (fetch/axios)
-- [ ] Hooks para CRUD de topologías
-- [ ] Guardar topología
-- [ ] Cargar topología
-- [ ] Lista de topologías
+- [x] Cliente HTTP (axios)
+- [x] Hooks para CRUD de topologías
+- [x] Guardar topología
+- [x] Cargar topología
+- [x] Lista de topologías
 
 #### 2.6 Tests
-- [ ] Tests de componentes (React Testing Library)
-- [ ] Tests de hooks
+- [x] Tests de componentes (React Testing Library)
+- [x] Tests de hooks
 - [ ] Mock de API con MSW
 
 ### Criterios de aceptación
-- [ ] Usuario puede crear topología visual
-- [ ] Usuario puede añadir/eliminar nodos y enlaces
-- [ ] Usuario puede guardar y cargar topologías
-- [ ] UI es responsive y fluida
+- [x] Usuario puede crear topología visual
+- [x] Usuario puede añadir/eliminar nodos y enlaces
+- [x] Usuario puede guardar y cargar topologías
+- [x] UI es responsive y fluida
 
 ### Tests
-- [ ] Component: TopologyEditor renderiza correctamente
-- [ ] Component: NodePalette permite drag
-- [ ] Integration: Guardar y cargar topología
+- [x] Component: TopologyEditor renderiza correctamente
+- [x] Component: Panel de propiedades funciona
+- [x] Integration: Guardar y cargar topología
 - [ ] E2E: Flujo completo de creación de topología
 
 ---
