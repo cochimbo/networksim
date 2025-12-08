@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS applications (
     chart_repo TEXT,
     chart_name TEXT NOT NULL,
     chart_version TEXT,
-    values TEXT,  -- JSON values
+    helm_values TEXT,  -- JSON values (renamed from 'values' which is reserved)
     status TEXT NOT NULL DEFAULT 'pending',
     created_at TEXT NOT NULL,
     FOREIGN KEY (deployment_id) REFERENCES deployments(id) ON DELETE CASCADE

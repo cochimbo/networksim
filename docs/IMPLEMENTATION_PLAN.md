@@ -87,47 +87,47 @@ Backend funcional con API REST básica, base de datos y estructura de código s�
 ### Tareas
 
 #### 1.1 Estructura del backend
-- [ ] Configurar Axum con estructura modular
-- [ ] Configurar tracing para logging
-- [ ] Crear módulo de configuración (config.rs)
-- [ ] Crear módulo de errores (error.rs)
-- [ ] Health check endpoint: `GET /health`
+- [x] Configurar Axum con estructura modular
+- [x] Configurar tracing para logging
+- [x] Crear módulo de configuración (config.rs)
+- [x] Crear módulo de errores (error.rs)
+- [x] Health check endpoint: `GET /health`
 
 #### 1.2 Base de datos
-- [ ] Configurar SQLite con sqlx
-- [ ] Crear migraciones iniciales
-- [ ] Módulo de conexión a BD
-- [ ] Pool de conexiones
+- [x] Configurar SQLite con sqlx
+- [x] Crear migraciones iniciales
+- [x] Módulo de conexión a BD
+- [x] Pool de conexiones
 
 #### 1.3 API de Topologías (CRUD)
-- [ ] `POST /api/topologies` - Crear topología
-- [ ] `GET /api/topologies` - Listar topologías
-- [ ] `GET /api/topologies/:id` - Obtener topología
-- [ ] `PUT /api/topologies/:id` - Actualizar topología
-- [ ] `DELETE /api/topologies/:id` - Eliminar topología
+- [x] `POST /api/topologies` - Crear topología
+- [x] `GET /api/topologies` - Listar topologías
+- [x] `GET /api/topologies/:id` - Obtener topología
+- [x] `PUT /api/topologies/:id` - Actualizar topología
+- [x] `DELETE /api/topologies/:id` - Eliminar topología
 
 #### 1.4 Modelos de dominio
-- [ ] Struct Topology (con nodos y enlaces)
-- [ ] Struct Node
-- [ ] Struct Link
-- [ ] Validaciones básicas
+- [x] Struct Topology (con nodos y enlaces)
+- [x] Struct Node
+- [x] Struct Link
+- [x] Validaciones básicas
 
 #### 1.5 Tests
-- [ ] Tests unitarios de modelos
-- [ ] Tests de integración de API
-- [ ] Tests de BD (migraciones, CRUD)
+- [x] Tests unitarios de modelos
+- [x] Tests de integración de API
+- [x] Tests de BD (migraciones, CRUD)
 
 ### Criterios de aceptación
-- [ ] API responde correctamente a todas las operaciones CRUD
-- [ ] Datos persisten en SQLite
-- [ ] Logs estructurados funcionando
-- [ ] Tests pasan con cobertura > 80%
+- [x] API responde correctamente a todas las operaciones CRUD
+- [x] Datos persisten en SQLite
+- [x] Logs estructurados funcionando
+- [x] Tests pasan (12 tests: 6 unitarios + 6 integración)
 
 ### Tests
-- [ ] Unit: Validación de topología
-- [ ] Unit: Serialización/deserialización JSON
-- [ ] Integration: CRUD completo via HTTP
-- [ ] Integration: Persistencia en BD
+- [x] Unit: Validación de topología
+- [x] Unit: Serialización/deserialización JSON
+- [x] Integration: CRUD completo via HTTP
+- [x] Integration: Persistencia en BD
 
 ---
 
