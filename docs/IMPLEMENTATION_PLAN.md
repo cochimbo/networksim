@@ -270,7 +270,7 @@ Inyectar condiciones adversas usando Chaos Mesh.
 - [x] Pérdida de paquetes (NetworkChaos loss)
 - [x] Limitación de ancho de banda (NetworkChaos bandwidth)
 - [x] Corrupción de paquetes (NetworkChaos corrupt)
-- [ ] Partición de red (NetworkChaos partition) - Pendiente
+- [x] Partición de red (NetworkChaos partition) - Implementado como 100% loss
 
 #### 4.4 Modelo de datos
 - [x] Tipos en chaos/types.rs
