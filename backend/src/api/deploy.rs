@@ -169,3 +169,42 @@ pub async fn status(
 
     Ok(Json(status.into()))
 }
+
+/// Get active deployment (if any)
+/// 
+/// GET /api/deployments/active
+pub async fn get_active_deployment(
+    State(state): State<AppState>,
+) -> AppResult<Json<Option<DeploymentResponse>>> {
+    info!("Getting active deployment");
+
+    // Check if K8s client is available
+    let k8s = match &state.k8s {
+        Some(k) => k.clone(),
+        None => {
+            return Ok(Json(None));
+        }
+    };
+
+    // List all pods in the simulation namespace to find active deployments
+    let pods = k8s.list_pods("app.kubernetes.io/managed-by=networksim").await
+        .map_err(|e| AppError::internal(&format!("Failed to list pods: {}", e)))?;
+    
+    if pods.is_empty() {
+        return Ok(Json(None));
+    }
+
+    // Extract topology ID from the first pod's labels
+    if let Some(pod) = pods.first() {
+        if let Some(labels) = &pod.metadata.labels {
+            if let Some(topology_id) = labels.get("networksim.io/topology") {
+                let manager = DeploymentManager::new(k8s);
+                let status = manager.get_status(topology_id).await
+                    .map_err(|e| AppError::internal(&format!("Failed to get status: {}", e)))?;
+                return Ok(Json(Some(status.into())));
+            }
+        }
+    }
+
+    Ok(Json(None))
+}

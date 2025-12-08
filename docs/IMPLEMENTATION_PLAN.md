@@ -329,13 +329,20 @@ Actualizaciones en tiempo real de estado y eventos.
 - [x] Transformar eventos K8s a eventos WS
 
 #### 5.4 Frontend WebSocket
-- [x] Cliente WebSocket (useWebSocket hook)
+- [x] Cliente WebSocket (WebSocketContext singleton)
 - [x] Reconexión automática (max 10 intentos)
 - [x] Actualizar estado global con eventos
-- [x] Actualizar visualización del grafo (colores de nodos)
+- [x] Actualizar visualización del grafo (colores de nodos por estado)
 - [x] ConnectionStatus component (indicador Live/Offline)
 
-#### 5.5 Tests
+#### 5.5 UI de despliegue
+- [x] Indicador de estado del cluster K8s en header
+- [x] Botón Deploy/Stop en toolbar del editor
+- [x] Modal de progreso durante deploy/stop (DeploymentModal)
+- [x] Bloqueo de edición cuando topología desplegada
+- [x] Botón Chaos solo habilitado cuando hay despliegue activo
+
+#### 5.6 Tests
 - [ ] Tests de conexión WS
 - [ ] Tests de broadcast
 - [ ] Tests de reconexión
@@ -344,6 +351,7 @@ Actualizaciones en tiempo real de estado y eventos.
 - [x] Cambios de estado se reflejan instantáneamente en UI
 - [x] No es necesario recargar para ver actualizaciones
 - [x] Reconexión automática si se pierde conexión
+- [x] UI muestra estado del cluster y del despliegue
 
 ### Tests
 - [ ] Integration: Evento de pod ready llega a UI

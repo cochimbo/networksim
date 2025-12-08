@@ -24,6 +24,7 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         // Health check
         .route("/health", get(api::health::health_check))
+        .route("/api/cluster/status", get(api::health::cluster_status))
         // Topologies
         .route("/api/topologies", get(api::topologies::list))
         .route("/api/topologies", post(api::topologies::create))
@@ -34,6 +35,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/topologies/:id/deploy", post(api::deploy::deploy))
         .route("/api/topologies/:id/deploy", delete(api::deploy::destroy))
         .route("/api/topologies/:id/status", get(api::deploy::status))
+        .route("/api/deployments/active", get(api::deploy::get_active_deployment))
         // Chaos - per topology
         .route("/api/topologies/:id/chaos", get(api::chaos::list))
         .route("/api/topologies/:id/chaos", delete(api::chaos::delete_all))

@@ -1,4 +1,4 @@
-import { useWebSocket, WebSocketEvent } from '../hooks/useWebSocket';
+import { useWebSocketEvents, WebSocketEvent } from '../contexts/WebSocketContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import './ConnectionStatus.css';
@@ -40,9 +40,7 @@ export function ConnectionStatus({ showEvents = false }: ConnectionStatusProps) 
     }
   }, [queryClient]);
 
-  const { isConnected, reconnect } = useWebSocket({
-    onEvent: handleEvent,
-  });
+  const { isConnected, reconnect } = useWebSocketEvents(handleEvent);
 
   // Clear old events after 5 seconds
   useEffect(() => {

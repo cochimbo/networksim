@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import cytoscape, { Core } from 'cytoscape';
-import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize, Flame } from 'lucide-react';
-import { topologyApi, Topology, Node, Link } from '../services/api';
+import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize, Flame, Play, Square, Loader2 } from 'lucide-react';
+import { topologyApi, clusterApi, deploymentApi, Topology, Node, Link } from '../services/api';
 import { ChaosPanel } from '../components/ChaosPanel';
-import { useWebSocket, WebSocketEvent } from '../hooks/useWebSocket';
+import { DeploymentModal, DeploymentAction, DeploymentPhase } from '../components/DeploymentModal';
+import { useWebSocketEvents, WebSocketEvent } from '../contexts/WebSocketContext';
 
 // Node status from K8s
 type NodeStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'unknown';
@@ -21,7 +22,7 @@ export default function TopologyEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const cyRef = useRef<HTMLDivElement>(null);
+  const cyContainerRef = useRef<HTMLDivElement | null>(null);
   const cyInstance = useRef<Core | null>(null);
 
   const [name, setName] = useState('New Topology');
@@ -33,6 +34,23 @@ export default function TopologyEditor() {
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const [showChaosPanel, setShowChaosPanel] = useState(false);
   const [nodeStatuses, setNodeStatuses] = useState<Record<string, NodeStatus>>({});
+  const [cyReady, setCyReady] = useState(false);
+  const [deployModal, setDeployModal] = useState<{
+    show: boolean;
+    action: DeploymentAction;
+    phase: DeploymentPhase;
+    message?: string;
+  } | null>(null);
+
+  // Refs to access current values in event handlers
+  const toolRef = useRef(tool);
+  const nodesRef = useRef(nodes);
+  const linkSourceRef = useRef(linkSource);
+
+  // Keep refs in sync
+  useEffect(() => { toolRef.current = tool; }, [tool]);
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  useEffect(() => { linkSourceRef.current = linkSource; }, [linkSource]);
 
   // Handle real-time WebSocket events
   const handleWsEvent = useCallback((event: WebSocketEvent) => {
@@ -56,37 +74,124 @@ export default function TopologyEditor() {
     }
   }, [id]);
 
-  useWebSocket({ onEvent: handleWsEvent });
+  useWebSocketEvents(handleWsEvent);
+
+  const isNewTopology = !id || id === 'new';
 
   // Load existing topology
   const { data: topology, isLoading } = useQuery({
     queryKey: ['topology', id],
     queryFn: () => topologyApi.get(id!),
-    enabled: !!id,
+    enabled: !isNewTopology,
   });
 
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: (data: Partial<Topology>) => {
-      if (id) {
-        return topologyApi.update(id, data);
+      if (!isNewTopology) {
+        return topologyApi.update(id!, data);
       }
       return topologyApi.create(data as any);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['topologies'] });
-      if (!id) {
+      if (isNewTopology) {
         navigate(`/topologies/${data.id}`);
       }
     },
   });
 
-  // Initialize Cytoscape
-  useEffect(() => {
-    if (!cyRef.current) return;
+  // Cluster status
+  const { data: clusterStatus } = useQuery({
+    queryKey: ['cluster-status'],
+    queryFn: clusterApi.status,
+    refetchInterval: 10000,
+  });
 
+  // Active deployment (global - any topology)
+  const { data: activeDeployment } = useQuery({
+    queryKey: ['active-deployment'],
+    queryFn: deploymentApi.getActive,
+    enabled: clusterStatus?.connected,
+    refetchInterval: 5000,
+  });
+
+  // Deployment status (this topology)
+  const { data: deploymentStatus, refetch: refetchDeployment } = useQuery({
+    queryKey: ['deployment-status', id],
+    queryFn: () => topologyApi.status(id!),
+    enabled: !isNewTopology && clusterStatus?.connected,
+    refetchInterval: 5000,
+  });
+
+  // Check if THIS topology is deployed
+  const isThisTopologyDeployed = deploymentStatus?.status === 'running' || deploymentStatus?.status === 'pending';
+  // Check if ANY topology is deployed (for global blocking)
+  const isAnyDeployed = activeDeployment !== null && activeDeployment !== undefined;
+  // For UI blocking purposes
+  const isDeployed = isAnyDeployed;
+  const isClusterReady = clusterStatus?.connected ?? false;
+
+  // Deploy mutation
+  const deployMutation = useMutation({
+    mutationFn: () => topologyApi.deploy(id!),
+    onMutate: () => {
+      setDeployModal({ show: true, action: 'deploy', phase: 'starting' });
+    },
+    onSuccess: () => {
+      setDeployModal({ show: true, action: 'deploy', phase: 'success' });
+      refetchDeployment();
+      queryClient.invalidateQueries({ queryKey: ['deployment-status', id] });
+      queryClient.invalidateQueries({ queryKey: ['active-deployment'] });
+    },
+    onError: (error: any) => {
+      setDeployModal({ 
+        show: true, 
+        action: 'deploy', 
+        phase: 'error',
+        message: error?.response?.data?.message || error.message || 'Deploy failed'
+      });
+    },
+  });
+
+  // Destroy mutation
+  const destroyMutation = useMutation({
+    mutationFn: () => topologyApi.destroy(id!),
+    onMutate: () => {
+      setDeployModal({ show: true, action: 'destroy', phase: 'starting' });
+    },
+    onSuccess: () => {
+      setDeployModal({ show: true, action: 'destroy', phase: 'success' });
+      refetchDeployment();
+      queryClient.invalidateQueries({ queryKey: ['deployment-status', id] });
+      queryClient.invalidateQueries({ queryKey: ['active-deployment'] });
+      setNodeStatuses({});
+    },
+    onError: (error: any) => {
+      setDeployModal({ 
+        show: true, 
+        action: 'destroy', 
+        phase: 'error',
+        message: error?.response?.data?.message || error.message || 'Stop failed'
+      });
+    },
+  });
+
+  // Callback ref to initialize Cytoscape when container is available
+  const cyRef = useCallback((container: HTMLDivElement | null) => {
+    // Cleanup previous instance if any
+    if (cyInstance.current) {
+      cyInstance.current.destroy();
+      cyInstance.current = null;
+      setCyReady(false);
+    }
+
+    if (!container) return;
+
+    cyContainerRef.current = container;
+    
     cyInstance.current = cytoscape({
-      container: cyRef.current,
+      container: container,
       style: [
         {
           selector: 'node',
@@ -143,11 +248,11 @@ export default function TopologyEditor() {
 
     // Click on canvas to add node
     cy.on('tap', (event) => {
-      if (event.target === cy && tool === 'node') {
+      if (event.target === cy && toolRef.current === 'node') {
         const pos = event.position;
         const newNode: Node = {
           id: `node-${Date.now()}`,
-          name: `Node ${nodes.length + 1}`,
+          name: `Node ${nodesRef.current.length + 1}`,
           type: 'server',
           position: { x: pos.x, y: pos.y },
           config: {},
@@ -171,34 +276,32 @@ export default function TopologyEditor() {
     cy.on('tap', 'node', (event) => {
       const node = event.target;
       
-      if (tool === 'link') {
-        setLinkSource((prevSource) => {
-          if (prevSource === null) {
-            // First node selected - highlight it
-            node.addClass('link-source');
-            return node.id();
-          } else if (prevSource !== node.id()) {
-            // Second node selected - create link
-            const linkId = `link-${Date.now()}`;
-            const newLink: Link = {
-              id: linkId,
-              source: prevSource,
-              target: node.id(),
-            };
-            
-            cy.add({
-              group: 'edges',
-              data: { id: linkId, source: prevSource, target: node.id() },
-            });
-            
-            // Remove highlight from source
-            cy.$('.link-source').removeClass('link-source');
-            
-            setLinks((prev) => [...prev, newLink]);
-            return null;
-          }
-          return prevSource;
-        });
+      if (toolRef.current === 'link') {
+        const prevSource = linkSourceRef.current;
+        if (prevSource === null) {
+          // First node selected - highlight it
+          node.addClass('link-source');
+          setLinkSource(node.id());
+        } else if (prevSource !== node.id()) {
+          // Second node selected - create link
+          const linkId = `link-${Date.now()}`;
+          const newLink: Link = {
+            id: linkId,
+            source: prevSource,
+            target: node.id(),
+          };
+          
+          cy.add({
+            group: 'edges',
+            data: { id: linkId, source: prevSource, target: node.id() },
+          });
+          
+          // Remove highlight from source
+          cy.$('.link-source').removeClass('link-source');
+          
+          setLinks((prev) => [...prev, newLink]);
+          setLinkSource(null);
+        }
         return; // Don't select when creating link
       }
 
@@ -229,14 +332,12 @@ export default function TopologyEditor() {
       );
     });
 
-    return () => {
-      cy.destroy();
-    };
+    setCyReady(true);
   }, []);
 
   // Load topology data into Cytoscape
   useEffect(() => {
-    if (topology && cyInstance.current) {
+    if (topology && cyReady && cyInstance.current) {
       setName(topology.name);
       setDescription(topology.description || '');
       setNodes(topology.nodes);
@@ -264,7 +365,7 @@ export default function TopologyEditor() {
 
       cy.fit();
     }
-  }, [topology]);
+  }, [topology, cyReady]);
 
   const handleSave = () => {
     saveMutation.mutate({
@@ -313,7 +414,8 @@ export default function TopologyEditor() {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          disabled={isDeployed}
+          className="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
           placeholder="Topology name"
         />
 
@@ -323,22 +425,25 @@ export default function TopologyEditor() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => { setTool('select'); setLinkSource(null); }}
-            className={`p-2 rounded ${tool === 'select' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'}`}
+            disabled={isDeployed}
+            className={`p-2 rounded ${tool === 'select' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'} disabled:opacity-50 disabled:cursor-not-allowed`}
             title="Select"
           >
             <ArrowRight className="h-5 w-5" />
           </button>
           <button
             onClick={() => { setTool('node'); setLinkSource(null); }}
-            className={`p-2 rounded ${tool === 'node' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'}`}
-            title="Add Node"
+            disabled={isDeployed}
+            className={`p-2 rounded ${tool === 'node' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'} disabled:opacity-50 disabled:cursor-not-allowed`}
+            title={isDeployed ? "Cannot add nodes while deployed" : "Add Node"}
           >
             <Circle className="h-5 w-5" />
           </button>
           <button
             onClick={() => { setTool('link'); setLinkSource(null); }}
-            className={`p-2 rounded ${tool === 'link' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'}`}
-            title="Add Link (click two nodes)"
+            disabled={isDeployed}
+            className={`p-2 rounded ${tool === 'link' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'} disabled:opacity-50 disabled:cursor-not-allowed`}
+            title={isDeployed ? "Cannot add links while deployed" : "Add Link (click two nodes)"}
           >
             <LinkIcon className="h-5 w-5" />
           </button>
@@ -382,8 +487,9 @@ export default function TopologyEditor() {
         {id && (
           <button
             onClick={() => setShowChaosPanel(!showChaosPanel)}
-            className={`p-2 rounded flex items-center gap-1 ${showChaosPanel ? 'bg-red-100 text-red-700' : 'hover:bg-gray-100'}`}
-            title="Chaos Engineering"
+            disabled={!isThisTopologyDeployed}
+            className={`p-2 rounded flex items-center gap-1 ${showChaosPanel ? 'bg-red-100 text-red-700' : 'hover:bg-gray-100'} disabled:opacity-50 disabled:cursor-not-allowed`}
+            title={!isThisTopologyDeployed ? "Deploy this topology first to use Chaos Engineering" : "Chaos Engineering"}
           >
             <Flame className="h-5 w-5" />
             <span className="text-sm">Chaos</span>
@@ -392,12 +498,70 @@ export default function TopologyEditor() {
 
         <div className="h-6 w-px bg-gray-200" />
 
+        {/* Deploy/Destroy */}
+        {id && isClusterReady && (
+          <>
+            {!isThisTopologyDeployed ? (
+              <button
+                onClick={() => deployMutation.mutate()}
+                disabled={deployMutation.isPending || nodes.length === 0 || isAnyDeployed}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={
+                  isAnyDeployed 
+                    ? `Another topology is deployed (${activeDeployment?.topology_id.slice(0, 8)}...). Stop it first.`
+                    : nodes.length === 0 
+                      ? "Add nodes before deploying" 
+                      : "Deploy to Kubernetes"
+                }
+              >
+                {deployMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                <span className="text-sm">Deploy</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => destroyMutation.mutate()}
+                disabled={destroyMutation.isPending}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                title="Stop and remove deployment"
+              >
+                {destroyMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="h-4 w-4" />
+                )}
+                <span className="text-sm">Stop</span>
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Deployment Status Badge */}
+        {id && deploymentStatus && (
+          <div className={`px-2 py-1 rounded text-xs font-medium ${
+            deploymentStatus.status === 'running' ? 'bg-green-100 text-green-700' :
+            deploymentStatus.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+            deploymentStatus.status === 'error' ? 'bg-red-100 text-red-700' :
+            'bg-gray-100 text-gray-600'
+          }`}>
+            {deploymentStatus.status === 'running' ? '● Running' :
+             deploymentStatus.status === 'pending' ? '◐ Pending' :
+             deploymentStatus.status === 'error' ? '✕ Error' :
+             '○ Stopped'}
+          </div>
+        )}
+
+        <div className="h-6 w-px bg-gray-200" />
+
         {/* Actions */}
         <button
           onClick={handleDeleteSelected}
-          disabled={!selectedElement}
+          disabled={!selectedElement || isDeployed}
           className="p-2 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Delete Selected"
+          title={isDeployed ? "Cannot delete while deployed" : "Delete Selected"}
         >
           <Trash2 className="h-5 w-5" />
         </button>
@@ -595,10 +759,22 @@ export default function TopologyEditor() {
               rows={3}
               className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
               placeholder="Add a description..."
+              disabled={isDeployed}
             />
           </div>
         </div>
       </div>
+
+      {/* Deployment Modal */}
+      {deployModal?.show && (
+        <DeploymentModal
+          action={deployModal.action}
+          phase={deployModal.phase}
+          message={deployModal.message}
+          nodeCount={nodes.length}
+          onClose={() => setDeployModal(null)}
+        />
+      )}
     </div>
   );
 }

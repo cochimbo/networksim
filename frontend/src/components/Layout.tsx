@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Network, Settings, PlayCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { ConnectionStatus } from './ConnectionStatus';
+import { ClusterStatus } from './ClusterStatus';
 
 const navigation = [
   { name: 'Topologies', href: '/topologies', icon: Network },
@@ -52,7 +53,10 @@ export default function Layout() {
           <h1 className="text-xl font-semibold text-gray-900">
             {navigation.find((item) => location.pathname.startsWith(item.href))?.name || 'NetworkSim'}
           </h1>
-          <ConnectionStatus />
+          <div className="flex items-center gap-4">
+            <ClusterStatus />
+            <ConnectionStatus />
+          </div>
         </header>
 
         {/* Page content */}

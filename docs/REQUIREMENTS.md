@@ -67,15 +67,15 @@ NetworkSim es un simulador de redes que permite crear topologías personalizadas
 
 ### RF-04: Despliegue de Topología
 
-| ID | Requisito | Prioridad |
-|----|-----------|-----------|
-| RF-04.1 | El usuario puede desplegar una topología en el cluster | Alta |
-| RF-04.2 | El sistema crea los nodos como contenedores/pods | Alta |
-| RF-04.3 | El sistema configura la conectividad de red entre nodos según los enlaces | Alta |
-| RF-04.4 | El usuario puede ver el progreso del despliegue | Media |
-| RF-04.5 | El usuario puede destruir un despliegue activo | Alta |
-| RF-04.6 | El usuario puede ver el estado de cada nodo desplegado | Alta |
-| RF-04.7 | Solo puede haber un despliegue activo a la vez | Alta |
+| ID | Requisito | Prioridad | Estado |
+|----|-----------|-----------|--------|
+| RF-04.1 | El usuario puede desplegar una topología en el cluster | Alta | ✅ |
+| RF-04.2 | El sistema crea los nodos como contenedores/pods | Alta | ✅ |
+| RF-04.3 | El sistema configura la conectividad de red entre nodos según los enlaces | Alta | ✅ |
+| RF-04.4 | El usuario puede ver el progreso del despliegue | Media | ✅ |
+| RF-04.5 | El usuario puede destruir un despliegue activo | Alta | ✅ |
+| RF-04.6 | El usuario puede ver el estado de cada nodo desplegado | Alta | ✅ |
+| RF-04.7 | Solo puede haber un despliegue activo a la vez | Alta | ✅ |
 
 ---
 
@@ -94,18 +94,18 @@ NetworkSim es un simulador de redes que permite crear topologías personalizadas
 
 ### RF-06: Condiciones Adversas (Chaos)
 
-| ID | Requisito | Prioridad |
-|----|-----------|-----------|
-| RF-06.1 | El usuario puede aplicar latencia a un nodo o enlace | Alta |
-| RF-06.2 | El usuario puede aplicar pérdida de paquetes a un nodo o enlace | Alta |
-| RF-06.3 | El usuario puede limitar el ancho de banda de un nodo o enlace | Alta |
-| RF-06.4 | El usuario puede desconectar completamente un nodo (partición) | Alta |
-| RF-06.5 | El usuario puede aplicar corrupción de paquetes | Media |
-| RF-06.6 | El usuario puede aplicar jitter (variación de latencia) | Media |
-| RF-06.7 | El usuario puede ver las condiciones adversas activas | Alta |
-| RF-06.8 | El usuario puede eliminar una condición adversa | Alta |
-| RF-06.9 | El usuario puede aplicar múltiples condiciones simultáneamente | Media |
-| RF-06.10 | Las condiciones adversas se reflejan visualmente en el grafo | Alta |
+| ID | Requisito | Prioridad | Estado |
+|----|-----------|-----------|--------|
+| RF-06.1 | El usuario puede aplicar latencia a un nodo o enlace | Alta | ✅ |
+| RF-06.2 | El usuario puede aplicar pérdida de paquetes a un nodo o enlace | Alta | ✅ |
+| RF-06.3 | El usuario puede limitar el ancho de banda de un nodo o enlace | Alta | ✅ |
+| RF-06.4 | El usuario puede desconectar completamente un nodo (partición) | Alta | ⏳ |
+| RF-06.5 | El usuario puede aplicar corrupción de paquetes | Media | ✅ |
+| RF-06.6 | El usuario puede aplicar jitter (variación de latencia) | Media | ✅ |
+| RF-06.7 | El usuario puede ver las condiciones adversas activas | Alta | ✅ |
+| RF-06.8 | El usuario puede eliminar una condición adversa | Alta | ✅ |
+| RF-06.9 | El usuario puede aplicar múltiples condiciones simultáneamente | Media | ✅ |
+| RF-06.10 | Las condiciones adversas se reflejan visualmente en el grafo | Alta | ✅ |
 
 **Parámetros de condiciones:**
 - **Latencia:** delay (ms), jitter (ms)
@@ -118,13 +118,13 @@ NetworkSim es un simulador de redes que permite crear topologías personalizadas
 
 ### RF-07: Visualización en Tiempo Real
 
-| ID | Requisito | Prioridad |
-|----|-----------|-----------|
-| RF-07.1 | El grafo muestra el estado actual de los nodos (color por estado) | Alta |
-| RF-07.2 | El grafo muestra las condiciones adversas activas (iconos/colores) | Alta |
-| RF-07.3 | Los cambios de estado se reflejan sin recargar la página | Alta |
-| RF-07.4 | El usuario puede hacer zoom y pan en el canvas | Media |
-| RF-07.5 | El usuario puede centrar la vista en un nodo específico | Baja |
+| ID | Requisito | Prioridad | Estado |
+|----|-----------|-----------|--------|
+| RF-07.1 | El grafo muestra el estado actual de los nodos (color por estado) | Alta | ✅ |
+| RF-07.2 | El grafo muestra las condiciones adversas activas (iconos/colores) | Alta | ✅ |
+| RF-07.3 | Los cambios de estado se reflejan sin recargar la página | Alta | ✅ |
+| RF-07.4 | El usuario puede hacer zoom y pan en el canvas | Media | ✅ |
+| RF-07.5 | El usuario puede centrar la vista en un nodo específico | Baja | ⏳ |
 
 ---
 
@@ -318,11 +318,11 @@ events:
 
 ### RNF-04: Disponibilidad
 
-| ID | Requisito |
-|----|-----------|
-| RNF-04.1 | El backend se recupera de errores sin perder datos |
-| RNF-04.2 | Si el backend reinicia, el despliegue activo en K3s persiste |
-| RNF-04.3 | El frontend puede reconectarse automáticamente al WebSocket |
+| ID | Requisito | Estado |
+|----|-----------|--------|
+| RNF-04.1 | El backend se recupera de errores sin perder datos | ✅ |
+| RNF-04.2 | Si el backend reinicia, el despliegue activo en K3s persiste | ✅ |
+| RNF-04.3 | El frontend puede reconectarse automáticamente al WebSocket | ✅ |
 
 ---
 

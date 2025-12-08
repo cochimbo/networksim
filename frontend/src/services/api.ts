@@ -107,6 +107,28 @@ export const topologyApi = {
   },
 };
 
+// Deployment API
+export interface ActiveDeployment {
+  topology_id: string;
+  status: string;
+  message?: string;
+  nodes: Array<{
+    id: string;
+    name: string;
+    status: string;
+    pod_name?: string;
+    pod_ip?: string;
+    message?: string;
+  }>;
+}
+
+export const deploymentApi = {
+  getActive: async (): Promise<ActiveDeployment | null> => {
+    const response = await api.get('/api/deployments/active');
+    return response.data;
+  },
+};
+
 // Chaos Types
 export type ChaosType = 'delay' | 'loss' | 'bandwidth' | 'corrupt' | 'duplicate' | 'partition';
 export type ChaosDirection = 'to' | 'from' | 'both';
@@ -190,6 +212,33 @@ export const chaosApi = {
 
   deleteAll: async (topologyId: string): Promise<void> => {
     await api.delete(`/api/topologies/${topologyId}/chaos`);
+  },
+};
+
+// Cluster Status
+export interface ClusterStatus {
+  connected: boolean;
+  message: string;
+}
+
+export interface DeploymentStatus {
+  topology_id: string;
+  status: 'pending' | 'running' | 'stopped' | 'error' | 'not_deployed';
+  message?: string;
+  nodes: Array<{
+    id: string;
+    name: string;
+    status: string;
+    pod_name?: string;
+    pod_ip?: string;
+    message?: string;
+  }>;
+}
+
+export const clusterApi = {
+  status: async (): Promise<ClusterStatus> => {
+    const response = await api.get('/api/cluster/status');
+    return response.data;
   },
 };
 
