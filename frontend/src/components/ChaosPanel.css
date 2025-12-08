@@ -1,16 +1,8 @@
 .chaos-panel {
-  position: absolute;
-  top: 70px;
-  right: 10px;
-  width: 380px;
-  max-height: calc(100vh - 100px);
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  overflow: hidden;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  background: white;
 }
 
 .chaos-panel-header {
@@ -20,6 +12,32 @@
   padding: 12px 16px;
   background: linear-gradient(135deg, #ff6b6b, #ee5253);
   color: white;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.refresh-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .chaos-panel-header h3 {
@@ -256,4 +274,326 @@
 
 .btn-secondary:hover {
   background: #f5f5f5;
+}
+
+/* Global Controls */
+.global-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.btn-success {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.btn-success:hover {
+  background: #388e3c;
+}
+
+.btn-success:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-warning {
+  background: #ff9800;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.btn-warning:hover {
+  background: #f57c00;
+}
+
+.btn-warning:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.btn-danger:hover {
+  background: #d32f2f;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Condition Item improved */
+.condition-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  border-left: 3px solid #999;
+  transition: all 0.2s ease;
+}
+
+.condition-item.status-active {
+  border-left-color: #4caf50;
+  background: #e8f5e9;
+}
+
+.condition-item.status-paused {
+  border-left-color: #ff9800;
+  background: #fff3e0;
+}
+
+.condition-item.status-pending {
+  border-left-color: #9e9e9e;
+}
+
+.condition-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.condition-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.condition-type {
+  font-weight: 500;
+  font-size: 13px;
+  color: #333;
+}
+
+.condition-params {
+  font-weight: normal;
+  color: #666;
+  margin-left: 6px;
+  font-size: 12px;
+}
+
+.condition-targets {
+  font-size: 11px;
+  color: #888;
+}
+
+.condition-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 3px;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-expand {
+  margin-right: 4px;
+  font-size: 10px;
+  padding: 2px 4px;
+}
+
+.btn-edit {
+  color: #2196f3;
+}
+
+.btn-start {
+  color: #4caf50;
+}
+
+.btn-stop {
+  color: #ff9800;
+}
+
+.btn-delete {
+  color: #f44336;
+}
+
+.condition-item.expanded {
+  flex-direction: column;
+  align-items: stretch;
+  border-left: 3px solid #2196f3;
+}
+
+.condition-item.expanded .condition-main {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.condition-item.expanded .condition-actions {
+  align-self: flex-end;
+  margin-bottom: 8px;
+}
+
+.condition-details {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+}
+
+.detail-row {
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.detail-row strong {
+  display: inline-block;
+  width: 80px;
+  color: #555;
+}
+
+.params-json {
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  margin-top: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: linear-gradient(135deg, #ff6b6b, #ee5253);
+  color: white;
+  border-radius: 8px 8px 0 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+  border-radius: 0 0 8px 8px;
+}
+
+.btn-primary {
+  background: #2196f3;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #1976d2;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #545b62;
+}
+
+.btn-start:hover {
+  background: #e8f5e9;
+}
+
+.btn-stop:hover {
+  background: #fff3e0;
+}
+
+.btn-delete:hover {
+  background: #ffebee;
 }

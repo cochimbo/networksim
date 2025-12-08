@@ -58,7 +58,6 @@ pub fn create_pod_spec(topology_id: &str, node: &Node) -> Pod {
             annotations: Some(
                 [
                     ("networksim.io/node-name".to_string(), node.name.clone()),
-                    ("networksim.io/node-type".to_string(), node.node_type.to_string()),
                 ]
                 .into_iter()
                 .collect(),
@@ -306,13 +305,11 @@ pub fn get_connected_nodes(node_id: &str, links: &[(String, String, String)]) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::NodeType;
 
     fn create_test_node() -> Node {
         Node {
             id: "node-1".to_string(),
             name: "Test Node".to_string(),
-            node_type: NodeType::Server,
             position: crate::models::Position { x: 100.0, y: 100.0 },
             config: NodeConfig::default(),
         }
@@ -395,7 +392,7 @@ mod tests {
         assert_eq!(policy.metadata.name, Some("ns-topo-123-node-1-netpol".to_string()));
         
         let spec = policy.spec.unwrap();
-        assert_eq!(spec.policy_types, Some(vec!["Ingress".to_string()]));
+        assert_eq!(spec.policy_types, Some(vec!["Ingress".to_string(), "Egress".to_string()]));
         
         let ingress = spec.ingress.unwrap();
         assert_eq!(ingress.len(), 1);

@@ -59,4 +59,6 @@ pub enum Event {
     ChaosApplied { id: String, target: String },
     #[serde(rename = "chaos:removed")]
     ChaosRemoved { id: String },
+    #[serde(rename = "chaos:updated")]
+    ChaosUpdated { id: String },
 }

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import cytoscape, { Core } from 'cytoscape';
-import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize, Flame, Play, Square, Loader2 } from 'lucide-react';
-import { topologyApi, clusterApi, deploymentApi, Topology, Node, Link } from '../services/api';
+import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize, Play, Square, Loader2 } from 'lucide-react';
+import { topologyApi, clusterApi, deploymentApi, chaosApi, diagnosticApi, Topology, Node, Link, ContainerInfo } from '../services/api';
 import { ChaosPanel } from '../components/ChaosPanel';
 import { DeploymentModal, DeploymentAction, DeploymentPhase } from '../components/DeploymentModal';
 import { useWebSocketEvents, WebSocketEvent } from '../contexts/WebSocketContext';
@@ -32,7 +32,6 @@ export default function TopologyEditor() {
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [tool, setTool] = useState<'select' | 'node' | 'link'>('select');
   const [linkSource, setLinkSource] = useState<string | null>(null);
-  const [showChaosPanel, setShowChaosPanel] = useState(false);
   const [nodeStatuses, setNodeStatuses] = useState<Record<string, NodeStatus>>({});
   const [cyReady, setCyReady] = useState(false);
   const [deployModal, setDeployModal] = useState<{
@@ -124,8 +123,25 @@ export default function TopologyEditor() {
     refetchInterval: 5000,
   });
 
+  // Active chaos conditions (this topology)
+  const { data: chaosConditions } = useQuery({
+    queryKey: ['chaos-conditions', id],
+    queryFn: () => chaosApi.list(id!),
+    enabled: !isNewTopology && clusterStatus?.connected,
+    refetchInterval: 3000,
+  });
+
   // Check if THIS topology is deployed
   const isThisTopologyDeployed = deploymentStatus?.status === 'running' || deploymentStatus?.status === 'pending';
+
+  // Node containers (when a node is selected and topology is deployed)
+  const { data: selectedNodeContainers }: { data?: ContainerInfo[] } = useQuery({
+    queryKey: ['node-containers', id, selectedElement?.data?.id],
+    queryFn: () => diagnosticApi.getNodeContainers(id!, selectedElement.data.id),
+    enabled: !isNewTopology && selectedElement?.type === 'node' && isThisTopologyDeployed && clusterStatus?.connected,
+    refetchInterval: 5000,
+  });
+
   // Check if ANY topology is deployed (for global blocking)
   const isAnyDeployed = activeDeployment !== null && activeDeployment !== undefined;
   // For UI blocking purposes
@@ -237,6 +253,108 @@ export default function TopologyEditor() {
             'border-style': 'dashed',
           },
         },
+        // Chaos condition styles
+        {
+          selector: 'edge.chaos-delay',
+          style: {
+            'line-color': '#f59e0b', // amber
+            'width': 4,
+            'target-arrow-color': '#f59e0b',
+            'label': '⏱️',
+            'font-size': 14,
+            'text-background-color': '#f59e0b',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -10,
+          },
+        },
+        {
+          selector: 'edge.chaos-loss',
+          style: {
+            'line-color': '#ef4444', // red
+            'width': 4,
+            'target-arrow-color': '#ef4444',
+            'line-style': 'dashed',
+            'label': '📉',
+            'font-size': 14,
+            'text-background-color': '#ef4444',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -10,
+          },
+        },
+        {
+          selector: 'edge.chaos-bandwidth',
+          style: {
+            'line-color': '#8b5cf6', // violet
+            'width': 4,
+            'target-arrow-color': '#8b5cf6',
+            'label': '📊',
+            'font-size': 14,
+            'text-background-color': '#8b5cf6',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -10,
+          },
+        },
+        {
+          selector: 'edge.chaos-corrupt',
+          style: {
+            'line-color': '#f97316', // orange
+            'width': 4,
+            'target-arrow-color': '#f97316',
+            'line-style': 'dotted',
+            'label': '🔧',
+            'font-size': 14,
+            'text-background-color': '#f97316',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -10,
+          },
+        },
+        {
+          selector: 'edge.chaos-duplicate',
+          style: {
+            'line-color': '#06b6d4', // cyan
+            'width': 4,
+            'target-arrow-color': '#06b6d4',
+            'label': '📋',
+            'font-size': 14,
+            'text-background-color': '#06b6d4',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -10,
+          },
+        },
+        {
+          selector: 'edge.chaos-partition',
+          style: {
+            'line-color': '#dc2626', // red-600
+            'width': 6,
+            'target-arrow-color': '#dc2626',
+            'line-style': 'dashed',
+            'label': '🚫',
+            'font-size': 16,
+            'text-background-color': '#dc2626',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -12,
+          },
+        },
+        {
+          selector: 'edge.chaos-multiple',
+          style: {
+            'line-color': '#7c3aed', // purple-600
+            'width': 5,
+            'target-arrow-color': '#7c3aed',
+            'line-style': 'solid',
+            'font-size': 12,
+            'text-background-color': '#7c3aed',
+            'text-background-opacity': 0.9,
+            'text-background-padding': '2px',
+            'text-margin-y': -8,
+          },
+        },
       ],
       layout: { name: 'preset' },
       userPanningEnabled: true,
@@ -253,7 +371,6 @@ export default function TopologyEditor() {
         const newNode: Node = {
           id: `node-${Date.now()}`,
           name: `Node ${nodesRef.current.length + 1}`,
-          type: 'server',
           position: { x: pos.x, y: pos.y },
           config: {},
         };
@@ -335,6 +452,88 @@ export default function TopologyEditor() {
     setCyReady(true);
   }, []);
 
+  // Function to update edge styles based on active chaos conditions
+  const updateEdgeChaosStyles = useCallback(() => {
+    if (!cyInstance.current || !chaosConditions) return;
+
+    const cy = cyInstance.current;
+
+    // Clear all chaos classes from edges
+    cy.edges().removeClass('chaos-delay chaos-loss chaos-bandwidth chaos-corrupt chaos-duplicate chaos-partition chaos-multiple');
+
+    // Collect all conditions affecting each edge
+    const edgeConditions = new Map<string, string[]>();
+
+    chaosConditions
+      .filter(condition => condition.status === 'active')
+      .forEach(condition => {
+        const chaosType = condition.chaos_type;
+
+        if (condition.target_node_id) {
+          // Condition targets a specific node pair
+          const sourceNode = condition.source_node_id;
+          const targetNode = condition.target_node_id;
+
+          // Find edges between these nodes (in both directions)
+          const edges = cy.edges().filter(edge => {
+            const source = edge.data('source');
+            const target = edge.data('target');
+            return (source === sourceNode && target === targetNode) ||
+                   (source === targetNode && target === sourceNode);
+          });
+
+          edges.forEach(edge => {
+            const edgeId = edge.id();
+            if (!edgeConditions.has(edgeId)) {
+              edgeConditions.set(edgeId, []);
+            }
+            edgeConditions.get(edgeId)!.push(chaosType);
+          });
+        } else {
+          // Condition affects all traffic from source node
+          const sourceNode = condition.source_node_id;
+
+          // Find all edges from this source node
+          const edges = cy.edges().filter(edge => edge.data('source') === sourceNode);
+          edges.forEach(edge => {
+            const edgeId = edge.id();
+            if (!edgeConditions.has(edgeId)) {
+              edgeConditions.set(edgeId, []);
+            }
+            edgeConditions.get(edgeId)!.push(chaosType);
+          });
+        }
+      });
+
+    // Apply appropriate classes based on conditions
+    edgeConditions.forEach((types, edgeId) => {
+      const edge = cy.$(`#${edgeId}`);
+      if (edge.length === 0) return;
+
+      if (types.length === 1) {
+        // Single condition - apply specific class
+        edge.addClass(`chaos-${types[0]}`);
+      } else if (types.length > 1) {
+        // Multiple conditions - create combined label
+        const icons = types.map(type => {
+          const iconMap: Record<string, string> = {
+            'delay': '⏱️',
+            'loss': '📉',
+            'bandwidth': '📊',
+            'corrupt': '🔧',
+            'duplicate': '📋',
+            'partition': '🚫'
+          };
+          return iconMap[type] || '❓';
+        }).join('');
+
+        // Apply multiple class and set custom label
+        edge.addClass('chaos-multiple');
+        edge.style('label', icons);
+      }
+    });
+  }, [chaosConditions]);
+
   // Load topology data into Cytoscape
   useEffect(() => {
     if (topology && cyReady && cyInstance.current) {
@@ -366,6 +565,11 @@ export default function TopologyEditor() {
       cy.fit();
     }
   }, [topology, cyReady]);
+
+  // Update edge chaos styles when conditions change
+  useEffect(() => {
+    updateEdgeChaosStyles();
+  }, [updateEdgeChaosStyles]);
 
   const handleSave = () => {
     saveMutation.mutate({
@@ -483,21 +687,6 @@ export default function TopologyEditor() {
 
         <div className="h-6 w-px bg-gray-200" />
 
-        {/* Chaos Engineering */}
-        {id && (
-          <button
-            onClick={() => setShowChaosPanel(!showChaosPanel)}
-            disabled={!isThisTopologyDeployed}
-            className={`p-2 rounded flex items-center gap-1 ${showChaosPanel ? 'bg-red-100 text-red-700' : 'hover:bg-gray-100'} disabled:opacity-50 disabled:cursor-not-allowed`}
-            title={!isThisTopologyDeployed ? "Deploy this topology first to use Chaos Engineering" : "Chaos Engineering"}
-          >
-            <Flame className="h-5 w-5" />
-            <span className="text-sm">Chaos</span>
-          </button>
-        )}
-
-        <div className="h-6 w-px bg-gray-200" />
-
         {/* Deploy/Destroy */}
         {id && isClusterReady && (
           <>
@@ -579,189 +768,227 @@ export default function TopologyEditor() {
         </button>
       </div>
 
-      {/* Canvas and properties panel */}
-      <div className="flex-1 flex relative">
-        {/* Cytoscape canvas */}
+      {/* Canvas y Chaos Panel en el centro */}
+      <div className="flex-1 flex">
+        {/* Cytoscape canvas - columna principal */}
         <div ref={cyRef} className="flex-1 bg-gray-50" />
 
-        {/* Chaos Panel */}
-        {showChaosPanel && id && (
-          <ChaosPanel
-            topologyId={id}
-            nodes={nodes}
-            onClose={() => setShowChaosPanel(false)}
-          />
-        )}
-
-        {/* Properties panel */}
-        <div className="w-72 bg-white border-l border-gray-200 p-4 overflow-y-auto">
-          <h3 className="font-medium text-gray-900 mb-4">Properties</h3>
-
-          {selectedElement ? (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">Type</label>
-                <p className="text-sm font-medium capitalize">{selectedElement.type}</p>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">ID</label>
-                <p className="text-sm font-mono text-xs break-all">{selectedElement.data.id}</p>
-              </div>
-              {selectedElement.type === 'node' && (
-                <>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Name</label>
-                    <input
-                      type="text"
-                      value={selectedElement.data.name}
-                      onChange={(e) => {
-                        const newName = e.target.value;
-                        setNodes((prev) =>
-                          prev.map((n) =>
-                            n.id === selectedElement.data.id ? { ...n, name: newName } : n
-                          )
-                        );
-                        if (cyInstance.current) {
-                          cyInstance.current.$(`#${selectedElement.data.id}`).data('name', newName);
-                        }
-                        setSelectedElement({
-                          ...selectedElement,
-                          data: { ...selectedElement.data, name: newName },
-                        });
-                      }}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Node Type</label>
-                    <select
-                      value={nodes.find(n => n.id === selectedElement.data.id)?.type || 'server'}
-                      onChange={(e) => {
-                        const newType = e.target.value as Node['type'];
-                        setNodes((prev) =>
-                          prev.map((n) =>
-                            n.id === selectedElement.data.id ? { ...n, type: newType } : n
-                          )
-                        );
-                        // Update node color based on type
-                        if (cyInstance.current) {
-                          const colors: Record<string, string> = {
-                            server: '#0ea5e9',
-                            router: '#8b5cf6',
-                            client: '#22c55e',
-                            custom: '#f59e0b',
-                          };
-                          cyInstance.current.$(`#${selectedElement.data.id}`).style('background-color', colors[newType] || '#0ea5e9');
-                        }
-                      }}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                    >
-                      <option value="server">Server</option>
-                      <option value="router">Router</option>
-                      <option value="client">Client</option>
-                      <option value="custom">Custom</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Container Image</label>
-                    <input
-                      type="text"
-                      value={nodes.find(n => n.id === selectedElement.data.id)?.config.image || ''}
-                      onChange={(e) => {
-                        const image = e.target.value;
-                        setNodes((prev) =>
-                          prev.map((n) =>
-                            n.id === selectedElement.data.id ? { ...n, config: { ...n.config, image } } : n
-                          )
-                        );
-                      }}
-                      placeholder="nginx:latest"
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                    />
-                  </div>
-                  {nodeStatuses[selectedElement.data.id] && (
-                    <div>
-                      <label className="block text-sm text-gray-500 mb-1">K8s Status</label>
-                      <div className="flex items-center gap-2">
-                        <span 
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: STATUS_COLORS[nodeStatuses[selectedElement.data.id]] }}
-                        />
-                        <span className="text-sm font-medium capitalize">
-                          {nodeStatuses[selectedElement.data.id]}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-              {selectedElement.type === 'edge' && (
-                <>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Source</label>
-                    <p className="text-sm font-mono text-xs">{selectedElement.data.source}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Target</label>
-                    <p className="text-sm font-mono text-xs">{selectedElement.data.target}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Bandwidth</label>
-                    <input
-                      type="text"
-                      value={links.find(l => l.id === selectedElement.data.id)?.properties?.bandwidth || ''}
-                      onChange={(e) => {
-                        const bandwidth = e.target.value;
-                        setLinks((prev) =>
-                          prev.map((l) =>
-                            l.id === selectedElement.data.id 
-                              ? { ...l, properties: { ...l.properties, bandwidth } } 
-                              : l
-                          )
-                        );
-                      }}
-                      placeholder="100Mbps"
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">Latency</label>
-                    <input
-                      type="text"
-                      value={links.find(l => l.id === selectedElement.data.id)?.properties?.latency || ''}
-                      onChange={(e) => {
-                        const latency = e.target.value;
-                        setLinks((prev) =>
-                          prev.map((l) =>
-                            l.id === selectedElement.data.id 
-                              ? { ...l, properties: { ...l.properties, latency } } 
-                              : l
-                          )
-                        );
-                      }}
-                      placeholder="10ms"
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500">Select a node or edge to view properties</p>
-          )}
-
-          {/* Description */}
-          <div className="mt-6">
-            <label className="block text-sm text-gray-500 mb-1">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-              placeholder="Add a description..."
-              disabled={isDeployed}
+        {/* Chaos Panel columna fija a la derecha ocupando toda la altura */}
+        {id && (
+          <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-full">
+            <ChaosPanel
+              topologyId={id}
+              nodes={nodes}
+              links={links}
+              onClose={() => {}} // No close button, always visible
             />
           </div>
+        )}
+      </div>
+
+      {/* Chaos Legend Panel - horizontal distribution */}
+      <div className="bg-white border-t border-gray-200 p-4">
+        <div className="flex flex-wrap gap-6 justify-center">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-yellow-600 text-lg">⏱️</span>
+            <span className="text-gray-700">Delay</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-red-500 text-lg">📉</span>
+            <span className="text-gray-700">Packet Loss</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-purple-600 text-lg">📊</span>
+            <span className="text-gray-700">Bandwidth</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-orange-600 text-lg">🔧</span>
+            <span className="text-gray-700">Corrupt</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-cyan-600 text-lg">📋</span>
+            <span className="text-gray-700">Duplicate</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-red-700 text-lg">🚫</span>
+            <span className="text-gray-700">Partition</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm border-l border-gray-300 pl-4">
+            <span className="text-purple-700 text-lg">⚡</span>
+            <span className="text-gray-700">Multiple</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Properties panel abajo */}
+      <div className="bg-white border-t border-gray-200 p-4 overflow-y-auto max-h-64">
+        <h3 className="font-medium text-gray-900 mb-4">Properties</h3>
+
+        {selectedElement ? (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-500 mb-1">Type</label>
+              <p className="text-sm font-medium capitalize">{selectedElement.type}</p>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-500 mb-1">ID</label>
+              <p className="text-sm font-mono text-xs break-all">{selectedElement.data.id}</p>
+            </div>
+            {selectedElement.type === 'node' && (
+              <>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={selectedElement.data.name}
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setNodes((prev) =>
+                        prev.map((n) =>
+                          n.id === selectedElement.data.id ? { ...n, name: newName } : n
+                        )
+                      );
+                      if (cyInstance.current) {
+                        cyInstance.current.$(`#${selectedElement.data.id}`).data('name', newName);
+                      }
+                      setSelectedElement({
+                        ...selectedElement,
+                        data: { ...selectedElement.data, name: newName },
+                      });
+                    }}
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Container Image</label>
+                  <input
+                    type="text"
+                    value={nodes.find(n => n.id === selectedElement.data.id)?.config.image || ''}
+                    onChange={(e) => {
+                      const image = e.target.value;
+                      setNodes((prev) =>
+                        prev.map((n) =>
+                          n.id === selectedElement.data.id ? { ...n, config: { ...n.config, image } } : n
+                        )
+                      );
+                    }}
+                    placeholder="nginx:latest"
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+
+                {/* Container Information Section */}
+                {isThisTopologyDeployed && selectedNodeContainers && selectedNodeContainers.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Running Containers</h4>
+                    <div className="space-y-2">
+                      {selectedNodeContainers.map((container, index) => (
+                        <div key={index} className="bg-gray-50 p-3 rounded-md border">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-gray-900">{container.name}</span>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              container.ready 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {container.status}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-600 space-y-1">
+                            <div>Image: {container.image}</div>
+                            <div>Restarts: {container.restart_count}</div>
+                            {container.started_at && (
+                              <div>Started: {new Date(container.started_at).toLocaleString()}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedElement.type === 'edge' && (
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">K8s Status</label>
+                    <div className="flex items-center gap-2">
+                      <span 
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: STATUS_COLORS[nodeStatuses[selectedElement.data.id]] }}
+                      />
+                      <span className="text-sm font-medium capitalize">
+                        {nodeStatuses[selectedElement.data.id]}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            {selectedElement.type === 'edge' && (
+              <>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Source</label>
+                  <p className="text-sm font-mono text-xs">{selectedElement.data.source}</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Target</label>
+                  <p className="text-sm font-mono text-xs">{selectedElement.data.target}</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Bandwidth</label>
+                  <input
+                    type="text"
+                    value={links.find(l => l.id === selectedElement.data.id)?.properties?.bandwidth || ''}
+                    onChange={(e) => {
+                      const bandwidth = e.target.value;
+                      setLinks((prev) =>
+                        prev.map((l) =>
+                          l.id === selectedElement.data.id 
+                            ? { ...l, properties: { ...l.properties, bandwidth } } 
+                            : l
+                        )
+                      );
+                    }}
+                    placeholder="100Mbps"
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Latency</label>
+                  <input
+                    type="text"
+                    value={links.find(l => l.id === selectedElement.data.id)?.properties?.latency || ''}
+                    onChange={(e) => {
+                      const latency = e.target.value;
+                      setLinks((prev) =>
+                        prev.map((l) =>
+                          l.id === selectedElement.data.id 
+                            ? { ...l, properties: { ...l.properties, latency } } 
+                            : l
+                        )
+                      );
+                    }}
+                    placeholder="10ms"
+                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500">Select a node or edge to view properties</p>
+        )}
+
+        {/* Description */}
+        <div className="mt-6">
+          <label className="block text-sm text-gray-500 mb-1">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+            placeholder="Add a description..."
+            disabled={isDeployed}
+          />
         </div>
       </div>
 

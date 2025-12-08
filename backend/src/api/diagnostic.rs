@@ -14,7 +14,6 @@ use tracing::{info, warn};
 
 use crate::api::AppState;
 use crate::error::{AppError, AppResult};
-use crate::k8s::K8sClient;
 
 /// Result of a connectivity test between two nodes
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +84,17 @@ pub struct DiagnosticSummary {
     pub success_rate: f64,
     pub unexpected_connections: u32,
     pub missing_connections: u32,
+}
+
+/// Information about a container running in a pod
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerInfo {
+    pub name: String,
+    pub image: String,
+    pub status: String,
+    pub ready: bool,
+    pub restart_count: i32,
+    pub started_at: Option<String>,
 }
 
 /// Run network diagnostic for a deployed topology
@@ -378,4 +388,68 @@ async fn test_pod_connectivity(
             (ConnectivityStatus::Error, None)
         }
     }
+}
+
+/// Get container information for a specific node/pod
+///
+/// GET /api/topologies/:topology_id/nodes/:node_id/containers
+pub async fn get_node_containers(
+    State(state): State<AppState>,
+    Path((topology_id, node_id)): Path<(String, String)>,
+) -> AppResult<Json<Vec<ContainerInfo>>> {
+    info!(topology_id = %topology_id, node_id = %node_id, "Getting container info for node");
+
+    let k8s = state.k8s.ok_or_else(|| {
+        AppError::internal("Kubernetes client not configured")
+    })?;
+
+    let client: &Client = k8s.inner();
+    let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
+
+    // Find the pod for this node
+    let pod_name = format!("ns-{}-{}", &topology_id[..8.min(topology_id.len())], node_id).to_lowercase();
+    
+    let pod = pods.get(&pod_name).await
+        .map_err(|e| AppError::internal(&format!("Failed to get pod {}: {}", &pod_name, e)))?;
+
+    let mut containers = Vec::new();
+
+    if let Some(status) = &pod.status {
+        if let Some(container_statuses) = &status.container_statuses {
+            for container_status in container_statuses {
+                let ready = container_status.ready;
+                let restart_count = container_status.restart_count;
+                let started_at = container_status.state.as_ref()
+                    .and_then(|state| state.running.as_ref())
+                    .and_then(|running| running.started_at.as_ref())
+                    .map(|time| time.0.to_string());
+
+                // Determine status
+                let status = if ready {
+                    "Running"
+                } else if let Some(state) = &container_status.state {
+                    if state.waiting.is_some() {
+                        "Waiting"
+                    } else if state.terminated.is_some() {
+                        "Terminated"
+                    } else {
+                        "Unknown"
+                    }
+                } else {
+                    "Unknown"
+                };
+
+                containers.push(ContainerInfo {
+                    name: container_status.name.clone(),
+                    image: container_status.image.clone(),
+                    status: status.to_string(),
+                    ready,
+                    restart_count,
+                    started_at,
+                });
+            }
+        }
+    }
+
+    Ok(Json(containers))
 }

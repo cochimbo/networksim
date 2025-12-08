@@ -25,7 +25,6 @@ export interface NodeConfig {
 export interface Node {
   id: string;
   name: string;
-  type: 'server' | 'router' | 'client' | 'custom';
   position: Position;
   config: NodeConfig;
 }
@@ -172,6 +171,8 @@ export interface CreateChaosRequest {
   params: ChaosParams;
 }
 
+export type ChaosConditionStatus = 'pending' | 'active' | 'paused';
+
 export interface ChaosCondition {
   id: string;
   topology_id: string;
@@ -181,9 +182,10 @@ export interface ChaosCondition {
   direction: ChaosDirection;
   duration?: string;
   params: ChaosParams;
-  k8s_name: string;
-  active: boolean;
+  k8s_name?: string;
+  status: ChaosConditionStatus;
   created_at: string;
+  updated_at: string;
 }
 
 export interface ChaosStatus {
@@ -196,7 +198,7 @@ export interface ChaosStatus {
 }
 
 export const chaosApi = {
-  list: async (topologyId: string): Promise<ChaosStatus[]> => {
+  list: async (topologyId: string): Promise<ChaosCondition[]> => {
     const response = await api.get(`/api/topologies/${topologyId}/chaos`);
     return response.data;
   },
@@ -206,12 +208,38 @@ export const chaosApi = {
     return response.data;
   },
 
+  start: async (topologyId: string, conditionId: string): Promise<ChaosCondition> => {
+    const response = await api.post(`/api/topologies/${topologyId}/chaos/${conditionId}/start`);
+    return response.data;
+  },
+
+  stop: async (topologyId: string, conditionId: string): Promise<ChaosCondition> => {
+    const response = await api.post(`/api/topologies/${topologyId}/chaos/${conditionId}/stop`);
+    return response.data;
+  },
+
+  startAll: async (topologyId: string): Promise<{ started: number; errors: string[] }> => {
+    const response = await api.post(`/api/topologies/${topologyId}/chaos/start`);
+    return response.data;
+  },
+
+  stopAll: async (topologyId: string): Promise<{ stopped: number }> => {
+    const response = await api.post(`/api/topologies/${topologyId}/chaos/stop`);
+    return response.data;
+  },
+
   delete: async (topologyId: string, conditionId: string): Promise<void> => {
     await api.delete(`/api/topologies/${topologyId}/chaos/${conditionId}`);
   },
 
-  deleteAll: async (topologyId: string): Promise<void> => {
-    await api.delete(`/api/topologies/${topologyId}/chaos`);
+  update: async (topologyId: string, conditionId: string, data: Partial<CreateChaosRequest>): Promise<ChaosCondition> => {
+    const response = await api.put(`/api/topologies/${topologyId}/chaos/${conditionId}`, data);
+    return response.data;
+  },
+
+  deleteAll: async (topologyId: string): Promise<{ deleted: number }> => {
+    const response = await api.delete(`/api/topologies/${topologyId}/chaos`);
+    return response.data;
   },
 };
 
@@ -238,6 +266,22 @@ export interface DeploymentStatus {
 export const clusterApi = {
   status: async (): Promise<ClusterStatus> => {
     const response = await api.get('/api/cluster/status');
+    return response.data;
+  },
+};
+
+export interface ContainerInfo {
+  name: string;
+  image: string;
+  status: string;
+  ready: boolean;
+  restart_count: number;
+  started_at?: string;
+}
+
+export const diagnosticApi = {
+  getNodeContainers: async (topologyId: string, nodeId: string): Promise<ContainerInfo[]> => {
+    const response = await api.get(`/api/topologies/${topologyId}/nodes/${nodeId}/containers`);
     return response.data;
   },
 };

@@ -20,33 +20,9 @@ pub struct Topology {
 pub struct Node {
     pub id: String,
     pub name: String,
-    #[serde(rename = "type")]
-    pub node_type: NodeType,
     pub position: Position,
     #[serde(default)]
     pub config: NodeConfig,
-}
-
-/// Type of network node
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum NodeType {
-    #[default]
-    Server,
-    Router,
-    Client,
-    Custom,
-}
-
-impl std::fmt::Display for NodeType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NodeType::Server => write!(f, "server"),
-            NodeType::Router => write!(f, "router"),
-            NodeType::Client => write!(f, "client"),
-            NodeType::Custom => write!(f, "custom"),
-        }
-    }
 }
 
 /// Position of a node on the canvas
@@ -162,11 +138,10 @@ impl Topology {
 
 impl Node {
     #[allow(dead_code)]
-    pub fn new(name: String, node_type: NodeType, x: f64, y: f64) -> Self {
+    pub fn new(name: String, x: f64, y: f64) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             name,
-            node_type,
             position: Position { x, y },
             config: NodeConfig::default(),
         }
@@ -205,8 +180,8 @@ mod tests {
         assert!(topology.validate().is_ok());
 
         // Add nodes
-        let node1 = Node::new("Node1".to_string(), NodeType::Server, 0.0, 0.0);
-        let node2 = Node::new("Node2".to_string(), NodeType::Client, 100.0, 100.0);
+        let node1 = Node::new("Node1".to_string(), 0.0, 0.0);
+        let node2 = Node::new("Node2".to_string(), 100.0, 100.0);
         let node1_id = node1.id.clone();
         let node2_id = node2.id.clone();
 
@@ -230,8 +205,8 @@ mod tests {
     fn test_duplicate_node_ids() {
         let mut topology = Topology::new("Test".to_string(), None);
 
-        let node1 = Node::new("Node1".to_string(), NodeType::Server, 0.0, 0.0);
-        let mut node2 = Node::new("Node2".to_string(), NodeType::Client, 100.0, 100.0);
+        let node1 = Node::new("Node1".to_string(), 0.0, 0.0);
+        let mut node2 = Node::new("Node2".to_string(), 100.0, 100.0);
 
         // Force same ID
         node2.id = node1.id.clone();

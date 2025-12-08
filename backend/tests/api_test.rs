@@ -84,7 +84,7 @@ async fn test_topology_crud() {
     let create_payload = json!({
         "name": "CRUD Test",
         "nodes": [
-            {"id": "n1", "name": "Node1", "type": "server", "position": {"x": 0.0, "y": 0.0}}
+            {"id": "n1", "name": "Node1", "position": {"x": 0.0, "y": 0.0}}
         ],
         "links": []
     });
@@ -210,8 +210,8 @@ async fn test_topology_validation() {
     let payload = json!({
         "name": "Invalid Topology",
         "nodes": [
-            {"id": "n1", "name": "Node1", "type": "server", "position": {"x": 0.0, "y": 0.0}},
-            {"id": "n1", "name": "Node2", "type": "client", "position": {"x": 100.0, "y": 0.0}}
+            {"id": "n1", "name": "Node1", "position": {"x": 0.0, "y": 0.0}},
+            {"id": "n1", "name": "Node2", "position": {"x": 100.0, "y": 0.0}}
         ],
         "links": []
     });
@@ -238,9 +238,9 @@ async fn test_topology_with_links() {
     let payload = json!({
         "name": "Network with Links",
         "nodes": [
-            {"id": "server", "name": "Server", "type": "server", "position": {"x": 0.0, "y": 0.0}},
-            {"id": "client1", "name": "Client1", "type": "client", "position": {"x": 100.0, "y": 0.0}},
-            {"id": "client2", "name": "Client2", "type": "client", "position": {"x": 100.0, "y": 100.0}}
+            {"id": "server", "name": "Server", "position": {"x": 0.0, "y": 0.0}},
+            {"id": "client1", "name": "Client1", "position": {"x": 100.0, "y": 0.0}},
+            {"id": "client2", "name": "Client2", "position": {"x": 100.0, "y": 100.0}}
         ],
         "links": [
             {"id": "l1", "source": "server", "target": "client1", "properties": {"bandwidth": "1000Mbps", "latency": "5ms"}},
@@ -278,7 +278,7 @@ async fn test_invalid_link_target() {
     let payload = json!({
         "name": "Invalid Links",
         "nodes": [
-            {"id": "n1", "name": "Node1", "type": "server", "position": {"x": 0.0, "y": 0.0}}
+            {"id": "n1", "name": "Node1", "position": {"x": 0.0, "y": 0.0}}
         ],
         "links": [
             {"id": "l1", "source": "n1", "target": "nonexistent"}

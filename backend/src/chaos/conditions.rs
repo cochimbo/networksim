@@ -149,9 +149,12 @@ pub fn create_network_chaos(
         target_labels.insert("networksim.io/topology".to_string(), topology_id.to_string());
         target_labels.insert("networksim.io/node".to_string(), target_id.to_string());
         
+        // Chaos Mesh requires target.selector structure
         spec["target"] = json!({
-            "namespaces": [namespace],
-            "labelSelectors": target_labels,
+            "selector": {
+                "namespaces": [namespace],
+                "labelSelectors": target_labels
+            },
             "mode": "all"
         });
     }

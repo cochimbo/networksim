@@ -1,42 +1,39 @@
 //! Chaos Engineering API endpoints
 //!
-//! Create, list, and delete chaos conditions on deployed topologies
+//! Create, list, start, stop and delete chaos conditions on deployed topologies
 
 use axum::{
     extract::{Path, State},
     Json,
 };
-use tracing::info;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::api::AppState;
-use crate::chaos::{ChaosClient, ChaosCondition, ChaosStatus, CreateChaosRequest};
+use crate::chaos::{ChaosClient, ChaosCondition, ChaosConditionStatus, CreateChaosRequest, UpdateChaosRequest};
 use crate::error::{AppError, AppResult};
 
 /// Namespace for chaos resources
 const CHAOS_NAMESPACE: &str = "networksim-sim";
 
-/// List active chaos conditions for a topology
+/// List all chaos conditions for a topology (from DB)
 pub async fn list(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
-) -> AppResult<Json<Vec<ChaosStatus>>> {
+) -> AppResult<Json<Vec<ChaosCondition>>> {
     info!("Listing chaos conditions for topology: {}", topology_id);
 
     // Verify topology exists
     let _ = state.db.get_topology(&topology_id).await?
         .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
 
-    // Get chaos client
-    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
-
-    // List chaos resources
-    let conditions = chaos_client.list_chaos(&topology_id).await?;
+    // Get conditions from DB
+    let conditions = state.db.list_chaos_conditions(&topology_id).await?;
 
     Ok(Json(conditions))
 }
 
-/// Create a chaos condition
+/// Create a chaos condition (saves to DB but does NOT apply to K8s yet)
 pub async fn create(
     State(state): State<AppState>,
     Json(req): Json<CreateChaosRequest>,
@@ -46,7 +43,7 @@ pub async fn create(
         req.topology_id, req.chaos_type, req.source_node_id, req.target_node_id
     );
 
-    // Verify topology exists and is deployed
+    // Verify topology exists
     let topology = state.db.get_topology(&req.topology_id).await?
         .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", req.topology_id)))?;
 
@@ -72,25 +69,9 @@ pub async fn create(
 
     // Generate condition ID
     let condition_id = Uuid::new_v4().to_string()[..8].to_string();
+    let now = chrono::Utc::now();
 
-    // Get chaos client
-    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
-
-    // Create the chaos resource
-    let k8s_name = chaos_client
-        .create_chaos(
-            &req.topology_id,
-            &condition_id,
-            &req.source_node_id,
-            req.target_node_id.as_deref(),
-            &req.chaos_type,
-            &req.direction,
-            req.duration.as_deref(),
-            &req.params,
-        )
-        .await?;
-
-    // Build response
+    // Build condition (pending status - not yet applied)
     let condition = ChaosCondition {
         id: condition_id.clone(),
         topology_id: req.topology_id.clone(),
@@ -100,21 +81,298 @@ pub async fn create(
         direction: req.direction,
         duration: req.duration,
         params: req.params,
-        k8s_name,
-        active: true,
-        created_at: chrono::Utc::now(),
+        k8s_name: None,
+        status: ChaosConditionStatus::Pending,
+        created_at: now,
+        updated_at: now,
     };
 
-    // Broadcast chaos applied event
+    // Save to database
+    state.db.create_chaos_condition(&condition).await?;
+
+    info!("Created chaos condition {} (pending)", condition_id);
+
+    Ok(Json(condition))
+}
+
+/// Start (activate) a chaos condition - applies it to K8s
+pub async fn start(
+    State(state): State<AppState>,
+    Path((topology_id, condition_id)): Path<(String, String)>,
+) -> AppResult<Json<ChaosCondition>> {
+    info!(
+        "Starting chaos condition {} for topology {}",
+        condition_id, topology_id
+    );
+
+    // Get condition from DB
+    let mut condition = state.db.get_chaos_condition(&condition_id).await?
+        .ok_or_else(|| AppError::not_found(&format!("Condition {} not found", condition_id)))?;
+
+    // Verify topology matches
+    if condition.topology_id != topology_id {
+        return Err(AppError::bad_request("Condition does not belong to this topology"));
+    }
+
+    // Check if already active
+    if condition.status == ChaosConditionStatus::Active {
+        return Ok(Json(condition)); // Already running
+    }
+
+    // Get chaos client
+    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+
+    // Create the chaos resource in K8s
+    let k8s_name = chaos_client
+        .create_chaos(
+            &condition.topology_id,
+            &condition.id,
+            &condition.source_node_id,
+            condition.target_node_id.as_deref(),
+            &condition.chaos_type,
+            &condition.direction,
+            condition.duration.as_deref(),
+            &condition.params,
+        )
+        .await?;
+
+    // Update DB
+    state.db.update_chaos_condition_status(
+        &condition.id,
+        &ChaosConditionStatus::Active,
+        Some(&k8s_name),
+    ).await?;
+
+    condition.status = ChaosConditionStatus::Active;
+    condition.k8s_name = Some(k8s_name);
+
+    // Broadcast event
     let _ = state.event_tx.send(crate::api::Event::ChaosApplied {
         id: condition_id,
-        target: req.source_node_id,
+        target: condition.source_node_id.clone(),
     });
 
     Ok(Json(condition))
 }
 
-/// Delete a chaos condition
+/// Stop (pause) a chaos condition - removes from K8s but keeps in DB
+pub async fn stop(
+    State(state): State<AppState>,
+    Path((topology_id, condition_id)): Path<(String, String)>,
+) -> AppResult<Json<ChaosCondition>> {
+    info!(
+        "Stopping chaos condition {} for topology {}",
+        condition_id, topology_id
+    );
+
+    // Get condition from DB
+    let mut condition = state.db.get_chaos_condition(&condition_id).await?
+        .ok_or_else(|| AppError::not_found(&format!("Condition {} not found", condition_id)))?;
+
+    // Verify topology matches
+    if condition.topology_id != topology_id {
+        return Err(AppError::bad_request("Condition does not belong to this topology"));
+    }
+
+    // Check if already paused/pending
+    if condition.status != ChaosConditionStatus::Active {
+        return Ok(Json(condition)); // Not running
+    }
+
+    // Get chaos client
+    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+
+    // Delete from K8s
+    chaos_client.delete_chaos(&topology_id, &condition_id).await?;
+
+    // Update DB
+    state.db.update_chaos_condition_status(
+        &condition.id,
+        &ChaosConditionStatus::Paused,
+        None,
+    ).await?;
+
+    condition.status = ChaosConditionStatus::Paused;
+    condition.k8s_name = None;
+
+    // Broadcast event
+    let _ = state.event_tx.send(crate::api::Event::ChaosRemoved {
+        id: condition_id,
+    });
+
+    Ok(Json(condition))
+}
+
+/// Update a chaos condition (only editable fields)
+pub async fn update(
+    State(state): State<AppState>,
+    Path((topology_id, condition_id)): Path<(String, String)>,
+    Json(req): Json<UpdateChaosRequest>,
+) -> AppResult<Json<ChaosCondition>> {
+    info!(
+        "Updating chaos condition {} for topology {}",
+        condition_id, topology_id
+    );
+
+    // Get condition from DB
+    let mut condition = state.db.get_chaos_condition(&condition_id).await?
+        .ok_or_else(|| AppError::not_found(&format!("Condition {} not found", condition_id)))?;
+
+    // Verify topology matches
+    if condition.topology_id != topology_id {
+        return Err(AppError::bad_request("Condition does not belong to this topology"));
+    }
+
+    // Update the condition fields
+    condition.direction = req.direction;
+    condition.duration = req.duration;
+    condition.params = req.params;
+    condition.updated_at = chrono::Utc::now();
+
+    // If condition is active, we need to restart it with new parameters
+    if condition.status == ChaosConditionStatus::Active {
+        // Stop the current chaos
+        let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+        if let Err(e) = chaos_client.delete_chaos(&topology_id, &condition.id).await {
+            warn!("Failed to delete old chaos {} from K8s: {}", condition.id, e);
+        }
+
+        // Create new chaos with updated parameters
+        let k8s_name = chaos_client
+            .create_chaos(
+                &condition.topology_id,
+                &condition.id,
+                &condition.source_node_id,
+                condition.target_node_id.as_deref(),
+                &condition.chaos_type,
+                &condition.direction,
+                condition.duration.as_deref(),
+                &condition.params,
+            )
+            .await?;
+
+        condition.k8s_name = Some(k8s_name);
+    }
+
+    // Update in DB
+    state.db.update_chaos_condition(&condition).await?;
+
+    // Broadcast event
+    let _ = state.event_tx.send(crate::api::Event::ChaosUpdated {
+        id: condition.id.clone(),
+    });
+
+    Ok(Json(condition))
+}
+
+/// Start all chaos conditions for a topology
+pub async fn start_all(
+    State(state): State<AppState>,
+    Path(topology_id): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    info!("Starting all chaos conditions for topology {}", topology_id);
+
+    // Verify topology exists
+    let _ = state.db.get_topology(&topology_id).await?
+        .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
+
+    // Get all conditions
+    let conditions = state.db.list_chaos_conditions(&topology_id).await?;
+    
+    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+    let mut started = 0;
+    let mut errors = Vec::new();
+
+    for condition in conditions {
+        if condition.status != ChaosConditionStatus::Active {
+            match chaos_client
+                .create_chaos(
+                    &condition.topology_id,
+                    &condition.id,
+                    &condition.source_node_id,
+                    condition.target_node_id.as_deref(),
+                    &condition.chaos_type,
+                    &condition.direction,
+                    condition.duration.as_deref(),
+                    &condition.params,
+                )
+                .await
+            {
+                Ok(k8s_name) => {
+                    let _ = state.db.update_chaos_condition_status(
+                        &condition.id,
+                        &ChaosConditionStatus::Active,
+                        Some(&k8s_name),
+                    ).await;
+                    
+                    let _ = state.event_tx.send(crate::api::Event::ChaosApplied {
+                        id: condition.id.clone(),
+                        target: condition.source_node_id.clone(),
+                    });
+                    
+                    started += 1;
+                }
+                Err(e) => {
+                    warn!("Failed to start condition {}: {}", condition.id, e);
+                    errors.push(format!("{}: {}", condition.id, e));
+                }
+            }
+        }
+    }
+
+    Ok(Json(serde_json::json!({
+        "started": started,
+        "errors": errors,
+        "topology_id": topology_id
+    })))
+}
+
+/// Stop all chaos conditions for a topology
+pub async fn stop_all(
+    State(state): State<AppState>,
+    Path(topology_id): Path<String>,
+) -> AppResult<Json<serde_json::Value>> {
+    info!("Stopping all chaos conditions for topology {}", topology_id);
+
+    // Verify topology exists
+    let _ = state.db.get_topology(&topology_id).await?
+        .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
+
+    // Get all active conditions
+    let conditions = state.db.list_chaos_conditions(&topology_id).await?;
+    
+    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+    let mut stopped = 0;
+
+    for condition in conditions {
+        if condition.status == ChaosConditionStatus::Active {
+            // Delete from K8s
+            if let Err(e) = chaos_client.delete_chaos(&topology_id, &condition.id).await {
+                warn!("Failed to delete chaos {} from K8s: {}", condition.id, e);
+            }
+
+            // Update DB
+            let _ = state.db.update_chaos_condition_status(
+                &condition.id,
+                &ChaosConditionStatus::Paused,
+                None,
+            ).await;
+
+            let _ = state.event_tx.send(crate::api::Event::ChaosRemoved {
+                id: condition.id.clone(),
+            });
+
+            stopped += 1;
+        }
+    }
+
+    Ok(Json(serde_json::json!({
+        "stopped": stopped,
+        "topology_id": topology_id
+    })))
+}
+
+/// Delete a chaos condition (removes from K8s and DB)
 pub async fn delete(
     State(state): State<AppState>,
     Path((topology_id, condition_id)): Path<(String, String)>,
@@ -124,20 +382,24 @@ pub async fn delete(
         condition_id, topology_id
     );
 
-    // Verify topology exists
-    let _ = state.db.get_topology(&topology_id).await?
-        .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
+    // Get condition from DB
+    let condition = state.db.get_chaos_condition(&condition_id).await?;
 
-    // Get chaos client
-    let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+    if let Some(cond) = condition {
+        // If active, remove from K8s first
+        if cond.status == ChaosConditionStatus::Active {
+            let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+            let _ = chaos_client.delete_chaos(&topology_id, &condition_id).await;
+        }
 
-    // Delete the chaos resource
-    chaos_client.delete_chaos(&topology_id, &condition_id).await?;
+        // Delete from DB
+        state.db.delete_chaos_condition(&condition_id).await?;
 
-    // Broadcast chaos removed event
-    let _ = state.event_tx.send(crate::api::Event::ChaosRemoved {
-        id: condition_id.clone(),
-    });
+        // Broadcast event
+        let _ = state.event_tx.send(crate::api::Event::ChaosRemoved {
+            id: condition_id.clone(),
+        });
+    }
 
     Ok(Json(serde_json::json!({
         "deleted": condition_id,
@@ -145,7 +407,7 @@ pub async fn delete(
     })))
 }
 
-/// Delete all chaos conditions for a topology
+/// Delete all chaos conditions for a topology (from K8s and DB)
 pub async fn delete_all(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -156,14 +418,28 @@ pub async fn delete_all(
     let _ = state.db.get_topology(&topology_id).await?
         .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
 
-    // Get chaos client
+    // Get all conditions to clean up K8s resources
+    let conditions = state.db.list_chaos_conditions(&topology_id).await?;
+    
+    // Clean up K8s resources
     let chaos_client = ChaosClient::new(CHAOS_NAMESPACE).await?;
+    for condition in &conditions {
+        if condition.status == ChaosConditionStatus::Active {
+            if let Err(e) = chaos_client.delete_chaos(&topology_id, &condition.id).await {
+                warn!("Failed to delete chaos {} from K8s: {}", condition.id, e);
+            }
+        }
+        // Broadcast event for each
+        let _ = state.event_tx.send(crate::api::Event::ChaosRemoved {
+            id: condition.id.clone(),
+        });
+    }
 
-    // Cleanup all chaos for topology
-    chaos_client.cleanup_topology(&topology_id).await?;
+    // Delete all from DB
+    let deleted = state.db.delete_all_chaos_conditions(&topology_id).await?;
 
     Ok(Json(serde_json::json!({
-        "cleanup": "complete",
+        "deleted": deleted,
         "topology_id": topology_id
     })))
 }

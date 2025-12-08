@@ -154,6 +154,54 @@ pub struct CreateChaosRequest {
     pub params: serde_json::Value,
 }
 
+/// Request to update a chaos condition (only editable fields)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateChaosRequest {
+    /// Direction of traffic to affect
+    #[serde(default)]
+    pub direction: ChaosDirection,
+    /// Duration (e.g., "60s", "5m") - if not set, runs until deleted
+    #[serde(default)]
+    pub duration: Option<String>,
+    /// Parameters specific to the chaos type
+    pub params: serde_json::Value,
+}
+
+/// Status of a chaos condition in the system
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ChaosConditionStatus {
+    /// Created but not yet applied to K8s
+    #[default]
+    Pending,
+    /// Currently active in K8s
+    Active,
+    /// Paused (removed from K8s but saved in DB)
+    Paused,
+}
+
+impl std::fmt::Display for ChaosConditionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChaosConditionStatus::Pending => write!(f, "pending"),
+            ChaosConditionStatus::Active => write!(f, "active"),
+            ChaosConditionStatus::Paused => write!(f, "paused"),
+        }
+    }
+}
+
+impl std::str::FromStr for ChaosConditionStatus {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "pending" => Ok(ChaosConditionStatus::Pending),
+            "active" => Ok(ChaosConditionStatus::Active),
+            "paused" => Ok(ChaosConditionStatus::Paused),
+            _ => Err(format!("Unknown status: {}", s)),
+        }
+    }
+}
+
 /// A chaos condition that has been applied
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChaosCondition {
@@ -173,12 +221,16 @@ pub struct ChaosCondition {
     pub duration: Option<String>,
     /// Parameters
     pub params: serde_json::Value,
-    /// Kubernetes resource name
-    pub k8s_name: String,
-    /// Whether the condition is currently active
-    pub active: bool,
+    /// Kubernetes resource name (when active)
+    #[serde(default)]
+    pub k8s_name: Option<String>,
+    /// Current status: pending, active, paused
+    #[serde(default)]
+    pub status: ChaosConditionStatus,
     /// When created
     pub created_at: DateTime<Utc>,
+    /// When last updated
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Status of a chaos condition from Kubernetes
