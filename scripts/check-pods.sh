@@ -33,14 +33,14 @@ echo ""
 
 if [ -n "$TOPOLOGY_ID" ]; then
     # Filtrar por topología específica
-    PODS=$(kubectl get pods -n "$NAMESPACE" -l "networksim.io/topology-id=$TOPOLOGY_ID" --no-headers 2>/dev/null)
+    PODS=$(kubectl get pods -n "$NAMESPACE" -l "networksim.io/topology=$TOPOLOGY_ID" --no-headers 2>/dev/null)
     if [ -z "$PODS" ]; then
         echo "No hay pods para la topología: $TOPOLOGY_ID"
         exit 0
     fi
     echo "Filtrando por topología: $TOPOLOGY_ID"
     echo ""
-    kubectl get pods -n "$NAMESPACE" -l "networksim.io/topology-id=$TOPOLOGY_ID" -o wide
+    kubectl get pods -n "$NAMESPACE" -l "networksim.io/topology=$TOPOLOGY_ID" -o wide
 else
     # Mostrar todos los pods
     kubectl get pods -n "$NAMESPACE" -o wide

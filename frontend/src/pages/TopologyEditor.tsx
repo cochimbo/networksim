@@ -138,7 +138,7 @@ export default function TopologyEditor() {
   });
 
   // Check if THIS topology is deployed
-  const isThisTopologyDeployed = deploymentStatus?.status === 'running' || deploymentStatus?.status === 'pending';
+  const isThisTopologyDeployed = deploymentStatus?.status === 'running' || deploymentStatus?.status === 'pending' || deploymentStatus?.status === 'deploying';
 
   // Node containers (when a node is selected and topology is deployed)
   const { data: selectedNodeContainers }: { data?: ContainerInfo[] } = useQuery({
@@ -739,11 +739,13 @@ export default function TopologyEditor() {
           <div className={`px-2 py-1 rounded text-xs font-medium ${
             deploymentStatus.status === 'running' ? 'bg-green-100 text-green-700' :
             deploymentStatus.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+            deploymentStatus.status === 'deploying' ? 'bg-blue-100 text-blue-700' :
             deploymentStatus.status === 'error' ? 'bg-red-100 text-red-700' :
             'bg-gray-100 text-gray-600'
           }`}>
             {deploymentStatus.status === 'running' ? '● Running' :
              deploymentStatus.status === 'pending' ? '◐ Pending' :
+             deploymentStatus.status === 'deploying' ? '⟳ Deploying' :
              deploymentStatus.status === 'error' ? '✕ Error' :
              '○ Stopped'}
           </div>
