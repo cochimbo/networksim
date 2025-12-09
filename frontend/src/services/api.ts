@@ -204,7 +204,11 @@ export const chaosApi = {
   },
 
   create: async (data: CreateChaosRequest): Promise<ChaosCondition> => {
+    console.log('chaosApi.create called with data:', data);
+    console.log('API_BASE:', API_BASE);
+    console.log('Full URL:', `${API_BASE}/api/chaos`);
     const response = await api.post('/api/chaos', data);
+    console.log('Response:', response);
     return response.data;
   },
 

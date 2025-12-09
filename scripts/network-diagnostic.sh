@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 # Network Diagnostic Script for NetworkSim
 # Verifies connectivity between deployed pods matches the topology graph
 
@@ -70,10 +70,10 @@ print_success "Found $POD_COUNT pods"
 echo ""
 
 # Build maps: node_id -> info, and display_name -> node_id
-declare -A POD_IPS          # node_id -> IP
-declare -A POD_NAMES        # node_id -> pod_name  
-declare -A NODE_DISPLAY     # node_id -> display_name (e.g., "Node 1")
-declare -A DISPLAY_TO_ID    # display_name -> node_id
+typeset -A POD_IPS          # node_id -> IP
+typeset -A POD_NAMES        # node_id -> pod_name  
+typeset -A NODE_DISPLAY     # node_id -> display_name (e.g., "Node 1")
+typeset -A DISPLAY_TO_ID    # display_name -> node_id
 
 for i in $(seq 0 $((POD_COUNT - 1))); do
     POD_NAME=$(echo "$PODS" | jq -r ".items[$i].metadata.name")
@@ -81,10 +81,10 @@ for i in $(seq 0 $((POD_COUNT - 1))); do
     NODE_ID=$(echo "$PODS" | jq -r ".items[$i].metadata.labels[\"networksim.io/node\"] // \"unknown\"")
     DISPLAY_NAME=$(echo "$PODS" | jq -r ".items[$i].metadata.annotations[\"networksim.io/node-name\"] // \"$NODE_ID\"")
     
-    POD_IPS["$NODE_ID"]="$POD_IP"
-    POD_NAMES["$NODE_ID"]="$POD_NAME"
-    NODE_DISPLAY["$NODE_ID"]="$DISPLAY_NAME"
-    DISPLAY_TO_ID["$DISPLAY_NAME"]="$NODE_ID"
+    POD_IPS[$NODE_ID]="$POD_IP"
+    POD_NAMES[$NODE_ID]="$POD_NAME"
+    NODE_DISPLAY[$NODE_ID]="$DISPLAY_NAME"
+    DISPLAY_TO_ID[$DISPLAY_NAME]="$NODE_ID"
     
     echo -e "  ${CYAN}$DISPLAY_NAME${NC}"
     echo "    Pod: $POD_NAME"
@@ -102,20 +102,20 @@ print_info "Found $NETPOL_COUNT network policies"
 echo ""
 
 # Build expected connectivity map from network policies
-declare -A EXPECTED_CONNECTIONS  # node_id -> space-separated list of allowed source node_ids
+typeset -A EXPECTED_CONNECTIONS  # node_id -> space-separated list of allowed source node_ids
 
 for i in $(seq 0 $((NETPOL_COUNT - 1))); do
     TARGET_NODE=$(echo "$NETPOLS" | jq -r ".items[$i].spec.podSelector.matchLabels[\"networksim.io/node\"]")
     TARGET_DISPLAY="${NODE_DISPLAY[$TARGET_NODE]:-$TARGET_NODE}"
     
     # Get allowed source nodes from ingress rules
-    ALLOWED_SOURCES=$(echo "$NETPOLS" | jq -r ".items[$i].spec.ingress[0].from[]?.podSelector.matchLabels[\"networksim.io/node\"] // empty" 2>/dev/null | tr '\n' ' ')
+    ALLOWED_SOURCES=($(echo "$NETPOLS" | jq -r ".items[$i].spec.ingress[0].from // [] | map(.podSelector.matchLabels[\"networksim.io/node\"] // empty)[]"))
     
-    if [ -n "$ALLOWED_SOURCES" ]; then
-        EXPECTED_CONNECTIONS["$TARGET_NODE"]="$ALLOWED_SOURCES"
+    if [ ${#ALLOWED_SOURCES[@]} -gt 0 ]; then
+        EXPECTED_CONNECTIONS[$TARGET_NODE]="${ALLOWED_SOURCES[*]}"
         # Convert source IDs to display names
         SOURCE_NAMES=""
-        for SRC_ID in $ALLOWED_SOURCES; do
+        for SRC_ID in "${ALLOWED_SOURCES[@]}"; do
             SRC_NAME="${NODE_DISPLAY[$SRC_ID]:-$SRC_ID}"
             SOURCE_NAMES="$SOURCE_NAMES $SRC_NAME"
         done
@@ -176,20 +176,20 @@ FAILED_TESTS=0
 UNEXPECTED_PASS=0
 UNEXPECTED_FAIL=0
 
-for FROM_NODE in "${!POD_IPS[@]}"; do
+for FROM_NODE in ${(k)POD_IPS}; do
     FROM_POD="${POD_NAMES[$FROM_NODE]}"
     FROM_IP="${POD_IPS[$FROM_NODE]}"
     FROM_DISPLAY="${NODE_DISPLAY[$FROM_NODE]}"
     
-    if [ "$FROM_IP" == "pending" ]; then
+    if [ "$FROM_IP" = "pending" ]; then
         print_warning "Skipping $FROM_DISPLAY (pod not ready)"
         continue
     fi
     
     echo -e "Testing from: ${CYAN}$FROM_DISPLAY${NC}"
     
-    for TO_NODE in "${!POD_IPS[@]}"; do
-        if [ "$FROM_NODE" == "$TO_NODE" ]; then
+    for TO_NODE in ${(k)POD_IPS}; do
+        if [ "$FROM_NODE" = "$TO_NODE" ]; then
             continue
         fi
         
@@ -197,7 +197,7 @@ for FROM_NODE in "${!POD_IPS[@]}"; do
         TO_POD="${POD_NAMES[$TO_NODE]}"
         TO_DISPLAY="${NODE_DISPLAY[$TO_NODE]}"
         
-        if [ "$TO_IP" == "pending" ]; then
+        if [ "$TO_IP" = "pending" ]; then
             continue
         fi
         
@@ -221,22 +221,22 @@ for FROM_NODE in "${!POD_IPS[@]}"; do
         fi
         
         # Measure latency if connected
-        if [ "$ACTUAL" == "CONNECTED" ]; then
+        if [ "$ACTUAL" = "CONNECTED" ]; then
             LATENCY=$(measure_latency "$FROM_POD" "$TO_IP")
         else
             LATENCY="N/A"
         fi
         
         # Determine status
-        if [ "$EXPECTED" == "ALLOW" ] && [ "$ACTUAL" == "CONNECTED" ]; then
+        if [ "$EXPECTED" = "ALLOW" ] && [ "$ACTUAL" = "CONNECTED" ]; then
             STATUS="PASS"
             PASSED_TESTS=$((PASSED_TESTS + 1))
             print_success "$FROM_DISPLAY → $TO_DISPLAY: Connected (expected) - Latency: ${LATENCY}ms"
-        elif [ "$EXPECTED" == "DENY" ] && [ "$ACTUAL" == "BLOCKED" ]; then
+        elif [ "$EXPECTED" = "DENY" ] && [ "$ACTUAL" = "BLOCKED" ]; then
             STATUS="PASS"
             PASSED_TESTS=$((PASSED_TESTS + 1))
             print_success "$FROM_DISPLAY → $TO_DISPLAY: Blocked (expected)"
-        elif [ "$EXPECTED" == "ALLOW" ] && [ "$ACTUAL" == "BLOCKED" ]; then
+        elif [ "$EXPECTED" = "ALLOW" ] && [ "$ACTUAL" = "BLOCKED" ]; then
             STATUS="FAIL"
             FAILED_TESTS=$((FAILED_TESTS + 1))
             UNEXPECTED_FAIL=$((UNEXPECTED_FAIL + 1))
@@ -280,7 +280,7 @@ echo "Legend: ✓ = Connected, ✗ = Blocked"
 echo ""
 
 # Get node IDs in sorted order by display name
-mapfile -t SORTED_NODE_IDS < <(for k in "${!NODE_DISPLAY[@]}"; do echo "${NODE_DISPLAY[$k]}|$k"; done | sort | cut -d'|' -f2)
+SORTED_NODE_IDS=(${(f)"$(for k in ${(k)NODE_DISPLAY}; do echo "${NODE_DISPLAY[$k]}|$k"; done | sort | cut -d'|' -f2)"})
 
 # Determine column width
 COL_WIDTH=12
@@ -304,13 +304,13 @@ for FROM_ID in "${SORTED_NODE_IDS[@]}"; do
     printf "%${COL_WIDTH}s" "${NODE_DISPLAY[$FROM_ID]}"
     
     for TO_ID in "${SORTED_NODE_IDS[@]}"; do
-        if [ "$FROM_ID" == "$TO_ID" ]; then
+        if [ "$FROM_ID" = "$TO_ID" ]; then
             printf "%${COL_WIDTH}s" "-"
         else
             ROW=$(grep "^$FROM_ID,$TO_ID," "$RESULTS_FILE" 2>/dev/null || echo "")
             if [ -n "$ROW" ]; then
                 ACTUAL=$(echo "$ROW" | cut -d',' -f6)
-                if [ "$ACTUAL" == "CONNECTED" ]; then
+                if [ "$ACTUAL" = "CONNECTED" ]; then
                     printf "%${COL_WIDTH}s" "✓"
                 else
                     printf "%${COL_WIDTH}s" "✗"
@@ -328,12 +328,12 @@ echo ""
 # Network statistics per node
 print_header "Network Statistics per Node"
 
-for NODE_ID in "${!POD_IPS[@]}"; do
+for NODE_ID in ${(k)POD_IPS}; do
     POD_NAME="${POD_NAMES[$NODE_ID]}"
     POD_IP="${POD_IPS[$NODE_ID]}"
     DISPLAY_NAME="${NODE_DISPLAY[$NODE_ID]}"
     
-    if [ "$POD_IP" == "pending" ]; then
+    if [ "$POD_IP" = "pending" ]; then
         continue
     fi
     

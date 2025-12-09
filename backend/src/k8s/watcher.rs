@@ -131,6 +131,17 @@ pub async fn start_chaos_watcher(event_tx: broadcast::Sender<Event>) {
 
     let chaos_api: Api<DynamicObject> = Api::namespaced_with(client, "networksim-sim", &ar);
 
+    // Check if chaos-mesh CRD exists before starting watcher
+    match chaos_api.list(&Default::default()).await {
+        Ok(_) => {
+            info!("Chaos-mesh detected, starting NetworkChaos watcher");
+        }
+        Err(e) => {
+            warn!("Chaos-mesh not available ({}), NetworkChaos watcher disabled", e);
+            return;
+        }
+    }
+
     let watcher_config =
         watcher::Config::default().labels("app.kubernetes.io/managed-by=networksim");
 

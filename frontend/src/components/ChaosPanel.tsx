@@ -95,6 +95,11 @@ export function ChaosPanel({ topologyId, nodes, links, onClose }: ChaosPanelProp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('ChaosPanel handleSubmit called');
+    console.log('topologyId:', topologyId);
+    console.log('sourceNode:', sourceNode);
+    console.log('targetNode:', targetNode);
+    
     const params = buildParams();
     const request: CreateChaosRequest = {
       topology_id: topologyId,
@@ -105,6 +110,8 @@ export function ChaosPanel({ topologyId, nodes, links, onClose }: ChaosPanelProp
       duration: duration || undefined,
       params,
     };
+
+    console.log('Request to send:', request);
 
     try {
       setLoading(true);

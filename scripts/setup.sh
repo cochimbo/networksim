@@ -27,7 +27,7 @@ NC='\033[0m'
 CLUSTER_NAME="networksim"
 NAMESPACE="networksim-sim"
 CALICO_VERSION="v3.27.0"
-CHAOS_MESH_VERSION="2.6.2"
+CHAOS_MESH_VERSION="2.8.0"
 
 # Flags
 SKIP_DEPS=false
@@ -381,10 +381,17 @@ EOF
 install_chaos_mesh() {
     print_step "Installing Chaos Mesh..."
     
-    # Check if already installed
-    if kubectl get namespace chaos-mesh &>/dev/null; then
-        print_success "Chaos Mesh already installed"
+    # Check if already installed and working
+    if kubectl get namespace chaos-mesh &>/dev/null && kubectl get pods -n chaos-mesh -l app.kubernetes.io/instance=chaos-mesh --no-headers 2>/dev/null | grep -q Running; then
+        print_success "Chaos Mesh already installed and running"
         return 0
+    fi
+    
+    # Remove namespace if it exists but chaos-mesh is not working
+    if kubectl get namespace chaos-mesh &>/dev/null; then
+        print_warning "Removing incomplete Chaos Mesh installation..."
+        helm uninstall chaos-mesh -n chaos-mesh 2>/dev/null || true
+        kubectl delete namespace chaos-mesh --timeout=60s 2>/dev/null || true
     fi
     
     # Create namespace
@@ -394,17 +401,25 @@ install_chaos_mesh() {
     helm repo add chaos-mesh https://charts.chaos-mesh.org 2>/dev/null || true
     helm repo update
     
-    # Install Chaos Mesh
+    # Install Chaos Mesh with correct configuration for K3s
     helm install chaos-mesh chaos-mesh/chaos-mesh \
         -n chaos-mesh \
         --set chaosDaemon.runtime=containerd \
         --set chaosDaemon.socketPath=/run/k3s/containerd/containerd.sock \
-        --version ${CHAOS_MESH_VERSION}
+        --version ${CHAOS_MESH_VERSION} \
+        --wait
     
     print_step "Waiting for Chaos Mesh to be ready..."
-    kubectl wait --for=condition=Ready pods -l app.kubernetes.io/instance=chaos-mesh -n chaos-mesh --timeout=300s 2>/dev/null || true
+    kubectl wait --for=condition=Ready pods -l app.kubernetes.io/instance=chaos-mesh -n chaos-mesh --timeout=300s
     
-    print_success "Chaos Mesh installed"
+    # Verify installation
+    if kubectl get pods -n chaos-mesh -l app.kubernetes.io/instance=chaos-mesh --no-headers | grep -q Running; then
+        print_success "Chaos Mesh installed and verified"
+    else
+        print_error "Chaos Mesh installation failed"
+        kubectl get pods -n chaos-mesh
+        return 1
+    fi
 }
 
 # Create simulation namespace
