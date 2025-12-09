@@ -18,6 +18,9 @@ pub struct Config {
 
     #[serde(default = "default_k8s_namespace_sim")]
     pub k8s_namespace_sim: String,
+
+    #[serde(default = "default_helm_namespace")]
+    pub helm_namespace: Option<String>,
 }
 
 fn default_port() -> u16 {
@@ -38,6 +41,11 @@ fn default_k8s_namespace_system() -> String {
 
 fn default_k8s_namespace_sim() -> String {
     "networksim-sim".to_string()
+}
+
+fn default_helm_namespace() -> Option<String> {
+    // Use the same namespace as the simulation for proper network policies
+    Some(default_k8s_namespace_sim())
 }
 
 impl Config {
@@ -65,6 +73,7 @@ impl Default for Config {
             kubeconfig: default_kubeconfig(),
             k8s_namespace_system: default_k8s_namespace_system(),
             k8s_namespace_sim: default_k8s_namespace_sim(),
+            helm_namespace: default_helm_namespace(),
         }
     }
 }

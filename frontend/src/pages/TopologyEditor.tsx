@@ -6,6 +6,7 @@ import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Ma
 import { topologyApi, clusterApi, deploymentApi, chaosApi, diagnosticApi, Topology, Node, Link, ContainerInfo } from '../services/api';
 import { ChaosPanel } from '../components/ChaosPanel';
 import { DeploymentModal, DeploymentAction, DeploymentPhase } from '../components/DeploymentModal';
+import { ApplicationsModal } from '../components/ApplicationsModal';
 import { useWebSocketEvents, WebSocketEvent } from '../contexts/WebSocketContext';
 
 // Node status from K8s
@@ -39,6 +40,11 @@ export default function TopologyEditor() {
     action: DeploymentAction;
     phase: DeploymentPhase;
     message?: string;
+  } | null>(null);
+  const [applicationsModal, setApplicationsModal] = useState<{
+    show: boolean;
+    nodeId: string;
+    nodeName: string;
   } | null>(null);
 
   // Refs to access current values in event handlers
@@ -820,172 +826,196 @@ export default function TopologyEditor() {
         </div>
       </div>
 
-      {/* Properties panel abajo */}
-      <div className="bg-white border-t border-gray-200 p-4 overflow-y-auto max-h-64">
-        <h3 className="font-medium text-gray-900 mb-4">Properties</h3>
+      {/* Properties panel abajo - ultra compacto en 3 columnas */}
+      <div className="bg-white border-t border-gray-200 p-3 overflow-y-auto max-h-40">
+        <h3 className="font-medium text-gray-900 mb-2 text-sm">Properties</h3>
 
         {selectedElement ? (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-gray-500 mb-1">Type</label>
-              <p className="text-sm font-medium capitalize">{selectedElement.type}</p>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-500 mb-1">ID</label>
-              <p className="text-sm font-mono text-xs break-all">{selectedElement.data.id}</p>
-            </div>
-            {selectedElement.type === 'node' && (
-              <>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Name</label>
-                  <input
-                    type="text"
-                    value={selectedElement.data.name}
-                    onChange={(e) => {
-                      const newName = e.target.value;
-                      setNodes((prev) =>
-                        prev.map((n) =>
-                          n.id === selectedElement.data.id ? { ...n, name: newName } : n
-                        )
-                      );
-                      if (cyInstance.current) {
-                        cyInstance.current.$(`#${selectedElement.data.id}`).data('name', newName);
-                      }
-                      setSelectedElement({
-                        ...selectedElement,
-                        data: { ...selectedElement.data, name: newName },
-                      });
-                    }}
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+          <div className="grid grid-cols-3 gap-3">
+            {/* Columna 1: Información básica */}
+            <div className="space-y-2">
+              <div className="text-xs text-gray-500 uppercase tracking-wide">{selectedElement.type}</div>
+              <div className="text-xs font-mono text-gray-400">{selectedElement.data.id.slice(-8)}</div>
+              {selectedElement.type === 'node' && nodeStatuses[selectedElement.data.id] && (
+                <div className="flex items-center gap-1">
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: STATUS_COLORS[nodeStatuses[selectedElement.data.id]] }}
                   />
+                  <span className="text-xs text-gray-600 capitalize">
+                    {nodeStatuses[selectedElement.data.id]}
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Container Image</label>
-                  <input
-                    type="text"
-                    value={nodes.find(n => n.id === selectedElement.data.id)?.config.image || ''}
-                    onChange={(e) => {
-                      const image = e.target.value;
-                      setNodes((prev) =>
-                        prev.map((n) =>
-                          n.id === selectedElement.data.id ? { ...n, config: { ...n.config, image } } : n
-                        )
-                      );
-                    }}
-                    placeholder="nginx:latest"
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                  />
-                </div>
+              )}
+              {selectedElement.type === 'edge' && (
+                <>
+                  <div className="text-xs">
+                    <span className="text-gray-500">From:</span>
+                    <div className="font-mono text-gray-400">{selectedElement.data.source.slice(-8)}</div>
+                  </div>
+                  <div className="text-xs">
+                    <span className="text-gray-500">To:</span>
+                    <div className="font-mono text-gray-400">{selectedElement.data.target.slice(-8)}</div>
+                  </div>
+                </>
+              )}
+            </div>
 
-                {/* Container Information Section */}
-                {isThisTopologyDeployed && selectedNodeContainers && selectedNodeContainers.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Running Containers</h4>
-                    <div className="space-y-2">
-                      {selectedNodeContainers.map((container, index) => (
-                        <div key={index} className="bg-gray-50 p-3 rounded-md border">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium text-gray-900">{container.name}</span>
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              container.ready 
-                                ? 'bg-green-100 text-green-800' 
+            {/* Columna 2: Campos editables */}
+            <div className="space-y-2">
+              {selectedElement.type === 'node' && (
+                <>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={selectedElement.data.name}
+                      onChange={(e) => {
+                        const newName = e.target.value;
+                        setNodes((prev) =>
+                          prev.map((n) =>
+                            n.id === selectedElement.data.id ? { ...n, name: newName } : n
+                          )
+                        );
+                        if (cyInstance.current) {
+                          cyInstance.current.$(`#${selectedElement.data.id}`).data('name', newName);
+                        }
+                        setSelectedElement({
+                          ...selectedElement,
+                          data: { ...selectedElement.data, name: newName },
+                        });
+                      }}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  {/* Helm Applications Button - Only available when topology is deployed */}
+                  <button
+                    onClick={() => setApplicationsModal({
+                      show: true,
+                      nodeId: selectedElement.data.id,
+                      nodeName: selectedElement.data.name
+                    })}
+                    className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    disabled={!clusterStatus?.connected || !isThisTopologyDeployed}
+                    title={
+                      !clusterStatus?.connected 
+                        ? "Kubernetes cluster not connected" 
+                        : !isThisTopologyDeployed 
+                          ? "Deploy the topology first to manage Helm applications"
+                          : "Manage Helm applications"
+                    }
+                  >
+                    <span className="text-sm">⚓</span>
+                    Helm Apps
+                  </button>
+                </>
+              )}
+              {selectedElement.type === 'edge' && (
+                <>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Bandwidth</label>
+                    <input
+                      type="text"
+                      value={links.find(l => l.id === selectedElement.data.id)?.properties?.bandwidth || ''}
+                      onChange={(e) => {
+                        const bandwidth = e.target.value;
+                        setLinks((prev) =>
+                          prev.map((l) =>
+                            l.id === selectedElement.data.id ? {
+                              ...l,
+                              properties: { ...l.properties, bandwidth }
+                            } : l
+                          )
+                        );
+                      }}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                      placeholder="1Mbps"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Latency</label>
+                    <input
+                      type="text"
+                      value={links.find(l => l.id === selectedElement.data.id)?.properties?.latency || ''}
+                      onChange={(e) => {
+                        const latency = e.target.value;
+                        setLinks((prev) =>
+                          prev.map((l) =>
+                            l.id === selectedElement.data.id ? {
+                              ...l,
+                              properties: { ...l.properties, latency }
+                            } : l
+                          )
+                        );
+                      }}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                      placeholder="10ms"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Columna 3: Información adicional */}
+            <div className="space-y-2">
+              {selectedElement.type === 'node' && isThisTopologyDeployed && selectedNodeContainers && selectedNodeContainers.length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Containers ({selectedNodeContainers.length})</div>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {selectedNodeContainers.map((container, index) => (
+                      <div key={index} className="bg-gray-50 px-2 py-1.5 rounded text-xs border">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-gray-900 truncate" title={container.name}>
+                            {container.application_name ? `${container.application_name} (${container.name})` : container.name}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className={`px-1 py-0.5 rounded-full text-xs ${
+                              container.ready
+                                ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                             }`}>
                               {container.status}
                             </span>
-                          </div>
-                          <div className="text-xs text-gray-600 space-y-1">
-                            <div>Image: {container.image}</div>
-                            <div>Restarts: {container.restart_count}</div>
-                            {container.started_at && (
-                              <div>Started: {new Date(container.started_at).toLocaleString()}</div>
+                            {container.restart_count > 0 && (
+                              <span className="text-gray-500">🔄{container.restart_count}</span>
                             )}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        <div className="text-gray-600 text-xs space-y-0.5">
+                          {container.application_chart && (
+                            <div>Chart: {container.application_chart}</div>
+                          )}
+                          <div className="truncate" title={container.image}>Image: {container.image}</div>
+                          {container.ports && container.ports.length > 0 && (
+                            <div>
+                              Ports: {container.ports.map(p => `${p.container_port}/${p.protocol.toLowerCase()}`).join(', ')}
+                            </div>
+                          )}
+                          {container.started_at && (
+                            <div>Started: {new Date(container.started_at).toLocaleString()}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                )}
-
-                {selectedElement.type === 'edge' && (
-                  <div>
-                    <label className="block text-sm text-gray-500 mb-1">K8s Status</label>
-                    <div className="flex items-center gap-2">
-                      <span 
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: STATUS_COLORS[nodeStatuses[selectedElement.data.id]] }}
-                      />
-                      <span className="text-sm font-medium capitalize">
-                        {nodeStatuses[selectedElement.data.id]}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-            {selectedElement.type === 'edge' && (
-              <>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Source</label>
-                  <p className="text-sm font-mono text-xs">{selectedElement.data.source}</p>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Target</label>
-                  <p className="text-sm font-mono text-xs">{selectedElement.data.target}</p>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Bandwidth</label>
-                  <input
-                    type="text"
-                    value={links.find(l => l.id === selectedElement.data.id)?.properties?.bandwidth || ''}
-                    onChange={(e) => {
-                      const bandwidth = e.target.value;
-                      setLinks((prev) =>
-                        prev.map((l) =>
-                          l.id === selectedElement.data.id 
-                            ? { ...l, properties: { ...l.properties, bandwidth } } 
-                            : l
-                        )
-                      );
-                    }}
-                    placeholder="100Mbps"
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Latency</label>
-                  <input
-                    type="text"
-                    value={links.find(l => l.id === selectedElement.data.id)?.properties?.latency || ''}
-                    onChange={(e) => {
-                      const latency = e.target.value;
-                      setLinks((prev) =>
-                        prev.map((l) =>
-                          l.id === selectedElement.data.id 
-                            ? { ...l, properties: { ...l.properties, latency } } 
-                            : l
-                        )
-                      );
-                    }}
-                    placeholder="10ms"
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
-                  />
-                </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
         ) : (
-          <p className="text-sm text-gray-500">Select a node or edge to view properties</p>
+          <div className="text-center text-gray-400 text-sm py-2">
+            Select a node or link
+          </div>
         )}
 
-        {/* Description */}
-        <div className="mt-6">
-          <label className="block text-sm text-gray-500 mb-1">Description</label>
+        {/* Description - ocupa todo el ancho */}
+        <div className="mt-2 border-t border-gray-100 pt-2">
+          <label className="block text-xs text-gray-500 mb-1">Description</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md text-sm"
+            rows={2}
+            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Add a description..."
             disabled={isDeployed}
           />
@@ -1000,6 +1030,17 @@ export default function TopologyEditor() {
           message={deployModal.message}
           nodeCount={nodes.length}
           onClose={() => setDeployModal(null)}
+        />
+      )}
+
+      {/* Applications Modal */}
+      {applicationsModal?.show && id && (
+        <ApplicationsModal
+          topologyId={id}
+          nodeId={applicationsModal.nodeId}
+          nodeName={applicationsModal.nodeName}
+          isOpen={applicationsModal.show}
+          onClose={() => setApplicationsModal(null)}
         />
       )}
     </div>

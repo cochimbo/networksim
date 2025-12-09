@@ -1,3 +1,4 @@
+pub mod applications;
 pub mod chaos;
 pub mod deploy;
 pub mod diagnostic;
@@ -8,6 +9,7 @@ pub mod ws;
 
 use crate::config::Config;
 use crate::db::Database;
+use crate::helm::HelmClient;
 use crate::k8s::K8sClient;
 #[allow(unused_imports)]
 use std::sync::Arc;
@@ -21,6 +23,7 @@ pub struct AppState {
     pub config: Config,
     pub event_tx: broadcast::Sender<Event>,
     pub k8s: Option<K8sClient>,
+    pub helm: Option<HelmClient>,
 }
 
 impl AppState {
@@ -31,11 +34,17 @@ impl AppState {
             config,
             event_tx,
             k8s: None,
+            helm: None,
         }
     }
 
     pub fn with_k8s(mut self, k8s: K8sClient) -> Self {
         self.k8s = Some(k8s);
+        self
+    }
+
+    pub fn with_helm(mut self, helm: HelmClient) -> Self {
+        self.helm = Some(helm);
         self
     }
 }

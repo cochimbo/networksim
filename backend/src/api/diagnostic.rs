@@ -95,6 +95,17 @@ pub struct ContainerInfo {
     pub ready: bool,
     pub restart_count: i32,
     pub started_at: Option<String>,
+    pub ports: Vec<ContainerPort>,
+    pub application_name: Option<String>,
+    pub application_chart: Option<String>,
+}
+
+/// Container port information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerPort {
+    pub container_port: i32,
+    pub protocol: String,
+    pub name: Option<String>,
 }
 
 /// Run network diagnostic for a deployed topology
@@ -418,8 +429,13 @@ pub async fn get_node_containers(
         .await
         .map_err(|e| AppError::internal(&format!("Failed to get pod {}: {}", &pod_name, e)))?;
 
+    // Get applications for this node to show their containers too
+    let applications = state.db.list_applications_by_node(&node_id).await
+        .unwrap_or_default();
+
     let mut containers = Vec::new();
 
+    // First, add containers from the node pod
     if let Some(status) = &pod.status {
         if let Some(container_statuses) = &status.container_statuses {
             for container_status in container_statuses {
@@ -447,6 +463,27 @@ pub async fn get_node_containers(
                     "Unknown"
                 };
 
+                // Get ports from spec
+                let ports = if let Some(spec) = &pod.spec {
+                    spec.containers
+                        .iter()
+                        .find(|c| c.name == container_status.name)
+                        .and_then(|c| c.ports.as_ref())
+                        .map(|ports| {
+                            ports
+                                .iter()
+                                .map(|p| ContainerPort {
+                                    container_port: p.container_port,
+                                    protocol: p.protocol.clone().unwrap_or_else(|| "TCP".to_string()),
+                                    name: p.name.clone(),
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                } else {
+                    Vec::new()
+                };
+
                 containers.push(ContainerInfo {
                     name: container_status.name.clone(),
                     image: container_status.image.clone(),
@@ -454,7 +491,86 @@ pub async fn get_node_containers(
                     ready,
                     restart_count,
                     started_at,
+                    ports,
+                    application_name: Some("Node Base".to_string()),
+                    application_chart: Some("alpine".to_string()),
                 });
+            }
+        }
+    }
+
+    // Then, add containers from applications deployed to this node
+    for app in &applications {
+        // Find pods created by this application
+        let label_selector = format!("app.kubernetes.io/instance={}", app.release_name);
+        let app_pods: Vec<k8s_openapi::api::core::v1::Pod> = pods
+            .list(&kube::api::ListParams::default().labels(&label_selector))
+            .await
+            .map(|list| list.items)
+            .unwrap_or_default();
+
+        for app_pod in app_pods {
+            if let Some(status) = &app_pod.status {
+                if let Some(container_statuses) = &status.container_statuses {
+                    for container_status in container_statuses {
+                        let ready = container_status.ready;
+                        let restart_count = container_status.restart_count;
+                        let started_at = container_status
+                            .state
+                            .as_ref()
+                            .and_then(|state| state.running.as_ref())
+                            .and_then(|running| running.started_at.as_ref())
+                            .map(|time| time.0.to_string());
+
+                        // Determine status
+                        let status = if ready {
+                            "Running"
+                        } else if let Some(state) = &container_status.state {
+                            if state.waiting.is_some() {
+                                "Waiting"
+                            } else if state.terminated.is_some() {
+                                "Terminated"
+                            } else {
+                                "Unknown"
+                            }
+                        } else {
+                            "Unknown"
+                        };
+
+                        // Get ports from spec
+                        let ports = if let Some(spec) = &app_pod.spec {
+                            spec.containers
+                                .iter()
+                                .find(|c| c.name == container_status.name)
+                                .and_then(|c| c.ports.as_ref())
+                                .map(|ports| {
+                                    ports
+                                        .iter()
+                                        .map(|p| ContainerPort {
+                                        container_port: p.container_port,
+                                        protocol: p.protocol.clone().unwrap_or_else(|| "TCP".to_string()),
+                                        name: p.name.clone(),
+                                    })
+                                    .collect()
+                                })
+                                .unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        };
+
+                        containers.push(ContainerInfo {
+                            name: container_status.name.clone(),
+                            image: container_status.image.clone(),
+                            status: status.to_string(),
+                            ready,
+                            restart_count,
+                            started_at,
+                            ports,
+                            application_name: Some(app.name.clone()),
+                            application_chart: Some(app.chart.clone()),
+                        });
+                    }
+                }
             }
         }
     }

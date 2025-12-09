@@ -12,6 +12,6 @@ mod resources;
 mod watcher;
 
 pub use client::K8sClient;
-pub use deployment::{DeploymentManager, DeploymentStatus, NodeStatus};
+pub use deployment::{DeploymentManager, DeploymentStatus, DeploymentState, NodeStatus};
 pub use resources::{create_network_policy, create_pod_spec, create_service};
 pub use watcher::{start_chaos_watcher, start_pod_watcher};

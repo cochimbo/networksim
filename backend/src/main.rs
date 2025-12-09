@@ -7,6 +7,7 @@ use networksim_backend::{
     config::Config,
     create_router,
     db::Database,
+    helm::HelmClient,
     k8s::{start_chaos_watcher, start_pod_watcher, K8sClient},
 };
 
@@ -59,6 +60,12 @@ async fn main() -> Result<()> {
             false
         }
     };
+
+    // Initialize Helm client (optional)
+    let helm_namespace = config.helm_namespace.clone().unwrap_or_else(|| "default".to_string());
+    let helm = HelmClient::new(helm_namespace);
+    state = state.with_helm(helm);
+    tracing::info!("Helm client initialized");
 
     // Start Kubernetes watchers if connected
     if k8s_connected {

@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{sqlite::SqlitePoolOptions, FromRow, Pool, Sqlite};
 
 use crate::chaos::{ChaosCondition, ChaosConditionStatus, ChaosDirection, ChaosType};
-use crate::models::Topology;
+use crate::models::{Application, Topology};
 
 pub type DbPool = Pool<Sqlite>;
 
@@ -34,6 +34,22 @@ struct ChaosConditionRow {
     params: String,
     status: String,
     k8s_name: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(FromRow)]
+struct ApplicationRow {
+    id: String,
+    topology_id: String,
+    node_id: String,
+    name: String,
+    chart: String,
+    version: Option<String>,
+    namespace: String,
+    values: Option<String>,
+    status: String,
+    release_name: Option<String>,
     created_at: String,
     updated_at: String,
 }
@@ -232,6 +248,139 @@ impl Database {
         Ok(result.rows_affected())
     }
 
+    /// Create a new application
+    pub async fn create_application(&self, app: &Application) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT INTO applications (id, topology_id, node_id, name, chart, version, namespace, \"values\", status, release_name, created_at, updated_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(app.id.to_string())
+        .bind(app.topology_id.to_string())
+        .bind(&app.node_id)
+        .bind(&app.name)
+        .bind(&app.chart)
+        .bind(&app.version)
+        .bind(&app.namespace)
+        .bind(app.values.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()))
+        .bind(app.status.to_string())
+        .bind(&app.release_name)
+        .bind(app.created_at.to_rfc3339())
+        .bind(app.updated_at.to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Get an application by ID
+    pub async fn get_application(&self, id: &str) -> Result<Option<Application>, sqlx::Error> {
+        let row: Option<ApplicationRow> = sqlx::query_as(
+            "SELECT id, topology_id, node_id, name, chart, version, namespace, \"values\", status, release_name, created_at, updated_at 
+             FROM applications WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        row.map(Self::row_to_application).transpose()
+    }
+
+    /// List all applications for a topology
+    pub async fn list_applications(&self, topology_id: &str) -> Result<Vec<Application>, sqlx::Error> {
+        let rows: Vec<ApplicationRow> = sqlx::query_as(
+            "SELECT id, topology_id, node_id, name, chart, version, namespace, \"values\", status, release_name, created_at, updated_at 
+             FROM applications WHERE topology_id = ? ORDER BY created_at",
+        )
+        .bind(topology_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter().map(Self::row_to_application).collect()
+    }
+
+    /// List all applications for a specific node
+    pub async fn list_applications_by_node(&self, node_id: &str) -> Result<Vec<Application>, sqlx::Error> {
+        let rows: Vec<ApplicationRow> = sqlx::query_as(
+            "SELECT id, topology_id, node_id, name, chart, version, namespace, \"values\", status, release_name, created_at, updated_at 
+             FROM applications WHERE node_id = ? ORDER BY created_at",
+        )
+        .bind(node_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.into_iter().map(Self::row_to_application).collect()
+    }
+
+    /// Update application status and release name
+    pub async fn update_application_status(
+        &self,
+        id: &str,
+        status: &crate::models::AppStatus,
+        release_name: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "UPDATE applications SET status = ?, release_name = ?, updated_at = ? WHERE id = ?",
+        )
+        .bind(status.to_string())
+        .bind(release_name)
+        .bind(&now)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Update application (all fields)
+    pub async fn update_application(&self, app: &Application) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE applications SET 
+                name = ?, 
+                chart = ?, 
+                version = ?, 
+                namespace = ?, 
+                \"values\" = ?, 
+                status = ?, 
+                release_name = ?, 
+                updated_at = ? 
+             WHERE id = ?",
+        )
+        .bind(&app.name)
+        .bind(&app.chart)
+        .bind(&app.version)
+        .bind(&app.namespace)
+        .bind(app.values.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()))
+        .bind(app.status.to_string())
+        .bind(&app.release_name)
+        .bind(app.updated_at.to_rfc3339())
+        .bind(&app.id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Delete an application
+    pub async fn delete_application(&self, id: &str) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM applications WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Delete all applications for a topology
+    pub async fn delete_all_applications(&self, topology_id: &str) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM applications WHERE topology_id = ?")
+            .bind(topology_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(result.rows_affected())
+    }
+
     /// Helper to convert row to ChaosCondition
     fn row_to_chaos_condition(row: ChaosConditionRow) -> Result<ChaosCondition, sqlx::Error> {
         let chaos_type = match row.chaos_type.as_str() {
@@ -270,6 +419,48 @@ impl Database {
             params,
             status,
             k8s_name: row.k8s_name,
+            created_at: row
+                .created_at
+                .parse::<DateTime<Utc>>()
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            updated_at: row
+                .updated_at
+                .parse::<DateTime<Utc>>()
+                .map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+        })
+    }
+
+    /// Helper to convert row to Application
+    fn row_to_application(row: ApplicationRow) -> Result<Application, sqlx::Error> {
+        use crate::models::AppStatus;
+        use uuid::Uuid;
+
+        let status = match row.status.to_lowercase().as_str() {
+            "pending" => AppStatus::Pending,
+            "deploying" => AppStatus::Deploying,
+            "deployed" => AppStatus::Deployed,
+            "failed" => AppStatus::Failed,
+            "uninstalling" => AppStatus::Uninstalling,
+            _ => AppStatus::Pending,
+        };
+
+        let values = if let Some(values_str) = row.values {
+            Some(serde_json::from_str(&values_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?)
+        } else {
+            None
+        };
+
+        Ok(Application {
+            id: Uuid::parse_str(&row.id).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            topology_id: Uuid::parse_str(&row.topology_id).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
+            node_id: row.node_id,
+            name: row.name,
+            chart: row.chart,
+            version: row.version,
+            namespace: row.namespace,
+            values,
+            status,
+            release_name: row.release_name.unwrap_or_default(),
             created_at: row
                 .created_at
                 .parse::<DateTime<Utc>>()

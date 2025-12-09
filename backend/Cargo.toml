@@ -35,10 +35,15 @@ metrics-exporter-prometheus = "0.12"
 # Utilities
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
+strum = { version = "0.25", features = ["derive"] }
 thiserror = "1"
 anyhow = "1"
 config = "0.14"
 dotenvy = "0.15"
+
+# Command execution
+tokio-process = "0.2"
+async-process = "1.7"
 
 # WebSocket
 tokio-tungstenite = "0.21"

@@ -277,11 +277,77 @@ export interface ContainerInfo {
   ready: boolean;
   restart_count: number;
   started_at?: string;
+  ports?: ContainerPort[];
+  application_name?: string;
+  application_chart?: string;
+}
+
+export interface ContainerPort {
+  container_port: number;
+  protocol: string;
+  name?: string;
 }
 
 export const diagnosticApi = {
   getNodeContainers: async (topologyId: string, nodeId: string): Promise<ContainerInfo[]> => {
     const response = await api.get(`/api/topologies/${topologyId}/nodes/${nodeId}/containers`);
+    return response.data;
+  },
+};
+
+// Application Types
+export type AppStatus = 'pending' | 'deploying' | 'deployed' | 'failed' | 'uninstalling';
+
+export interface Application {
+  id: string;
+  topology_id: string;
+  node_id: string;
+  name: string;
+  chart: string;
+  version?: string;
+  namespace: string;
+  values?: Record<string, any>;
+  status: AppStatus;
+  release_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeployAppRequest {
+  chart: string;
+  name?: string;
+  version?: string;
+  // namespace is now fixed to simulation namespace for network policies
+  values?: Record<string, any>;
+}
+
+export interface AppLogs {
+  logs: string;
+  truncated: boolean;
+}
+
+export const applicationsApi = {
+  deploy: async (topologyId: string, nodeId: string, request: DeployAppRequest): Promise<Application> => {
+    const response = await api.post(`/api/topologies/${topologyId}/nodes/${nodeId}/apps`, request);
+    return response.data;
+  },
+
+  listByNode: async (topologyId: string, nodeId: string): Promise<Application[]> => {
+    const response = await api.get(`/api/topologies/${topologyId}/nodes/${nodeId}/apps`);
+    return response.data;
+  },
+
+  get: async (topologyId: string, appId: string): Promise<Application> => {
+    const response = await api.get(`/api/topologies/${topologyId}/apps/${appId}`);
+    return response.data;
+  },
+
+  uninstall: async (topologyId: string, appId: string): Promise<void> => {
+    await api.delete(`/api/topologies/${topologyId}/apps/${appId}`);
+  },
+
+  getLogs: async (topologyId: string, appId: string): Promise<AppLogs> => {
+    const response = await api.get(`/api/topologies/${topologyId}/apps/${appId}/logs`);
     return response.data;
   },
 };
