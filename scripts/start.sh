@@ -14,7 +14,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-PROJECT_DIR="/home/cochimbo/networksim"
+PROJECT_DIR=".."
 BACKEND_LOG="/tmp/networksim-backend.log"
 FRONTEND_LOG="/tmp/networksim-frontend.log"
 
