@@ -2,6 +2,7 @@
 //!
 //! Functions to create Pod, Service, and NetworkPolicy specs from topology data
 
+use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{
     Container, ContainerPort, EnvVar, Pod, PodSpec, ResourceRequirements, Service, ServicePort,
     ServiceSpec,
@@ -15,7 +16,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use std::collections::BTreeMap;
 
-use crate::models::{Node, NodeConfig};
+use crate::models::{Node, NodeConfig, Application};
 
 /// Default container image for simulation nodes
 pub const DEFAULT_NODE_IMAGE: &str = "alpine:3.18";
@@ -431,5 +432,221 @@ mod tests {
         let ingress = spec.ingress.unwrap();
         assert_eq!(ingress.len(), 1);
         assert_eq!(ingress[0].from.as_ref().unwrap().len(), 2);
+    }
+}
+
+/// Create a Pod spec for a topology node with applications as sidecars
+pub fn create_pod_spec_with_applications(topology_id: &str, node: &Node, applications: &[Application]) -> Pod {
+    let labels = topology_labels(topology_id, &node.id);
+    let image = node
+        .config
+        .image
+        .clone()
+        .unwrap_or_else(|| DEFAULT_NODE_IMAGE.to_string());
+
+    // Build resource requirements
+    let resources = build_resource_requirements(&node.config);
+
+    // Build environment variables
+    let env_vars = build_env_vars(&node.config, &node.name, topology_id);
+
+    // DNS-safe name: prefix with 'ns-' and use short topology id
+    let short_id = &topology_id[..8.min(topology_id.len())];
+    let pod_name = format!("ns-{}-{}", short_id, node.id).to_lowercase();
+
+    // Create main container
+    let mut containers = vec![Container {
+        name: "main".to_string(),
+        image: Some(image),
+        image_pull_policy: Some("IfNotPresent".to_string()),
+        // Keep the container running with a sleep command
+        command: Some(vec!["/bin/sh".to_string()]),
+        args: Some(vec![
+            "-c".to_string(),
+            "trap 'exit 0' TERM; while true; do sleep 1; done".to_string(),
+        ]),
+        resources: Some(resources),
+        env: Some(env_vars),
+        ports: Some(vec![ContainerPort {
+            container_port: 8080,
+            name: Some("http".to_string()),
+            protocol: Some("TCP".to_string()),
+            ..Default::default()
+        }]),
+        ..Default::default()
+    }];
+
+    // Add application containers as sidecars
+    for app in applications {
+        let app_container = create_application_container(app);
+        containers.push(app_container);
+    }
+
+    Pod {
+        metadata: ObjectMeta {
+            name: Some(pod_name),
+            namespace: Some("networksim-sim".to_string()),
+            labels: Some(labels.clone()),
+            annotations: Some(
+                [("networksim.io/node-name".to_string(), node.name.clone())]
+                    .into_iter()
+                    .collect(),
+            ),
+            ..Default::default()
+        },
+        spec: Some(PodSpec {
+            containers,
+            restart_policy: Some("Always".to_string()),
+            // Use host networking for simplicity in simulation
+            // In production, would use CNI plugin for proper network simulation
+            dns_policy: Some("ClusterFirst".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+/// Create a container spec for an application
+pub fn create_application_container(app: &Application) -> Container {
+    // Determine the image based on chart type and reference
+    let image = match app.chart_type {
+        crate::models::ChartType::Predefined => {
+            // Map common applications to their official images
+            match app.chart_reference.to_lowercase().as_str() {
+                "grafana" => "grafana/grafana:latest".to_string(),
+                "nginx" => "nginx:alpine".to_string(),
+                "redis" => "redis:alpine".to_string(),
+                "postgres" => "postgres:alpine".to_string(),
+                "mysql" => "mysql:8.0".to_string(),
+                "mongodb" => "mongo:latest".to_string(),
+                "prometheus" => "prom/prometheus:latest".to_string(),
+                "elasticsearch" => "elasticsearch:8.11.0".to_string(),
+                "kibana" => "kibana:8.11.0".to_string(),
+                // For other references, try to use them directly or with bitnami prefix
+                _ => {
+                    if app.chart_reference.contains('/') {
+                        // Full reference like bitnami/nginx or custom/image:tag
+                        format!("docker.io/{}", app.chart_reference)
+                    } else {
+                        // Just name like nginx -> bitnami/nginx (fallback)
+                        format!("docker.io/bitnami/{}", app.chart_reference)
+                    }
+                }
+            }
+        }
+        crate::models::ChartType::Custom => {
+            // For custom charts, assume it's a full image reference
+            app.chart_reference.clone()
+        }
+    };
+
+    // Create environment variables for the application
+    let mut env_vars = vec![
+        EnvVar {
+            name: "APPLICATION_NAME".to_string(),
+            value: Some(app.name.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "APPLICATION_CHART".to_string(),
+            value: Some(app.chart_reference.clone()),
+            ..Default::default()
+        },
+    ];
+
+    // Add custom values as environment variables if they exist
+    if let Some(values) = &app.values {
+        if let Some(obj) = values.as_object() {
+            for (key, value) in obj {
+                if let Some(str_val) = value.as_str() {
+                    env_vars.push(EnvVar {
+                        name: format!("APP_{}", key.to_uppercase()),
+                        value: Some(str_val.to_string()),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+    }
+
+    Container {
+        name: format!("app-{}", app.id.simple()),
+        image: Some(image),
+        image_pull_policy: Some("IfNotPresent".to_string()),
+        env: Some(env_vars),
+        // Basic resource limits for applications
+        resources: Some(ResourceRequirements {
+            limits: Some({
+                let mut limits = BTreeMap::new();
+                limits.insert("cpu".to_string(), Quantity("200m".to_string()));
+                limits.insert("memory".to_string(), Quantity("256Mi".to_string()));
+                limits
+            }),
+            requests: Some({
+                let mut requests = BTreeMap::new();
+                requests.insert("cpu".to_string(), Quantity("50m".to_string()));
+                requests.insert("memory".to_string(), Quantity("64Mi".to_string()));
+                requests
+            }),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+/// Create a Deployment spec for an application
+pub fn create_application_deployment(app: &Application, node_id: &str, topology_id: &str) -> Deployment {
+    use k8s_openapi::api::apps::v1::{DeploymentSpec, DeploymentStrategy};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    
+    let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+    
+    let mut labels = BTreeMap::new();
+    labels.insert("app.kubernetes.io/name".to_string(), app.name.clone());
+    labels.insert("app.kubernetes.io/managed-by".to_string(), "networksim".to_string());
+    labels.insert("networksim.io/topology".to_string(), topology_id.to_string());
+    labels.insert("networksim.io/node".to_string(), node_id.to_string());
+    labels.insert("networksim.io/application".to_string(), app.id.to_string());
+    
+    let app_container = create_application_container(app);
+    
+    let pod_spec = PodSpec {
+        containers: vec![app_container],
+        restart_policy: Some("Always".to_string()),
+        ..Default::default()
+    };
+    
+    let pod_template_spec = k8s_openapi::api::core::v1::PodTemplateSpec {
+        metadata: Some(ObjectMeta {
+            labels: Some(labels.clone()),
+            ..Default::default()
+        }),
+        spec: Some(pod_spec),
+    };
+    
+    let label_selector = LabelSelector {
+        match_labels: Some(labels.clone()),
+        ..Default::default()
+    };
+    
+    let deployment_spec = DeploymentSpec {
+        replicas: Some(1),
+        selector: label_selector,
+        template: pod_template_spec,
+        strategy: Some(DeploymentStrategy {
+            type_: Some("RollingUpdate".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    
+    Deployment {
+        metadata: ObjectMeta {
+            name: Some(deployment_name),
+            labels: Some(labels),
+            ..Default::default()
+        },
+        spec: Some(deployment_spec),
+        ..Default::default()
     }
 }

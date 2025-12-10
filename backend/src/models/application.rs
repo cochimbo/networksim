@@ -39,10 +39,11 @@ impl From<&str> for AppStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Application {
     pub id: Uuid,
-    pub node_id: String,
     pub topology_id: Uuid,
+    pub node_selector: Vec<String>,  // Array of node IDs where to deploy
+    pub chart_type: ChartType,       // predefined or custom
+    pub chart_reference: String,     // Full chart reference (repo/chart or name)
     pub name: String,
-    pub chart: String,
     pub version: Option<String>,
     pub namespace: String,
     pub values: Option<serde_json::Value>,
@@ -52,14 +53,40 @@ pub struct Application {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Tipo de chart Helm
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, Display)]
+#[sqlx(type_name = "TEXT")]
+#[serde(rename_all = "lowercase")]
+pub enum ChartType {
+    Predefined,
+    Custom,
+}
+
+impl From<String> for ChartType {
+    fn from(s: String) -> Self {
+        match s.to_lowercase().as_str() {
+            "custom" => ChartType::Custom,
+            _ => ChartType::Predefined,
+        }
+    }
+}
+
+impl From<&str> for ChartType {
+    fn from(s: &str) -> Self {
+        ChartType::from(s.to_string())
+    }
+}
+
 /// Request para crear una nueva aplicación
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateApplication {
-    pub node_id: String,
+    pub node_id: String, // For backward compatibility - will be converted to single-item node_selector
     pub topology_id: Uuid,
     pub name: String,
     pub chart: String,
+    pub chart_type: Option<String>, // 'predefined' or 'custom', defaults to 'predefined'
     pub version: Option<String>,
+    // namespace is now fixed to the simulation namespace for network policies to work
     pub values: Option<serde_json::Value>,
 }
 

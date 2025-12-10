@@ -299,3 +299,70 @@ async fn test_invalid_link_target() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn test_topology_wide_app_deployment() {
+    let app = setup_app().await;
+
+    // First create a topology
+    let topology_payload = json!({
+        "name": "Test Topology for Apps",
+        "nodes": [
+            {
+                "id": "node1",
+                "name": "Node 1",
+                "position": {"x": 100.0, "y": 100.0},
+                "config": {"image": "nginx:latest"}
+            },
+            {
+                "id": "node2",
+                "name": "Node 2",
+                "position": {"x": 200.0, "y": 200.0},
+                "config": {"image": "nginx:latest"}
+            }
+        ],
+        "links": []
+    });
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/topologies")
+                .header("content-type", "application/json")
+                .body(Body::from(topology_payload.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let topology: Value = serde_json::from_slice(&body).unwrap();
+    let topology_id = topology["id"].as_str().unwrap();
+
+    // Test listing applications by topology (should be empty initially)
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/api/topologies/{}/apps", topology_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let apps: Value = serde_json::from_slice(&body).unwrap();
+    assert!(apps.is_array());
+    assert_eq!(apps.as_array().unwrap().len(), 0);
+}

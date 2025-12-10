@@ -301,13 +301,16 @@ export const diagnosticApi = {
 
 // Application Types
 export type AppStatus = 'pending' | 'deploying' | 'deployed' | 'failed' | 'uninstalling';
+export type ChartType = 'predefined' | 'custom';
 
 export interface Application {
   id: string;
   topology_id: string;
-  node_id: string;
+  node_selector: string[]; // Array of node IDs where to deploy
+  chart_type: ChartType;
+  chart_reference: string; // Full chart reference
   name: string;
-  chart: string;
+  chart: string; // Keep for backward compatibility
   version?: string;
   namespace: string;
   values?: Record<string, any>;
@@ -319,6 +322,8 @@ export interface Application {
 
 export interface DeployAppRequest {
   chart: string;
+  chart_type?: ChartType; // 'predefined' or 'custom', defaults to 'predefined'
+  node_selector: string[]; // List of node IDs where to deploy
   name?: string;
   version?: string;
   // namespace is now fixed to simulation namespace for network policies
@@ -330,7 +335,34 @@ export interface AppLogs {
   truncated: boolean;
 }
 
+export interface AppNodeStatus {
+  node_id: string;
+  pod_name: string;
+  container_name: string;
+  running: boolean;
+  error?: string;
+}
+
+export interface AppRuntimeStatus {
+  application_id: string;
+  application_name: string;
+  all_running: boolean;
+  node_statuses: AppNodeStatus[];
+}
+
 export const applicationsApi = {
+  // Topology-wide deployment (new)
+  deployTopology: async (topologyId: string, request: DeployAppRequest): Promise<Application> => {
+    const response = await api.post(`/api/topologies/${topologyId}/apps`, request);
+    return response.data;
+  },
+
+  listByTopology: async (topologyId: string): Promise<Application[]> => {
+    const response = await api.get(`/api/topologies/${topologyId}/apps`);
+    return response.data;
+  },
+
+  // Node-specific deployment (existing, for backward compatibility)
   deploy: async (topologyId: string, nodeId: string, request: DeployAppRequest): Promise<Application> => {
     const response = await api.post(`/api/topologies/${topologyId}/nodes/${nodeId}/apps`, request);
     return response.data;
@@ -352,6 +384,11 @@ export const applicationsApi = {
 
   getLogs: async (topologyId: string, appId: string): Promise<AppLogs> => {
     const response = await api.get(`/api/topologies/${topologyId}/apps/${appId}/logs`);
+    return response.data;
+  },
+
+  getStatus: async (topologyId: string, appId: string): Promise<AppRuntimeStatus> => {
+    const response = await api.get(`/api/topologies/${topologyId}/apps/${appId}/status`);
     return response.data;
   },
 };

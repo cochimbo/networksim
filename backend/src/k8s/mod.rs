@@ -7,8 +7,8 @@
 //! - Watching pod and chaos events in real-time
 
 mod client;
+pub mod resources;
 mod deployment;
-mod resources;
 mod watcher;
 
 pub use client::K8sClient;

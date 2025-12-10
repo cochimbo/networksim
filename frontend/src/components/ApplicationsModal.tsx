@@ -38,6 +38,8 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
   const [showDeployForm, setShowDeployForm] = useState(false);
   const [deployForm, setDeployForm] = useState<DeployAppRequest>({
     chart: '',
+    chart_type: 'predefined',
+    node_selector: [nodeId], // Single node for per-node deployment
     name: '',
     version: '',
     values: {},
@@ -70,6 +72,8 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
       setShowDeployForm(false);
       setDeployForm({
         chart: '',
+        chart_type: 'predefined',
+        node_selector: [nodeId],
         name: '',
         version: '',
         values: {},
@@ -134,6 +138,8 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
     setShowDeployForm(true);
     setDeployForm({
       chart: '',
+      chart_type: 'predefined',
+      node_selector: [nodeId],
       name: '',
       version: '',
       values: {},
@@ -366,7 +372,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                       ) : (
                         <Play className="h-4 w-4" />
                       )}
-                      Desplegar
+                      Schedule
                     </button>
                     <button
                       onClick={() => setShowDeployForm(false)}

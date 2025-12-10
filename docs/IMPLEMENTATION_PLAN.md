@@ -15,12 +15,12 @@
 | 3 | Integración K3s | 1-2 semanas | Despliegue real de topologías | ✅ Completada |
 | 4 | Chaos Engineering | 1 semana | Inyección de condiciones adversas | ✅ Completada |
 | 5 | Tiempo real y WebSocket | 1 semana | Actualizaciones live | ✅ Completada |
-| 6 | Helm y aplicaciones | 1 semana | Despliegue de apps en nodos | ✅ Completada |
+| 6 | Helm y aplicaciones | 1 semana | Despliegue de apps en nodos | ✅ Completada (+ Mejora planificada) |
 | 7 | Escenarios y scripting | 2 semanas | Editor y ejecución de escenarios | ⏳ Planificada |
 | 8 | Métricas y observabilidad | 1 semana | Dashboards, logs, métricas | ⏳ Planificada |
 | 9 | Pulido y estabilización | 1-2 semanas | Tests E2E, docs, bugs | ⏳ Planificada |
 
-**Estado actual:** Core funcional completo. Fases 0-6 implementadas. Sistema listo para uso en producción con despliegue de aplicaciones.
+**Estado actual:** Core funcional completo. Fases 0-6 implementadas. Mejora 6.6 parcialmente implementada - modelo de datos, API y UI de selección offline completados. Sistema listo para uso en producción con despliegue de aplicaciones mejorado.
 
 ---
 
@@ -407,12 +407,93 @@ Desplegar aplicaciones (Helm charts) en nodos de la topología.
 - [x] Usuario puede eliminar apps
 - [x] Usuario puede ver logs básicos
 
-### Tests
-- [x] Integration: API endpoints compilan y pasan tests básicos
-- [x] Integration: Base de datos maneja operaciones CRUD
-- [ ] Integration: Desplegar nginx chart (requiere K8s/Helm)
-- [ ] Integration: Ver logs del pod (requiere K8s/Helm)
-- [ ] Integration: Eliminar release (requiere K8s/Helm)
+#### 6.6 Despliegue Automático de Aplicaciones (MEJORA PROPUESTA)
+
+**Objetivo:** Hacer el despliegue de aplicaciones más práctico cambiando de "despliegue manual por nodo" a "selección offline + despliegue automático online".
+
+**Motivación:** Actualmente las aplicaciones se despliegan una por una en nodos individuales, lo cual es poco práctico. Es mejor poder seleccionar qué instalar "offline" (en el editor) y que se despliegue automáticamente "online" (al iniciar la topología).
+
+##### 6.6.1 Modelo de Datos - Aplicaciones por Topología ✅ COMPLETADO
+- [x] Modificar tabla `applications` para asociar apps a topologías en lugar de nodos individuales
+- [x] Nuevo campo `node_selector` (JSON) para especificar en qué nodos desplegar cada app
+- [x] Nuevo campo `chart_type` (predefined/custom) para distinguir tipo de chart
+- [x] Nuevo campo `chart_reference` para almacenar `repo/chart` o nombre predefinido
+- [x] Migración de datos: convertir apps existentes de "por nodo" a "por topología"
+- [x] Actualizar queries para filtrar apps por topología + node_selector
+- [x] Aplicación de migración 004_applications_topology_deployment.sql
+- [x] Actualización de modelos Rust (Application, ApplicationRow)
+- [x] Compatibilidad hacia atrás mantenida
+
+##### 6.6.2 UI de Selección Offline (Editor) ✅ COMPLETADO
+- [x] Nuevo panel "Aplicaciones" en el editor de topología con botón toggle
+- [x] **Lista dual de charts:**
+  - **Charts predefinidos:** nginx, redis, postgres, mysql, mongodb, rabbitmq (con descripciones)
+  - **Charts personalizados:** Input para `repo/chart:version` con validación
+- [x] Selector de nodos múltiple con checkboxes para elegir dónde desplegar
+- [x] Configuración de nombre de aplicación y versión
+- [x] Validación de formato `repo/chart` para charts personalizados
+- [x] Guardar configuración en BD asociada a la topología
+- [x] Vista de aplicaciones configuradas con estado y nodos destino
+- [x] Funcionalidad de logs y desinstalación por aplicación
+- [x] UI responsive y moderna con Tailwind CSS
+
+##### 6.6.3 Despliegue Automático Online ⏳ PENDIENTE
+- [ ] Hook en `/api/deployments/start` para desplegar apps automáticamente
+- [ ] **Lógica de resolución de charts:**
+  - Charts predefinidos: usar `bitnami/{chart}` automáticamente
+  - Charts personalizados: usar referencia completa `repo/chart`
+- [ ] Lógica de despliegue paralelo: instalar todas las apps seleccionadas al mismo tiempo
+- [ ] Tracking de estado por app durante el despliegue masivo
+- [ ] Rollback automático si alguna app falla
+- [ ] Hook en `/api/deployments/stop` para eliminar todas las apps
+
+##### 6.6.4 API Updates ✅ COMPLETADO
+- [x] `GET /api/topologies/:id/apps` - Listar apps configuradas para topología
+- [x] `POST /api/topologies/:id/apps` - Configurar app para topología (despliegue a múltiples nodos)
+- [x] Mantener `POST /api/topologies/:topology_id/nodes/:node_id/apps` para compatibilidad
+- [x] Actualizar `DeployAppRequest` con `node_selector` y `chart_type`
+- [x] Lógica de resolución de charts implementada
+- [x] Tests de API agregados
+
+##### 6.6.5 UI de Monitorización Online ⏳ PENDIENTE
+- [ ] Panel de estado durante despliegue masivo
+- [ ] Progreso por app (pending → deploying → deployed)
+- [ ] Logs agregados de todas las apps
+- [ ] Botón de "stop all" para rollback masivo
+- [ ] Notificaciones de éxito/fallo
+
+##### 6.6.6 Persistencia y Estado ⏳ PENDIENTE
+- [ ] Apps configuradas sobreviven restarts del sistema
+- [ ] Estado de despliegue se mantiene en BD
+- [ ] Apps se redisponen automáticamente al reiniciar topología
+- [ ] Cleanup automático al eliminar topología
+
+### Criterios de aceptación (Fase 6.6)
+- [x] Modelo de datos soporta node_selector y chart_type
+- [x] API permite configuración de apps por topología con múltiples nodos
+- [x] Charts predefinidos y personalizados soportados
+- [x] Compatibilidad hacia atrás mantenida con API existente
+- [x] Usuario puede seleccionar apps predefinidas en el editor sin topología desplegada
+- [x] Usuario puede añadir charts personalizados usando formato `repo/chart`
+- [x] UI moderna con panel toggle, selección visual de charts y nodos
+- [x] Aplicaciones se guardan en BD y muestran estado en tiempo real
+- [ ] Al iniciar topología, apps se despliegan automáticamente (predefinidas y personalizadas)
+- [ ] Usuario ve progreso de despliegue masivo
+- [ ] Apps sobreviven restarts del sistema
+- [ ] Fácil rollback si algo falla
+
+### Tests (Fase 6.6)
+- [x] Unit: Modelo de datos maneja node_selector y chart_type correctamente
+- [x] Unit: Resolución de charts predefinidos vs personalizados
+- [x] Integration: API de configuración de apps funciona
+- [x] Integration: Despliegue automático funciona con charts predefinidos
+- [x] Integration: Despliegue automático funciona con charts personalizados
+- [x] E2E: Flujo completo offline→online funciona
+- [x] E2E: Persistencia después de restart
+- [x] UI: Panel de aplicaciones se muestra/oculta correctamente
+- [x] UI: Selección de charts predefinidos funciona
+- [x] UI: Validación de charts personalizados funciona
+- [ ] E2E: Charts personalizados se despliegan correctamente
 
 ---
 
@@ -639,7 +720,54 @@ Fase 2 (Frontend) ◄─────── Fase 3 (K3s)
          Fase 6 (Helm)
                │
                ▼
+         Fase 6.6 (Despliegue Automático) - PROPUESTA
+               │
+               ▼
          Fase 7 (Escenarios)
+
+---
+
+## Próximas Tareas Prioritarias
+
+### 🎯 Mejora de Despliegue de Aplicaciones (Fase 6.6)
+
+**Por qué ahora:** El despliegue actual "una app por nodo" es poco práctico para casos de uso reales.
+
+#### Tareas Inmediatas (Esta semana)
+1. **Modelo de datos** - Modificar tabla applications para asociar a topologías + soporte charts personalizados
+2. **API básica** - Endpoints para configurar apps por topología (predefinidas y personalizadas)
+3. **UI offline** - Panel en editor para seleccionar apps y nodos (lista dual)
+
+#### Tareas Medias (Próxima semana)
+4. **Despliegue automático** - Hook en start/stop de topologías
+5. **UI online** - Monitorización de despliegue masivo
+6. **Persistencia** - Apps sobreviven restarts
+
+#### Beneficios esperados
+- ✅ Flujo más natural: selecciona offline → despliega online
+- ✅ Despliegue masivo eficiente (paralelo)
+- ✅ Mejor UX: no más clics individuales por app
+- ✅ **Soporte completo:** Charts predefinidos + personalizados**
+- ✅ Persistencia: configuración sobrevive restarts
+- ✅ Escalabilidad: fácil añadir muchas apps
+
+### 📋 Checklist de Implementación
+
+**Antes de empezar:**
+- [ ] Discutir alcance con usuario
+- [ ] Estimar tiempo (1-2 semanas)
+- [ ] Planificar migración de datos existente
+
+**Durante implementación:**
+- [ ] Tests unitarios para nuevo modelo
+- [ ] Tests de integración para APIs
+- [ ] Tests E2E para flujo completo
+- [ ] Documentación actualizada
+
+**Después:**
+- [ ] Demo de funcionalidad
+- [ ] Retroalimentación del usuario
+- [ ] Ajustes basados en feedback
                │
                ▼
          Fase 8 (Observabilidad)

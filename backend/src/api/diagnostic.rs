@@ -567,7 +567,7 @@ pub async fn get_node_containers(
                             started_at,
                             ports,
                             application_name: Some(app.name.clone()),
-                            application_chart: Some(app.chart.clone()),
+                            application_chart: Some(app.chart_reference.clone()),
                         });
                     }
                 }

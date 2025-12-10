@@ -76,11 +76,14 @@ pub fn create_router(state: AppState) -> Router {
         // Chaos - global create
         .route("/api/chaos", post(api::chaos::create))
         // Applications
+        .route("/api/topologies/:topology_id/apps", post(api::applications::deploy_topology))
+        .route("/api/topologies/:topology_id/apps", get(api::applications::list_by_topology))
         .route("/api/topologies/:topology_id/nodes/:node_id/apps", post(api::applications::deploy))
         .route("/api/topologies/:topology_id/nodes/:node_id/apps", get(api::applications::list_by_node))
         .route("/api/topologies/:topology_id/apps/:app_id", get(api::applications::get))
         .route("/api/topologies/:topology_id/apps/:app_id", delete(api::applications::uninstall))
         .route("/api/topologies/:topology_id/apps/:app_id/logs", get(api::applications::logs))
+        .route("/api/topologies/:topology_id/apps/:app_id/status", get(api::applications::status))
         // WebSocket
         .route("/ws/events", get(api::ws::ws_handler))
         // Metrics

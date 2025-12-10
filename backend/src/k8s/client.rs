@@ -1,6 +1,7 @@
 //! Kubernetes client wrapper for NetworkSim
 
 use anyhow::Result;
+use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{Namespace, Pod, Service};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use kube::{
@@ -125,6 +126,41 @@ impl K8sClient {
         Ok(pods.get(name).await?)
     }
 
+    /// Get a pod by name in a specific namespace
+    pub async fn get_pod_in_namespace(&self, name: &str, namespace: &str) -> Result<Pod> {
+        let pods: Api<Pod> = Api::namespaced(self.client.clone(), namespace);
+        Ok(pods.get(name).await?)
+    }
+
+    /// Update a pod
+    #[instrument(skip(self, pod), fields(pod_name = %pod.metadata.name.as_deref().unwrap_or("unknown")))]
+    pub async fn update_pod(&self, pod: &Pod) -> Result<Pod> {
+        let pods = self.pods();
+        let updated = pods.replace(
+            pod.metadata.name.as_deref().unwrap_or("unknown"),
+            &kube::api::PostParams::default(),
+            pod,
+        ).await?;
+        info!("Updated pod");
+        Ok(updated)
+    }
+
+    /// Get logs from a specific container in a pod
+    #[instrument(skip(self))]
+    pub async fn get_container_logs(&self, pod_name: &str, container_name: &str, namespace: &str, tail_lines: usize) -> Result<String> {
+        use kube::api::LogParams;
+        
+        let pods: Api<Pod> = Api::namespaced(self.client.clone(), namespace);
+        let log_params = LogParams {
+            container: Some(container_name.to_string()),
+            tail_lines: Some(tail_lines as i64),
+            ..Default::default()
+        };
+        
+        let logs = pods.logs(pod_name, &log_params).await?;
+        Ok(logs)
+    }
+
     /// List pods with a label selector
     pub async fn list_pods(&self, label_selector: &str) -> Result<Vec<Pod>> {
         let pods = self.pods();
@@ -209,10 +245,80 @@ impl K8sClient {
         Ok(())
     }
 
+    /// Check if all containers in a pod are running
+    #[instrument(skip(self))]
+    pub async fn check_pod_containers_running(&self, pod_name: &str, namespace: &str) -> Result<bool> {
+        let pod = self.get_pod_in_namespace(pod_name, namespace).await?;
+        
+        // Check if pod is in Running phase
+        if pod.status.as_ref().and_then(|s| s.phase.as_ref()) != Some(&"Running".to_string()) {
+            return Ok(false);
+        }
+        
+        // Check if all containers are ready
+        if let Some(status) = &pod.status {
+            if let Some(container_statuses) = &status.container_statuses {
+                for container_status in container_statuses {
+                    if !container_status.ready {
+                        return Ok(false);
+                    }
+                    // Also check if container is in running state
+                    if let Some(state) = &container_status.state {
+                        if state.running.is_none() {
+                            return Ok(false);
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(true)
+    }
+
     /// Check if cluster is reachable
     pub async fn health_check(&self) -> Result<bool> {
         let version = self.client.apiserver_version().await?;
         info!(version = %version.git_version, "Kubernetes cluster is healthy");
         Ok(true)
+    }
+
+    /// Create a deployment
+    pub async fn create_deployment(&self, deployment: &Deployment) -> Result<Deployment> {
+        let api: Api<Deployment> = Api::namespaced(self.client.clone(), &self.namespace);
+        let created = api.create(&PostParams::default(), deployment).await?;
+        info!(name = %created.metadata.name.as_deref().unwrap_or("unknown"), "Created deployment");
+        Ok(created)
+    }
+
+    /// Check if a deployment exists
+    pub async fn deployment_exists(&self, name: &str, namespace: &str) -> Result<bool> {
+        let api: Api<Deployment> = Api::namespaced(self.client.clone(), namespace);
+        match api.get(name).await {
+            Ok(_) => Ok(true),
+            Err(kube::Error::Api(e)) if e.code == 404 => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Check if a deployment is ready (all replicas available)
+    pub async fn check_deployment_ready(&self, name: &str, namespace: &str) -> Result<bool> {
+        let api: Api<Deployment> = Api::namespaced(self.client.clone(), namespace);
+        let deployment = api.get(name).await?;
+        
+        if let (Some(status), Some(spec)) = (&deployment.status, &deployment.spec) {
+            if let (Some(available), Some(desired)) = (status.available_replicas, spec.replicas) {
+                return Ok(available >= desired);
+            }
+        }
+        
+        Ok(false)
+    }
+
+    /// Delete a deployment
+    pub async fn delete_deployment(&self, name: &str) -> Result<()> {
+        let api: Api<Deployment> = Api::namespaced(self.client.clone(), &self.namespace);
+        api.delete(name, &DeleteParams::default()).await?;
+        info!(name = %name, "Deleted deployment");
+        Ok(())
     }
 }

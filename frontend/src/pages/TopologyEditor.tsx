@@ -6,7 +6,7 @@ import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Ma
 import { topologyApi, clusterApi, deploymentApi, chaosApi, diagnosticApi, Topology, Node, Link, ContainerInfo } from '../services/api';
 import { ChaosPanel } from '../components/ChaosPanel';
 import { DeploymentModal, DeploymentAction, DeploymentPhase } from '../components/DeploymentModal';
-import { ApplicationsModal } from '../components/ApplicationsModal';
+import { ApplicationsPanel } from '../components/ApplicationsPanel';
 import { useWebSocketEvents, WebSocketEvent } from '../contexts/WebSocketContext';
 
 // Node status from K8s
@@ -40,11 +40,6 @@ export default function TopologyEditor() {
     action: DeploymentAction;
     phase: DeploymentPhase;
     message?: string;
-  } | null>(null);
-  const [applicationsModal, setApplicationsModal] = useState<{
-    show: boolean;
-    nodeId: string;
-    nodeName: string;
   } | null>(null);
 
   // Refs to access current values in event handlers
@@ -696,27 +691,29 @@ export default function TopologyEditor() {
         {/* Deploy/Destroy */}
         {id && isClusterReady && (
           <>
-            {!isThisTopologyDeployed ? (
-              <button
-                onClick={() => deployMutation.mutate()}
-                disabled={deployMutation.isPending || nodes.length === 0 || isAnyDeployed}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title={
-                  isAnyDeployed 
+            <button
+              onClick={() => !isThisTopologyDeployed && !isAnyDeployed && deployMutation.mutate()}
+              disabled={deployMutation.isPending || nodes.length === 0 || isThisTopologyDeployed || isAnyDeployed}
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={
+                isThisTopologyDeployed
+                  ? "Topology is already deployed. Stop it first to redeploy."
+                  : isAnyDeployed 
                     ? `Another topology is deployed (${activeDeployment?.topology_id.slice(0, 8)}...). Stop it first.`
                     : nodes.length === 0 
                       ? "Add nodes before deploying" 
                       : "Deploy to Kubernetes"
-                }
-              >
-                {deployMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-                <span className="text-sm">Deploy</span>
-              </button>
-            ) : (
+              }
+            >
+              {deployMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              <span className="text-sm">Deploy</span>
+            </button>
+
+            {isThisTopologyDeployed && (
               <button
                 onClick={() => destroyMutation.mutate()}
                 disabled={destroyMutation.isPending}
@@ -778,10 +775,22 @@ export default function TopologyEditor() {
 
       {/* Canvas y Chaos Panel en el centro */}
       <div className="flex-1 flex">
+        {/* Left Panel - Applications */}
+        {id && (
+          <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full">
+            <ApplicationsPanel
+              topologyId={id}
+              nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+              selectedNode={selectedElement?.type === 'node' ? { id: selectedElement.data.id, name: selectedElement.data.name } : null}
+              isTopologyDeployed={isThisTopologyDeployed}
+            />
+          </div>
+        )}
+
         {/* Cytoscape canvas - columna principal */}
         <div ref={cyRef} className="flex-1 bg-gray-50" />
 
-        {/* Chaos Panel columna fija a la derecha ocupando toda la altura */}
+        {/* Right Panel - Chaos */}
         {id && (
           <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-full">
             <ChaosPanel
@@ -820,10 +829,6 @@ export default function TopologyEditor() {
           <div className="flex items-center gap-2 text-sm">
             <span className="text-red-700 text-lg">🚫</span>
             <span className="text-gray-700">Partition</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm border-l border-gray-300 pl-4">
-            <span className="text-purple-700 text-lg">⚡</span>
-            <span className="text-gray-700">Multiple</span>
           </div>
         </div>
       </div>
@@ -890,26 +895,6 @@ export default function TopologyEditor() {
                       className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
-                  {/* Helm Applications Button - Only available when topology is deployed */}
-                  <button
-                    onClick={() => setApplicationsModal({
-                      show: true,
-                      nodeId: selectedElement.data.id,
-                      nodeName: selectedElement.data.name
-                    })}
-                    className="w-full inline-flex items-center justify-center gap-1 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    disabled={!clusterStatus?.connected || !isThisTopologyDeployed}
-                    title={
-                      !clusterStatus?.connected 
-                        ? "Kubernetes cluster not connected" 
-                        : !isThisTopologyDeployed 
-                          ? "Deploy the topology first to manage Helm applications"
-                          : "Manage Helm applications"
-                    }
-                  >
-                    <span className="text-sm">⚓</span>
-                    Helm Apps
-                  </button>
                 </>
               )}
               {selectedElement.type === 'edge' && (
@@ -1032,17 +1017,6 @@ export default function TopologyEditor() {
           message={deployModal.message}
           nodeCount={nodes.length}
           onClose={() => setDeployModal(null)}
-        />
-      )}
-
-      {/* Applications Modal */}
-      {applicationsModal?.show && id && (
-        <ApplicationsModal
-          topologyId={id}
-          nodeId={applicationsModal.nodeId}
-          nodeName={applicationsModal.nodeName}
-          isOpen={applicationsModal.show}
-          onClose={() => setApplicationsModal(null)}
         />
       )}
     </div>

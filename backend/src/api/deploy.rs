@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use crate::api::AppState;
+use crate::api::applications::deploy_application_to_node;
 use crate::error::{AppError, AppResult};
-use crate::k8s::{DeploymentManager, DeploymentStatus as K8sDeploymentStatus};
+use crate::k8s::{DeploymentManager, DeploymentState, DeploymentStatus as K8sDeploymentStatus};
 
 /// Response for deployment operations
 #[derive(Debug, Serialize, Deserialize)]
@@ -65,6 +66,7 @@ pub async fn deploy(
     // Check if K8s client is available
     let k8s = state
         .k8s
+        .as_ref()
         .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     // Get the topology from database
@@ -80,7 +82,7 @@ pub async fn deploy(
     }
 
     // Create deployment manager and deploy
-    let manager = DeploymentManager::new(k8s);
+    let manager = DeploymentManager::new(k8s.clone());
     let status = manager.deploy(&topology).await.map_err(|e| {
         warn!(error = %e, "Failed to deploy topology");
         AppError::internal(&format!("Deployment failed: {}", e))
@@ -91,6 +93,17 @@ pub async fn deploy(
         topology_id: id.clone(),
         status: format!("{:?}", status.status).to_lowercase(),
     });
+
+    // If deployment was successful, activate any pending applications
+    info!(topology_id = %id, deployment_status = ?status.status, "Checking deployment status for pending applications activation");
+    if matches!(status.status, DeploymentState::Running | DeploymentState::PartiallyRunning) {
+        info!(topology_id = %id, "Activating pending applications for deployed topology");
+        if let Err(e) = activate_pending_applications(&state, &id).await {
+            warn!(error = %e, topology_id = %id, "Failed to activate some pending applications");
+        }
+    } else {
+        info!(topology_id = %id, status = ?status.status, "Skipping pending applications activation - topology not fully running");
+    }
 
     info!(topology_id = %id, "Topology deployed successfully");
     Ok(Json(status.into()))
@@ -167,6 +180,22 @@ pub async fn status(
         AppError::internal(&format!("Status check failed: {}", e))
     })?;
 
+    // If topology is running and has pending applications, activate them
+    if matches!(status.status, DeploymentState::Running | DeploymentState::PartiallyRunning) {
+        // Check if there are pending applications for this topology
+        let pending_apps = state.db.list_applications(&id).await?
+            .into_iter()
+            .filter(|app| matches!(app.status, crate::models::AppStatus::Pending))
+            .collect::<Vec<_>>();
+        
+        if !pending_apps.is_empty() {
+            info!(topology_id = %id, pending_count = pending_apps.len(), "Found pending applications for running topology, activating them");
+            if let Err(e) = activate_pending_applications(&state, &id).await {
+                warn!(error = %e, topology_id = %id, "Failed to activate pending applications during status check");
+            }
+        }
+    }
+
     Ok(Json(status.into()))
 }
 
@@ -211,4 +240,65 @@ pub async fn get_active_deployment(
     }
 
     Ok(Json(None))
+}
+
+/// Activate pending applications when topology is deployed
+async fn activate_pending_applications(
+    state: &AppState,
+    topology_id: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use crate::models::AppStatus;
+    
+    info!(topology_id = %topology_id, "Starting activation of pending applications");
+    
+    // Get all pending applications for this topology
+    let pending_apps = state.db.list_applications(topology_id).await?;
+    info!(topology_id = %topology_id, total_apps = pending_apps.len(), "Found applications in database");
+    
+    let pending_apps: Vec<_> = pending_apps.into_iter()
+        .filter(|app| matches!(app.status, AppStatus::Pending))
+        .collect();
+    
+    info!(topology_id = %topology_id, pending_count = pending_apps.len(), "Found pending applications to activate");
+    
+    if pending_apps.is_empty() {
+        info!(topology_id = %topology_id, "No pending applications to activate");
+        return Ok(());
+    }
+    
+    info!(topology_id = %topology_id, pending_count = pending_apps.len(), "Activating pending applications");
+    
+    for app in pending_apps {
+        info!(topology_id = %topology_id, app_id = %app.id, app_name = %app.name, "Activating pending application");
+        
+        // Update status to deploying
+        state.db.update_application_status(&app.id.to_string(), &AppStatus::Deploying, Some(&app.release_name)).await?;
+        
+        // Deploy as sidecars to selected nodes
+        let mut deployment_errors = Vec::new();
+        
+        for node_id in &app.node_selector {
+            match deploy_application_to_node(state, topology_id, node_id, &app).await {
+                Ok(_) => {
+                    info!(topology_id = %topology_id, app_id = %app.id, node_id = %node_id, "Application deployed to node");
+                }
+                Err(e) => {
+                    let error_msg = format!("Failed to deploy to node {}: {}", node_id, e);
+                    warn!(topology_id = %topology_id, app_id = %app.id, node_id = %node_id, error = %error_msg);
+                    deployment_errors.push(error_msg);
+                }
+            }
+        }
+        
+        // Update final status
+        if deployment_errors.is_empty() {
+            state.db.update_application_status(&app.id.to_string(), &AppStatus::Deployed, Some(&app.release_name)).await?;
+            info!(topology_id = %topology_id, app_id = %app.id, "Application activated successfully");
+        } else {
+            state.db.update_application_status(&app.id.to_string(), &AppStatus::Failed, Some(&app.release_name)).await?;
+            warn!(topology_id = %topology_id, app_id = %app.id, errors = ?deployment_errors, "Application activation failed");
+        }
+    }
+    
+    Ok(())
 }
