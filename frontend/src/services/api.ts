@@ -301,17 +301,13 @@ export const diagnosticApi = {
 
 // Application Types
 export type AppStatus = 'pending' | 'deploying' | 'deployed' | 'failed' | 'uninstalling';
-export type ChartType = 'predefined' | 'custom';
 
 export interface Application {
   id: string;
   topology_id: string;
-  node_selector: string[]; // Array of node IDs where to deploy
-  chart_type: ChartType;
-  chart_reference: string; // Full chart reference
-  name: string;
+  node_selector: string[]; // Array de node IDs where to deploy
+  image_name: string; // Full image reference
   chart: string; // Keep for backward compatibility
-  version?: string;
   namespace: string;
   values?: Record<string, any>;
   status: AppStatus;
@@ -322,10 +318,7 @@ export interface Application {
 
 export interface DeployAppRequest {
   chart: string;
-  chart_type?: ChartType; // 'predefined' or 'custom', defaults to 'predefined'
   node_selector: string[]; // List of node IDs where to deploy
-  name?: string;
-  version?: string;
   // namespace is now fixed to simulation namespace for network policies
   values?: Record<string, any>;
 }

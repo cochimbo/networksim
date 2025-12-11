@@ -598,7 +598,7 @@ pub fn create_application_deployment(app: &Application, node_id: &str, topology_
     let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
     
     let mut labels = BTreeMap::new();
-    labels.insert("app.kubernetes.io/name".to_string(), app.image_name.clone());
+    labels.insert("app.kubernetes.io/name".to_string(), app.image_name.replace(":", "-"));
     labels.insert("app.kubernetes.io/managed-by".to_string(), "networksim".to_string());
     labels.insert("networksim.io/topology".to_string(), topology_id.to_string());
     labels.insert("networksim.io/node".to_string(), node_id.to_string());

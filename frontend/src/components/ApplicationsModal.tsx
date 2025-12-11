@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import EnvVarsEditor from './EnvVarsEditor';
+  const [showEnvEditor, setShowEnvEditor] = useState(false);
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Plus, Play, Trash2, FileText, Loader2 } from 'lucide-react';
 import { applicationsApi, Application, DeployAppRequest } from '../services/api';
@@ -38,10 +40,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
   const [showDeployForm, setShowDeployForm] = useState(false);
   const [deployForm, setDeployForm] = useState<DeployAppRequest>({
     chart: '',
-    chart_type: 'predefined',
     node_selector: [nodeId], // Single node for per-node deployment
-    name: '',
-    version: '',
     values: {},
   });
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
@@ -72,10 +71,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
       setShowDeployForm(false);
       setDeployForm({
         chart: '',
-        chart_type: 'predefined',
         node_selector: [nodeId],
-        name: '',
-        version: '',
         values: {},
       });
     },
@@ -108,10 +104,10 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
       return '';
     }
 
-    // Charts válidos: solo nombre (para charts por defecto), o repo/nombre
-    const chartRegex = /^([a-z0-9-]+\/)?[a-z0-9-]+$/;
-    if (!chartRegex.test(chart)) {
-      return 'Formato inválido. Use: nombre o repositorio/nombre';
+    // Validar formato de imagen Docker: no puede estar vacío ni tener espacios
+    // Permite: ubuntu:22.04, nginx:alpine, bitnami/rabbitmq:3.12, docker.io/library/ubuntu:22.04, etc.
+    if (!chart.trim()) {
+      return 'La imagen Docker es requerida';
     }
 
     // Verificar que no tenga caracteres especiales problemáticos
@@ -138,10 +134,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
     setShowDeployForm(true);
     setDeployForm({
       chart: '',
-      chart_type: 'predefined',
       node_selector: [nodeId],
-      name: '',
-      version: '',
       values: {},
     });
     setChartValidationError('');
@@ -165,7 +158,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
   };
 
   const handleUninstall = (app: Application) => {
-    if (confirm(`¿Desinstalar la aplicación "${app.name}"?`)) {
+    if (confirm(`¿Desinstalar la aplicación "${app.id}"?`)) {
       uninstallMutation.mutate(app.id);
     }
   };
@@ -238,14 +231,13 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                       onClick={() => setSelectedApp(app)}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-gray-900">{app.name}</h4>
+                        <h4 className="font-medium text-gray-900">{app.id}</h4>
                         <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[app.status]}`}>
                           {STATUS_LABELS[app.status]}
                         </span>
                       </div>
                       <div className="text-sm text-gray-600 space-y-1">
                         <div>Chart: {app.chart}</div>
-                        {app.version && <div>Versión: {app.version}</div>}
                         <div>Namespace: {app.namespace}</div>
                       </div>
                       <div className="flex gap-2 mt-3">
@@ -294,16 +286,64 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                   </div>
                 </div>
                 <div className="space-y-4">
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Variables de entorno
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowEnvEditor(true)}
+                                        className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
+                                      >
+                                        Editar variables de entorno
+                                      </button>
+                                      {Array.isArray(deployForm.values?.env) && deployForm.values.env.length > 0 && (
+                                        <div className="mt-2 max-h-24 overflow-y-auto border rounded bg-gray-50 text-xs">
+                                          <table className="min-w-full">
+                                            <thead>
+                                              <tr className="bg-gray-100">
+                                                <th className="p-1 text-left">Nombre</th>
+                                                <th className="p-1 text-left">Valor</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {deployForm.values.env.map((v: any, i: number) => (
+                                                <tr key={i}>
+                                                  <td className="p-1">{v.name}</td>
+                                                  <td className="p-1">{v.value}</td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                      {showEnvEditor && (
+                                        <EnvVarsEditor
+                                          initialVars={deployForm.values?.env || []}
+                                          onSave={vars => {
+                                            setDeployForm(prev => ({
+                                              ...prev,
+                                              values: {
+                                                ...prev.values,
+                                                env: vars
+                                              }
+                                            }));
+                                            setShowEnvEditor(false);
+                                          }}
+                                          onClose={() => setShowEnvEditor(false)}
+                                        />
+                                      )}
+                                    </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Chart de Helm *
+                      Imagen Docker *
                     </label>
                     <div className="relative">
                       <input
                         type="text"
                         value={deployForm.chart}
                         onChange={(e) => handleChartChange(e.target.value)}
-                        placeholder="nginx, redis, postgres, etc."
+                        placeholder="ubuntu:22.04, nginx:alpine, bitnami/rabbitmq:3.12, docker.io/library/ubuntu:22.04"
                         className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
                           chartValidationError ? 'border-red-300' : 'border-gray-300'
                         }`}
@@ -335,32 +375,6 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nombre de la aplicación
-                    </label>
-                    <input
-                      type="text"
-                      value={deployForm.name}
-                      onChange={(e) => setDeployForm(prev => ({ ...prev, name: e.target.value }))}
-                      placeholder="Opcional - se generará automáticamente"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Versión
-                    </label>
-                    <input
-                      type="text"
-                      value={deployForm.version || ''}
-                      onChange={(e) => setDeployForm(prev => ({ ...prev, version: e.target.value }))}
-                      placeholder="Opcional - usa la última versión"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    />
-                  </div>
-
                   <div className="flex gap-3 pt-4">
                     <button
                       onClick={handleDeploy}
@@ -386,7 +400,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
             ) : selectedApp ? (
               <div className="flex-1 flex flex-col">
                 <div className="p-4 border-b border-gray-200">
-                  <h3 className="font-medium text-gray-900">Logs - {selectedApp.name}</h3>
+                  <h3 className="font-medium text-gray-900">Logs - {selectedApp.id}</h3>
                 </div>
                 <div className="flex-1 p-4 overflow-y-auto">
                   <pre className="text-xs font-mono bg-gray-900 text-green-400 p-3 rounded whitespace-pre-wrap">

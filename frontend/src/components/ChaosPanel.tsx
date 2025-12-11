@@ -40,7 +40,7 @@ const STATUS_LABELS: Record<ChaosConditionStatus, { label: string; color: string
   paused: { label: 'Paused', color: '#ff9800' },
 };
 
-export function ChaosPanel({ topologyId, nodes, links, onClose }: ChaosPanelProps) {
+export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: ChaosPanelProps) {
   const [conditions, setConditions] = useState<ChaosCondition[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -427,7 +427,7 @@ export function ChaosPanel({ topologyId, nodes, links, onClose }: ChaosPanelProp
           >
             🔄
           </button>
-          {onClose && <button className="close-btn" onClick={onClose}>×</button>}
+          {/* Botón de cerrar eliminado, ya no es modal */}
         </div>
       </div>
 

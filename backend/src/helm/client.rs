@@ -27,14 +27,34 @@ impl HelmClient {
         version: Option<&str>,
         values: Option<&serde_json::Value>,
     ) -> Result<String> {
-        // Si el chart no contiene "/", asumir que es de bitnami
-        let full_chart = if chart.contains('/') {
-            chart.to_string()
+        // Parse chart name and tag
+        let (chart_name, tag) = if let Some(colon_pos) = chart.find(':') {
+            let name = &chart[..colon_pos];
+            let tag = &chart[colon_pos + 1..];
+            (name.to_string(), Some(tag.to_string()))
         } else {
-            format!("bitnami/{}", chart)
+            (chart.to_string(), None)
+        };
+
+        // Si el chart no contiene "/", asumir que es de bitnami
+        let full_chart = if chart_name.contains('/') {
+            chart_name
+        } else {
+            format!("bitnami/{}", chart_name)
         };
 
         info!("Installing Helm chart: {} (release: {})", full_chart, release_name);
+
+        // If tag is specified, add it to values
+        let mut merged_values = values.cloned().unwrap_or(serde_json::json!({}));
+        if let Some(tag) = tag {
+            merged_values["image"] = serde_json::json!({ "tag": tag });
+        }
+        let values = if merged_values.as_object().map(|o| !o.is_empty()).unwrap_or(false) {
+            Some(&merged_values)
+        } else {
+            None
+        };
 
         let mut cmd = Command::new("helm");
         cmd.arg("install")

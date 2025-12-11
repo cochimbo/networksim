@@ -193,6 +193,49 @@ impl K8sClient {
         Ok(())
     }
 
+    /// Create a deployment
+    #[instrument(skip(self, deployment), fields(deployment_name = %deployment.metadata.name.as_deref().unwrap_or("unknown")))]
+    pub async fn create_deployment(&self, deployment: &Deployment) -> Result<Deployment> {
+        let deployments = self.deployments();
+        let created = deployments.create(&PostParams::default(), deployment).await?;
+        info!("Created deployment");
+        Ok(created)
+    }
+
+    /// Delete a deployment
+    #[instrument(skip(self))]
+    pub async fn delete_deployment(&self, name: &str) -> Result<()> {
+        let deployments = self.deployments();
+        deployments.delete(name, &DeleteParams::default()).await?;
+        info!(name, "Deleted deployment");
+        Ok(())
+    }
+
+    /// Get a deployment by name
+    pub async fn get_deployment(&self, name: &str) -> Result<Deployment> {
+        let deployments = self.deployments();
+        Ok(deployments.get(name).await?)
+    }
+
+    /// Check if a deployment exists
+    pub async fn deployment_exists(&self, name: &str, namespace: &str) -> Result<bool> {
+        let deployments: Api<Deployment> = Api::namespaced(self.client.clone(), namespace);
+        match deployments.get(name).await {
+            Ok(_) => Ok(true),
+            Err(kube::Error::Api(e)) if e.code == 404 => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Check if a deployment is ready
+    pub async fn check_deployment_ready(&self, name: &str, namespace: &str) -> Result<bool> {
+        let deployments: Api<Deployment> = Api::namespaced(self.client.clone(), namespace);
+        let deployment = deployments.get(name).await?;
+        let replicas = deployment.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
+        let ready_replicas = deployment.status.as_ref().and_then(|s| s.ready_replicas).unwrap_or(0);
+        Ok(ready_replicas >= replicas && replicas > 0)
+    }
+
     /// Create a network policy
     #[instrument(skip(self, policy), fields(policy_name = %policy.metadata.name.as_deref().unwrap_or("unknown")))]
     pub async fn create_network_policy(&self, policy: &NetworkPolicy) -> Result<NetworkPolicy> {
@@ -296,49 +339,5 @@ impl K8sClient {
         let version = self.client.apiserver_version().await?;
         info!(version = %version.git_version, "Kubernetes cluster is healthy");
         Ok(true)
-    }
-
-    /// Create a deployment
-    pub async fn create_deployment(&self, deployment: &Deployment) -> Result<Deployment> {
-        let api: Api<Deployment> = Api::namespaced(self.client.clone(), &self.namespace);
-        let created = api.create(&PostParams::default(), deployment).await?;
-        info!(name = %created.metadata.name.as_deref().unwrap_or("unknown"), "Created deployment");
-        Ok(created)
-    }
-
-    /// Check if a deployment exists
-    pub async fn deployment_exists(&self, name: &str, namespace: &str) -> Result<bool> {
-        let api: Api<Deployment> = Api::namespaced(self.client.clone(), namespace);
-        match api.get(name).await {
-            Ok(_) => Ok(true),
-            Err(kube::Error::Api(e)) if e.code == 404 => Ok(false),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    /// Check if a deployment is ready (all replicas available)
-    pub async fn check_deployment_ready(&self, name: &str, namespace: &str) -> Result<bool> {
-        let api: Api<Deployment> = Api::namespaced(self.client.clone(), namespace);
-        let deployment = api.get(name).await?;
-        
-        if let (Some(status), Some(spec)) = (&deployment.status, &deployment.spec) {
-            if let (Some(available), Some(desired)) = (status.available_replicas, spec.replicas) {
-                return Ok(available >= desired);
-            }
-        }
-        
-        Ok(false)
-    }
-
-    /// Delete a deployment
-    pub async fn delete_deployment(&self, name: &str) -> Result<()> {
-        let api: Api<Deployment> = Api::namespaced(self.client.clone(), &self.namespace);
-        let dp = DeleteParams {
-            propagation_policy: Some(kube::api::PropagationPolicy::Foreground),
-            ..DeleteParams::default()
-        };
-        api.delete(name, &dp).await?;
-        info!(name = %name, "Deleted deployment");
-        Ok(())
     }
 }

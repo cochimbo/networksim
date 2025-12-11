@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use crate::api::AppState;
-use crate::api::applications::{deploy_application_to_node, uninstall_application_by_id};
+use crate::api::applications::deploy_application_to_node;
 use crate::error::{AppError, AppResult};
 use crate::k8s::{DeploymentManager, DeploymentState, DeploymentStatus as K8sDeploymentStatus};
 
@@ -83,6 +83,19 @@ pub async fn deploy(
         return Err(AppError::bad_request("Cannot deploy empty topology"));
     }
 
+    // Update deploy_command_state to deploying (insert if not exists)
+    sqlx::query(
+        "INSERT OR REPLACE INTO deployments (id, topology_id, status, deploy_command_state, created_at, updated_at) VALUES (?, ?, 'pending', 'deploying', datetime('now'), datetime('now'))"
+    )
+    .bind(&format!("deploy-{}", id))
+    .bind(&id)
+    .execute(state.db.pool())
+    .await
+    .map_err(|e| {
+        warn!(error = %e, topology_id = %id, "Failed to insert/replace deployment state");
+        AppError::internal("Failed to update deployment state")
+    })?;
+
     // Create deployment manager and deploy
     let manager = DeploymentManager::new(k8s.clone());
     let status = manager.deploy(&topology).await.map_err(|e| {
@@ -128,12 +141,12 @@ pub async fn destroy(
 ) -> AppResult<Json<serde_json::Value>> {
     info!(topology_id = %id, "Destroying deployment");
 
-    // Reset all applications to Pending status
+    // Mark all applications as Pending (don't delete them)
     let applications = state.db.list_applications(&id).await?;
     for app in applications {
-        tracing::info!("Resetting application {} status to Pending", app.id);
-        if let Err(e) = state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Pending, Some(&app.release_name)).await {
-             tracing::warn!("Failed to reset application status {}: {}", app.id, e);
+        tracing::info!("Marking application {} as Pending before destroying topology", app.id);
+        if let Err(e) = state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Pending, Some(&format!("app-{}-{}", app.id.simple(), app.node_selector.first().unwrap_or(&"".to_string())))).await {
+            tracing::warn!("Failed to mark application {} as Pending: {}", app.id, e);
         }
     }
 
@@ -148,6 +161,17 @@ pub async fn destroy(
         warn!(error = %e, "Failed to destroy deployment");
         AppError::internal(&format!("Destroy failed: {}", e))
     })?;
+
+    // Update deploy_command_state to stopped
+    if let Err(e) = sqlx::query(
+        "INSERT OR REPLACE INTO deployments (id, topology_id, status, deploy_command_state, created_at, updated_at) VALUES (?, ?, 'stopped', 'stopped', datetime('now'), datetime('now'))"
+    )
+    .bind(&format!("deploy-{}", id))
+    .bind(&id)
+    .execute(state.db.pool())
+    .await {
+        warn!(error = %e, topology_id = %id, "Failed to update deploy_command_state to stopped");
+    }
 
     // Broadcast event
     let _ = state.event_tx.send(crate::api::Event::DeploymentStatus {
@@ -208,8 +232,8 @@ pub async fn status(
     .await
     .unwrap_or_else(|_| "pending".to_string());
 
-    // Solo activar aplicaciones si el comando está en 'deploying' o 'pending'
-    if (deploy_command_state == "deploying" || deploy_command_state == "pending") && matches!(status.status, DeploymentState::Running | DeploymentState::PartiallyRunning) {
+    // Solo activar aplicaciones si el comando está en 'deploying'
+    if deploy_command_state == "deploying" && matches!(status.status, DeploymentState::Running | DeploymentState::PartiallyRunning) {
         // Check if there are pending applications for this topology
         let pending_apps = state.db.list_applications(&id).await?
             .into_iter()

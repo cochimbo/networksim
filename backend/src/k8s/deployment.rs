@@ -212,7 +212,7 @@ impl DeploymentManager {
                 .cloned()
                 .unwrap_or_default();
 
-            let node_name = pod
+            let _node_name = pod
                 .metadata
                 .annotations
                 .as_ref()

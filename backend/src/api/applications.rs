@@ -16,75 +16,93 @@ pub async fn deploy(
     Path((topology_id, node_id)): Path<(Uuid, String)>,
     Json(request): Json<DeployAppRequest>,
 ) -> AppResult<Json<Application>> {
-    tracing::info!("🚀 Starting application deployment: topology_id={}, node_id={}, chart={}", 
-                   topology_id, node_id, request.chart);
+    tracing::info!("🚀 ===== STARTING APPLICATION DEPLOYMENT =====");
+    tracing::info!("📋 Request details: topology_id={}, node_id={}, image={}, values={:?}",
+                   topology_id, node_id, request.chart, request.values);
 
-    let helm = state.helm.as_ref().ok_or_else(|| {
-        tracing::error!("❌ Helm client not available");
-        AppError::BadRequest("Helm client not available".to_string())
+    let k8s = state.k8s.as_ref().ok_or_else(|| {
+        tracing::error!("❌ K8s client not available");
+        AppError::BadRequest("K8s client not available".to_string())
     })?;
-    tracing::info!("✅ Helm client available, namespace: {}", helm.namespace());
+    tracing::info!("✅ K8s client available, namespace: {}", k8s.namespace());
 
     // Create application record
     let app_id = Uuid::new_v4();
-    let app_name = format!("app-{}", app_id.simple());
-    let release_name = format!("app-{}", app_id.simple());
-    // Use the configured Helm namespace (same as simulation namespace)
-    let namespace = helm.namespace().to_string();
+    let deployment_name = format!("app-{}-{}", app_id.simple(), node_id);
+    let namespace = k8s.namespace().to_string();
 
-    tracing::info!("📝 Creating application record: id={}, release_name={}, namespace={}", 
-                   app_id, release_name, namespace);
+    tracing::info!("🆔 Generated application ID: {}", app_id);
+    tracing::info!("🏷️  Generated deployment name: {}", deployment_name);
+    tracing::info!("📝 Creating application record with details: id={}, deployment_name={}, namespace={}, topology_id={}, node_selector=[{}]",
+                   app_id, deployment_name, namespace, topology_id, node_id);
 
     let app = Application {
         id: app_id,
         topology_id,
         node_selector: vec![node_id.clone()],
         image_name: request.chart.clone(),
-        // name: app_name.clone(), // Eliminado
-        // version: None, // Eliminado
         namespace: namespace.clone(),
         values: request.values.clone(),
         status: crate::models::AppStatus::Pending,
-        release_name: release_name.clone(),
+        release_name: deployment_name.clone(),
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
-        // version: None, // Eliminado
-        // version: None, // Eliminado
-        // version: None, // Eliminado
     };
 
     // Save to database first
-    tracing::info!("💾 Saving application to database...");
-    state.db.create_application(&app).await?;
-    tracing::info!("✅ Application saved to database successfully");
+    tracing::info!("💾 Attempting to save application to database...");
+    match state.db.create_application(&app).await {
+        Ok(_) => tracing::info!("✅ Application saved to database successfully"),
+        Err(e) => {
+            tracing::error!("❌ Failed to save application to database: {}", e);
+            return Err(e.into());
+        }
+    }
 
     // Update status to deploying
     tracing::info!("🔄 Updating application status to Deploying...");
-    state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deploying, Some(&release_name)).await?;
-    tracing::info!("✅ Application status updated to Deploying");
+    match state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deploying, Some(&deployment_name)).await {
+        Ok(_) => tracing::info!("✅ Application status updated to Deploying"),
+        Err(e) => {
+            tracing::error!("❌ Failed to update application status to Deploying: {}", e);
+            return Err(e.into());
+        }
+    }
 
-    // Try to install with Helm
-    tracing::info!("⚓ Installing Helm chart: {} en namespace {}", 
-                   request.chart, namespace);
-    match helm.install_chart(&release_name, &request.chart, None, request.values.as_ref()).await {
+    // Create the deployment
+    tracing::info!("⚓ Creating Kubernetes deployment specification...");
+    let deployment = crate::k8s::resources::create_application_deployment(&app, &node_id, &topology_id.to_string());
+    tracing::info!("📦 Deployment spec created for: {}", deployment_name);
+
+    tracing::info!("🚀 Sending deployment to Kubernetes API...");
+    match k8s.create_deployment(&deployment).await {
         Ok(_) => {
-            tracing::info!("✅ Helm chart installed successfully");
+            tracing::info!("✅ Kubernetes deployment created successfully");
             // Update status to deployed
             tracing::info!("🔄 Updating application status to Deployed...");
-            state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&release_name)).await?;
-            tracing::info!("✅ Application deployment completed successfully");
+            match state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&deployment_name)).await {
+                Ok(_) => tracing::info!("✅ Application deployment completed successfully - status updated to Deployed"),
+                Err(e) => {
+                    tracing::error!("❌ Deployment succeeded but failed to update status to Deployed: {}", e);
+                    return Err(e.into());
+                }
+            }
             // Update the app struct status for the response
             let mut app = app;
             app.status = crate::models::AppStatus::Deployed;
+            tracing::info!("🎉 ===== APPLICATION DEPLOYMENT COMPLETED SUCCESSFULLY =====");
             Ok(Json(app))
         }
         Err(e) => {
-            tracing::error!("❌ Helm chart installation failed: {}", e);
+            tracing::error!("❌ Kubernetes deployment creation failed: {}", e);
             // Update status to failed
-            tracing::info!("🔄 Updating application status to Failed...");
-            state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Failed, Some(&release_name)).await?;
-            tracing::error!("❌ Application deployment failed, status updated to Failed");
-            Err(AppError::internal(&format!("Failed to deploy application: {}", e)).into())
+            tracing::info!("🔄 Updating application status to Failed due to deployment error...");
+            match state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Failed, Some(&deployment_name)).await {
+                Ok(_) => tracing::info!("✅ Application status updated to Failed"),
+                Err(update_err) => tracing::error!("❌ Failed to update application status to Failed: {}", update_err),
+            }
+            tracing::error!("💥 ===== APPLICATION DEPLOYMENT FAILED =====");
+            Err(AppError::internal(&format!("Failed to create deployment: {}", e)))
         }
     }
 }
@@ -161,48 +179,35 @@ pub async fn uninstall(
     let app = state.db.get_application(&app_id.to_string()).await?
         .ok_or_else(|| AppError::NotFound(format!("Application {} not found", app_id)))?;
 
-    // Verificar si la topología está desplegada
-    use crate::k8s::DeploymentManager;
-    let k8s = match &state.k8s {
-        Some(k) => k.clone(),
-        None => {
-            // Si no hay K8s, solo borra de la base de datos
-            state.db.delete_application(&app_id.to_string()).await?;
-            return Ok(Json(serde_json::json!({
-                "message": format!("Application {} uninstalled successfully (no k8s)", app_id)
-            })));
-        }
-    };
-    let deployment_manager = DeploymentManager::new(k8s);
-    let topology_status = deployment_manager.get_status(&app.topology_id.to_string()).await;
-    let is_topology_deployed = match topology_status {
-        Ok(status) => matches!(status.status, DeploymentState::Running | DeploymentState::PartiallyRunning),
-        Err(_) => false,
-    };
+    let k8s = state.k8s.as_ref().ok_or_else(|| {
+        tracing::error!("❌ K8s client not available");
+        AppError::BadRequest("K8s client not available".to_string())
+    })?;
 
-    if !is_topology_deployed {
-        // Si la topología NO está desplegada, solo borra la app de la base de datos
-        state.db.delete_application(&app_id.to_string()).await?;
-        return Ok(Json(serde_json::json!({
-            "message": format!("Application {} uninstalled successfully (not deployed)", app_id)
-        })));
-    }
-
-    // Si la topología está desplegada, sigue la lógica original (desinstalar de los pods)
+    // Update status to uninstalling
     state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Uninstalling, Some(&app.release_name)).await?;
+
+    // For each node, delete the corresponding deployment
     let mut uninstall_errors = Vec::new();
     for node_id in &app.node_selector {
-        match remove_application_from_node(&state, &app.topology_id.to_string(), node_id, &app).await {
+        let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+        match k8s.delete_deployment(&deployment_name).await {
             Ok(_) => {
-                tracing::info!("✅ Application removed from node {}", node_id);
+                tracing::info!("✅ Deployment {} deleted successfully", deployment_name);
             }
             Err(e) => {
-                let error_msg = format!("Failed to remove from node {}: {}", node_id, e);
-                tracing::error!("❌ {}", error_msg);
-                uninstall_errors.push(error_msg);
+                // Check if it's not found (already deleted), ignore
+                if e.to_string().contains("not found") || e.to_string().contains("NotFound") {
+                    tracing::info!("✅ Deployment {} already deleted or not found, skipping", deployment_name);
+                } else {
+                    let error_msg = format!("Failed to delete deployment {}: {}", deployment_name, e);
+                    tracing::error!("❌ {}", error_msg);
+                    uninstall_errors.push(error_msg);
+                }
             }
         }
     }
+
     if uninstall_errors.is_empty() {
         state.db.delete_application(&app_id.to_string()).await?;
         Ok(Json(serde_json::json!({
@@ -443,7 +448,7 @@ pub async fn deploy_application_to_node(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let k8s = state.k8s.as_ref().ok_or("K8s client not available")?;
     
-    // Create a separate deployment for the application instead of sidecar
+    // Create a separate deployment for the application
     use crate::k8s::resources::create_application_deployment;
     
     let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
@@ -506,27 +511,25 @@ pub async fn status(
     let mut all_running = true;
 
     for node_id in &app.node_selector {
-        let pod_name = format!("ns-{}-{}", &app.topology_id.to_string()[..8.min(app.topology_id.to_string().len())], node_id).to_lowercase();
-        let container_name = format!("app-{}", app.id.simple());
-
-        match k8s.check_pod_containers_running(&pod_name, "networksim-sim").await {
-            Ok(is_running) => {
+        let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+        match k8s.check_deployment_ready(&deployment_name, "networksim-sim").await {
+            Ok(is_ready) => {
                 node_statuses.push(serde_json::json!({
                     "node_id": node_id,
-                    "pod_name": pod_name,
-                    "container_name": container_name,
-                    "running": is_running
+                    "pod_name": format!("{}-{}", deployment_name, "pod"), // Simplified
+                    "container_name": format!("app-{}", app.id.simple()),
+                    "running": is_ready
                 }));
                 
-                if !is_running {
+                if !is_ready {
                     all_running = false;
                 }
             }
             Err(e) => {
                 node_statuses.push(serde_json::json!({
                     "node_id": node_id,
-                    "pod_name": pod_name,
-                    "container_name": container_name,
+                    "pod_name": format!("{}-{}", deployment_name, "pod"),
+                    "container_name": format!("app-{}", app.id.simple()),
                     "error": e.to_string(),
                     "running": false
                 }));
