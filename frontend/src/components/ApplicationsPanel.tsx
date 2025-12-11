@@ -3,6 +3,7 @@ import EnvVarsEditor from './EnvVarsEditor';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Play, Trash2, Package } from 'lucide-react';
 import { applicationsApi, DeployAppRequest, AppRuntimeStatus } from '../services/api';
+import envIcon from '../assets/icons/env-icon.png';
 import './ApplicationsPanel.css';
 
 interface ApplicationsPanelProps {
@@ -267,10 +268,11 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                     <div className="flex gap-1">
                       <button
                         onClick={() => setShowEnvEditor({ appId: app.id, env: [] })}
-                        className="p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700"
-                        title="Editar variables de entorno"
+                        disabled={isTopologyDeployed}
+                        className="p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={isTopologyDeployed ? "Cannot edit env vars while topology is deployed" : "Editar variables de entorno"}
                       >
-                        🧬 Env
+                        <img src={envIcon} alt="Env" className="h-4 w-7" />
                       </button>
                       <button
                         onClick={() => {
