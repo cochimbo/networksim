@@ -97,7 +97,7 @@ pub struct ContainerInfo {
     pub started_at: Option<String>,
     pub ports: Vec<ContainerPort>,
     pub application_name: Option<String>,
-    pub application_chart: Option<String>,
+    pub application_image: Option<String>,
 }
 
 /// Container port information
@@ -493,7 +493,7 @@ pub async fn get_node_containers(
                     started_at,
                     ports,
                     application_name: Some("Node Base".to_string()),
-                    application_chart: Some("alpine".to_string()),
+                    application_image: Some("alpine".to_string()),
                 });
             }
         }
@@ -566,8 +566,8 @@ pub async fn get_node_containers(
                             restart_count,
                             started_at,
                             ports,
-                            application_name: Some(app.name.clone()),
-                            application_chart: Some(app.chart_reference.clone()),
+                               application_name: Some(app.image_name.clone()),
+                            application_image: Some(app.image_name.clone()),
                         });
                     }
                 }

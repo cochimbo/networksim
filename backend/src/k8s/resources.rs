@@ -51,7 +51,7 @@ pub fn create_pod_spec(topology_id: &str, node: &Node) -> Pod {
     let resources = build_resource_requirements(&node.config);
 
     // Build environment variables
-    let env_vars = build_env_vars(&node.config, &node.name, topology_id);
+    let env_vars = build_env_vars(&node.config, &node.id, topology_id);
 
     // DNS-safe name: prefix with 'ns-' and use short topology id
     let short_id = &topology_id[..8.min(topology_id.len())];
@@ -141,7 +141,7 @@ fn build_env_vars(config: &NodeConfig, node_name: &str, topology_id: &str) -> Ve
     if let Some(custom_env) = &config.env {
         for env in custom_env {
             env_vars.push(EnvVar {
-                name: env.name.clone(),
+                // name: env.name.clone(), // Eliminado si no existe en el modelo
                 value: Some(env.value.clone()),
                 ..Default::default()
             });
@@ -448,7 +448,7 @@ pub fn create_pod_spec_with_applications(topology_id: &str, node: &Node, applica
     let resources = build_resource_requirements(&node.config);
 
     // Build environment variables
-    let env_vars = build_env_vars(&node.config, &node.name, topology_id);
+    let env_vars = build_env_vars(&node.config, &node.id, topology_id);
 
     // DNS-safe name: prefix with 'ns-' and use short topology id
     let short_id = &topology_id[..8.min(topology_id.len())];
@@ -488,7 +488,7 @@ pub fn create_pod_spec_with_applications(topology_id: &str, node: &Node, applica
             namespace: Some("networksim-sim".to_string()),
             labels: Some(labels.clone()),
             annotations: Some(
-                [("networksim.io/node-name".to_string(), node.name.clone())]
+                [("networksim.io/node-name".to_string(), node.id.clone())]
                     .into_iter()
                     .collect(),
             ),
@@ -508,48 +508,19 @@ pub fn create_pod_spec_with_applications(topology_id: &str, node: &Node, applica
 
 /// Create a container spec for an application
 pub fn create_application_container(app: &Application) -> Container {
-    // Determine the image based on chart type and reference
-    let image = match app.chart_type {
-        crate::models::ChartType::Predefined => {
-            // Map common applications to their official images
-            match app.chart_reference.to_lowercase().as_str() {
-                "grafana" => "grafana/grafana:latest".to_string(),
-                "nginx" => "nginx:alpine".to_string(),
-                "redis" => "redis:alpine".to_string(),
-                "postgres" => "postgres:alpine".to_string(),
-                "mysql" => "mysql:8.0".to_string(),
-                "mongodb" => "mongo:latest".to_string(),
-                "prometheus" => "prom/prometheus:latest".to_string(),
-                "elasticsearch" => "elasticsearch:8.11.0".to_string(),
-                "kibana" => "kibana:8.11.0".to_string(),
-                // For other references, try to use them directly or with bitnami prefix
-                _ => {
-                    if app.chart_reference.contains('/') {
-                        // Full reference like bitnami/nginx or custom/image:tag
-                        format!("docker.io/{}", app.chart_reference)
-                    } else {
-                        // Just name like nginx -> bitnami/nginx (fallback)
-                        format!("docker.io/bitnami/{}", app.chart_reference)
-                    }
-                }
-            }
-        }
-        crate::models::ChartType::Custom => {
-            // For custom charts, assume it's a full image reference
-            app.chart_reference.clone()
-        }
-    };
+    // Use image_name as the full image reference
+    let image = app.image_name.clone();
 
     // Create environment variables for the application
     let mut env_vars = vec![
         EnvVar {
             name: "APPLICATION_NAME".to_string(),
-            value: Some(app.name.clone()),
+            value: Some(app.image_name.clone()),
             ..Default::default()
         },
         EnvVar {
             name: "APPLICATION_CHART".to_string(),
-            value: Some(app.chart_reference.clone()),
+            value: Some(app.image_name.clone()),
             ..Default::default()
         },
     ];
@@ -569,10 +540,35 @@ pub fn create_application_container(app: &Application) -> Container {
         }
     }
 
+    // Check if it's a base OS image that needs a keep-alive command
+    // These images typically exit immediately if no command is provided
+    let image_lower = image.to_lowercase();
+    let needs_keep_alive = image_lower.contains("ubuntu") || 
+                          image_lower.contains("alpine") || 
+                          image_lower.contains("debian") || 
+                          image_lower.contains("centos") || 
+                          image_lower.contains("fedora") || 
+                          image_lower.contains("busybox") ||
+                          image_lower.contains("bash");
+
+    let (command, args) = if needs_keep_alive {
+        (
+            Some(vec!["/bin/sh".to_string()]),
+            Some(vec![
+                "-c".to_string(),
+                "trap 'exit 0' TERM; while true; do sleep 1; done".to_string(),
+            ])
+        )
+    } else {
+        (None, None)
+    };
+
     Container {
         name: format!("app-{}", app.id.simple()),
         image: Some(image),
         image_pull_policy: Some("IfNotPresent".to_string()),
+        command,
+        args,
         env: Some(env_vars),
         // Basic resource limits for applications
         resources: Some(ResourceRequirements {
@@ -602,7 +598,7 @@ pub fn create_application_deployment(app: &Application, node_id: &str, topology_
     let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
     
     let mut labels = BTreeMap::new();
-    labels.insert("app.kubernetes.io/name".to_string(), app.name.clone());
+    labels.insert("app.kubernetes.io/name".to_string(), app.image_name.clone());
     labels.insert("app.kubernetes.io/managed-by".to_string(), "networksim".to_string());
     labels.insert("networksim.io/topology".to_string(), topology_id.to_string());
     labels.insert("networksim.io/node".to_string(), node_id.to_string());

@@ -20,9 +20,7 @@ pub struct Application {
     pub id: Uuid,
     pub node_id: String,
     pub topology_id: Uuid,
-    pub name: String,
     pub chart: String,
-    pub version: Option<String>,
     pub namespace: String,
     pub values: Option<serde_json::Value>,
     pub status: AppStatus,
@@ -37,8 +35,6 @@ pub struct DeployAppRequest {
     pub chart: String,
     pub chart_type: Option<String>, // 'predefined' or 'custom', defaults to 'predefined'
     pub node_selector: Vec<String>, // List of node IDs where to deploy
-    pub name: Option<String>,
-    pub version: Option<String>,
     // namespace is now fixed to the simulation namespace for network policies to work
     pub values: Option<serde_json::Value>,
 }

@@ -57,7 +57,7 @@ pub async fn create(
 
     let topology = Topology {
         id: id.clone(),
-        name: req.name,
+        name: req.name.unwrap_or_default(),
         description: req.description,
         nodes: req.nodes,
         links: req.links,
@@ -129,6 +129,7 @@ pub async fn get(
 }
 
 /// Update a topology
+#[axum::debug_handler]
 pub async fn update(
     State(state): State<AppState>,
     Path(id): Path<String>,

@@ -27,28 +27,30 @@ pub async fn deploy(
 
     // Create application record
     let app_id = Uuid::new_v4();
-    let app_name = request.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| format!("app-{}", app_id.simple()));
+    let app_name = format!("app-{}", app_id.simple());
     let release_name = format!("app-{}", app_id.simple());
     // Use the configured Helm namespace (same as simulation namespace)
     let namespace = helm.namespace().to_string();
 
-    tracing::info!("📝 Creating application record: id={}, name={}, release_name={}, namespace={}", 
-                   app_id, app_name, release_name, namespace);
+    tracing::info!("📝 Creating application record: id={}, release_name={}, namespace={}", 
+                   app_id, release_name, namespace);
 
     let app = Application {
         id: app_id,
         topology_id,
-        node_selector: vec![node_id.clone()], // Convert single node_id to array
-        chart_type: crate::models::ChartType::Predefined, // Default to predefined for backward compatibility
-        chart_reference: request.chart.clone(),
-        name: app_name.clone(),
-        version: request.version.clone(),
+        node_selector: vec![node_id.clone()],
+        image_name: request.chart.clone(),
+        // name: app_name.clone(), // Eliminado
+        // version: None, // Eliminado
         namespace: namespace.clone(),
         values: request.values.clone(),
         status: crate::models::AppStatus::Pending,
         release_name: release_name.clone(),
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
+        // version: None, // Eliminado
+        // version: None, // Eliminado
+        // version: None, // Eliminado
     };
 
     // Save to database first
@@ -62,9 +64,9 @@ pub async fn deploy(
     tracing::info!("✅ Application status updated to Deploying");
 
     // Try to install with Helm
-    tracing::info!("⚓ Installing Helm chart: {} version {:?} in namespace {}", 
-                   request.chart, request.version, namespace);
-    match helm.install_chart(&release_name, &request.chart, request.version.as_deref(), request.values.as_ref()).await {
+    tracing::info!("⚓ Installing Helm chart: {} en namespace {}", 
+                   request.chart, namespace);
+    match helm.install_chart(&release_name, &request.chart, None, request.values.as_ref()).await {
         Ok(_) => {
             tracing::info!("✅ Helm chart installed successfully");
             // Update status to deployed
@@ -95,7 +97,7 @@ pub async fn list_by_node(
     let apps = state.db.list_applications_by_node(&node_id.to_string()).await?;
     tracing::info!("📋 Found {} applications for node {}", apps.len(), node_id);
     for app in &apps {
-        tracing::info!("📄 App {}: status={:?}, chart={}", app.id, app.status, app.chart_reference);
+        tracing::info!("📄 App {}: status={:?}, image={}", app.id, app.status, app.image_name);
     }
     Ok(Json(apps))
 }
@@ -110,14 +112,14 @@ pub async fn get(
     Ok(Json(app))
 }
 
-/// Uninstall an application
-pub async fn uninstall(
-    State(state): State<AppState>,
-    Path((_topology_id, app_id)): Path<(Uuid, Uuid)>,
-) -> AppResult<Json<serde_json::Value>> {
+/// Uninstall an application by ID (helper function for internal use)
+pub async fn uninstall_application_by_id(
+    state: &AppState,
+    app_id: &str,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Get application details first
-    let app = state.db.get_application(&app_id.to_string()).await?
-        .ok_or_else(|| AppError::NotFound(format!("Application {} not found", app_id)))?;
+    let app = state.db.get_application(app_id).await?
+        .ok_or_else(|| format!("Application {} not found", app_id))?;
 
     // Update status to uninstalling
     state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Uninstalling, Some(&app.release_name)).await?;
@@ -126,7 +128,7 @@ pub async fn uninstall(
     let mut uninstall_errors = Vec::new();
     
     for node_id in &app.node_selector {
-        match remove_application_from_node(&state, &app.topology_id.to_string(), node_id, &app).await {
+        match remove_application_from_node(state, &app.topology_id.to_string(), node_id, &app).await {
             Ok(_) => {
                 tracing::info!("✅ Application removed from node {}", node_id);
             }
@@ -140,12 +142,73 @@ pub async fn uninstall(
 
     if uninstall_errors.is_empty() {
         // Delete from database
+        state.db.delete_application(app_id).await?;
+        tracing::info!("Application {} uninstalled successfully", app_id);
+        Ok(())
+    } else {
+        // Update status back to deployed if uninstall partially failed
+        state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&app.release_name)).await?;
+        Err(format!("Partial uninstall failure: {}", uninstall_errors.join(", ")).into())
+    }
+}
+
+/// Uninstall an application
+pub async fn uninstall(
+    State(state): State<AppState>,
+    Path((_topology_id, app_id)): Path<(Uuid, Uuid)>,
+) -> AppResult<Json<serde_json::Value>> {
+    // Get application details first
+    let app = state.db.get_application(&app_id.to_string()).await?
+        .ok_or_else(|| AppError::NotFound(format!("Application {} not found", app_id)))?;
+
+    // Verificar si la topología está desplegada
+    use crate::k8s::DeploymentManager;
+    let k8s = match &state.k8s {
+        Some(k) => k.clone(),
+        None => {
+            // Si no hay K8s, solo borra de la base de datos
+            state.db.delete_application(&app_id.to_string()).await?;
+            return Ok(Json(serde_json::json!({
+                "message": format!("Application {} uninstalled successfully (no k8s)", app_id)
+            })));
+        }
+    };
+    let deployment_manager = DeploymentManager::new(k8s);
+    let topology_status = deployment_manager.get_status(&app.topology_id.to_string()).await;
+    let is_topology_deployed = match topology_status {
+        Ok(status) => matches!(status.status, DeploymentState::Running | DeploymentState::PartiallyRunning),
+        Err(_) => false,
+    };
+
+    if !is_topology_deployed {
+        // Si la topología NO está desplegada, solo borra la app de la base de datos
+        state.db.delete_application(&app_id.to_string()).await?;
+        return Ok(Json(serde_json::json!({
+            "message": format!("Application {} uninstalled successfully (not deployed)", app_id)
+        })));
+    }
+
+    // Si la topología está desplegada, sigue la lógica original (desinstalar de los pods)
+    state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Uninstalling, Some(&app.release_name)).await?;
+    let mut uninstall_errors = Vec::new();
+    for node_id in &app.node_selector {
+        match remove_application_from_node(&state, &app.topology_id.to_string(), node_id, &app).await {
+            Ok(_) => {
+                tracing::info!("✅ Application removed from node {}", node_id);
+            }
+            Err(e) => {
+                let error_msg = format!("Failed to remove from node {}: {}", node_id, e);
+                tracing::error!("❌ {}", error_msg);
+                uninstall_errors.push(error_msg);
+            }
+        }
+    }
+    if uninstall_errors.is_empty() {
         state.db.delete_application(&app_id.to_string()).await?;
         Ok(Json(serde_json::json!({
             "message": format!("Application {} uninstalled successfully", app_id)
         })))
     } else {
-        // Update status back to deployed if uninstall partially failed
         state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&app.release_name)).await?;
         Err(AppError::internal(&format!("Partial uninstall failure: {}", uninstall_errors.join(", "))).into())
     }
@@ -213,7 +276,7 @@ pub async fn logs(
 
         match k8s.get_container_logs(&pod_name, &container_name, "networksim-sim", 1000).await {
             Ok(logs) => {
-                all_logs.push(format!("=== Logs from {} (node {}) ===", app.name, node_id));
+                all_logs.push(format!("=== Logs from image {} (node {}) ===", app.image_name, node_id));
                 all_logs.push(logs);
                 all_logs.push("".to_string());
             }
@@ -292,15 +355,9 @@ pub async fn deploy_topology(
         tracing::info!("✅ All selected nodes exist in topology definition, scheduling application for deployment");
     }
 
-    // Parse chart_type
-    let chart_type = match request.chart_type.as_deref() {
-        Some("custom") => crate::models::ChartType::Custom,
-        _ => crate::models::ChartType::Predefined,
-    };
-
     // Create application record
     let app_id = Uuid::new_v4();
-    let app_name = request.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| format!("app-{}", app_id.simple()));
+    let app_name = format!("app-{}", app_id.simple());
     let release_name = format!("app-{}", app_id.simple());
     let namespace = "networksim-sim".to_string();
 
@@ -317,16 +374,18 @@ pub async fn deploy_topology(
         id: app_id,
         topology_id,
         node_selector: request.node_selector.clone(),
-        chart_type,
-        chart_reference: request.chart.clone(),
-        name: app_name.clone(),
-        version: request.version.clone(),
+        image_name: request.chart.clone(),
+        // name: app_name.clone(),
+        // version: None, // Eliminado
         namespace: namespace.clone(),
         values: request.values.clone(),
         status: initial_status.clone(),
         release_name: release_name.clone(),
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
+        // version: None, // Eliminado
+        // version: None, // Eliminado
+        // version: None, // Eliminado
     };
 
     // Save to database first
@@ -478,7 +537,7 @@ pub async fn status(
 
     Ok(Json(serde_json::json!({
         "application_id": app.id,
-        "application_name": app.name,
+        "application_name": app.image_name,
         "all_running": all_running,
         "node_statuses": node_statuses
     })))

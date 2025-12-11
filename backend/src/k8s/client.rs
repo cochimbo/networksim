@@ -102,6 +102,11 @@ impl K8sClient {
         Api::namespaced(self.client.clone(), &self.namespace)
     }
 
+    /// Get a typed API for deployments in the simulation namespace
+    pub fn deployments(&self) -> Api<Deployment> {
+        Api::namespaced(self.client.clone(), &self.namespace)
+    }
+
     /// Create a pod
     #[instrument(skip(self, pod), fields(pod_name = %pod.metadata.name.as_deref().unwrap_or("unknown")))]
     pub async fn create_pod(&self, pod: &Pod) -> Result<Pod> {
@@ -211,7 +216,18 @@ impl K8sClient {
     pub async fn cleanup_deployment(&self, topology_id: &str) -> Result<()> {
         let label_selector = format!("networksim.io/topology={}", topology_id);
 
-        // Delete pods
+        // Delete deployments first (this will trigger pod deletion for managed pods)
+        let deployments = self.deployments();
+        let deploy_list = deployments
+            .list(&ListParams::default().labels(&label_selector))
+            .await?;
+        for deploy in deploy_list.items {
+            if let Some(name) = deploy.metadata.name {
+                let _ = self.delete_deployment(&name).await;
+            }
+        }
+
+        // Delete pods (for unmanaged pods or to speed up deletion)
         let pods = self.list_pods(&label_selector).await?;
         for pod in pods {
             if let Some(name) = pod.metadata.name {
@@ -317,7 +333,11 @@ impl K8sClient {
     /// Delete a deployment
     pub async fn delete_deployment(&self, name: &str) -> Result<()> {
         let api: Api<Deployment> = Api::namespaced(self.client.clone(), &self.namespace);
-        api.delete(name, &DeleteParams::default()).await?;
+        let dp = DeleteParams {
+            propagation_policy: Some(kube::api::PropagationPolicy::Foreground),
+            ..DeleteParams::default()
+        };
+        api.delete(name, &dp).await?;
         info!(name = %name, "Deleted deployment");
         Ok(())
     }

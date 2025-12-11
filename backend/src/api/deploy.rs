@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use crate::api::AppState;
-use crate::api::applications::deploy_application_to_node;
+use crate::api::applications::{deploy_application_to_node, uninstall_application_by_id};
 use crate::error::{AppError, AppResult};
 use crate::k8s::{DeploymentManager, DeploymentState, DeploymentStatus as K8sDeploymentStatus};
 
@@ -35,13 +35,15 @@ impl From<K8sDeploymentStatus> for DeploymentResponse {
         let nodes = status
             .nodes
             .into_values()
-            .map(|n| NodeStatusResponse {
-                id: n.node_id,
-                name: n.name,
-                status: format!("{:?}", n.status).to_lowercase(),
-                pod_name: n.pod_name,
-                pod_ip: n.pod_ip,
-                message: n.message,
+            .map(|n| {
+                NodeStatusResponse {
+                    id: n.node_id,
+                        name: String::new(), // Se rellenará en el handler
+                    status: format!("{:?}", n.status).to_lowercase(),
+                    pod_name: n.pod_name,
+                    pod_ip: n.pod_ip,
+                    message: n.message,
+                }
             })
             .collect();
 
@@ -106,7 +108,15 @@ pub async fn deploy(
     }
 
     info!(topology_id = %id, "Topology deployed successfully");
-    Ok(Json(status.into()))
+    // Convertir a respuesta y rellenar nombres
+    let mut response = DeploymentResponse::from(status);
+    for node in &mut response.nodes {
+        node.name = topology.nodes.iter()
+            .find(|n| n.id == node.id)
+            .map(|n| n.name.clone())
+            .unwrap_or_else(|| node.id.clone());
+    }
+    Ok(Json(response))
 }
 
 /// Destroy a deployment
@@ -117,6 +127,15 @@ pub async fn destroy(
     Path(id): Path<String>,
 ) -> AppResult<Json<serde_json::Value>> {
     info!(topology_id = %id, "Destroying deployment");
+
+    // Reset all applications to Pending status
+    let applications = state.db.list_applications(&id).await?;
+    for app in applications {
+        tracing::info!("Resetting application {} status to Pending", app.id);
+        if let Err(e) = state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Pending, Some(&app.release_name)).await {
+             tracing::warn!("Failed to reset application status {}: {}", app.id, e);
+        }
+    }
 
     // Check if K8s client is available
     let k8s = state
@@ -180,14 +199,22 @@ pub async fn status(
         AppError::internal(&format!("Status check failed: {}", e))
     })?;
 
-    // If topology is running and has pending applications, activate them
-    if matches!(status.status, DeploymentState::Running | DeploymentState::PartiallyRunning) {
+    // Obtener el estado del comando de despliegue
+    let deploy_command_state: String = sqlx::query_scalar(
+        "SELECT deploy_command_state FROM deployments WHERE topology_id = ?"
+    )
+    .bind(&id)
+    .fetch_one(state.db.pool())
+    .await
+    .unwrap_or_else(|_| "pending".to_string());
+
+    // Solo activar aplicaciones si el comando está en 'deploying' o 'pending'
+    if (deploy_command_state == "deploying" || deploy_command_state == "pending") && matches!(status.status, DeploymentState::Running | DeploymentState::PartiallyRunning) {
         // Check if there are pending applications for this topology
         let pending_apps = state.db.list_applications(&id).await?
             .into_iter()
             .filter(|app| matches!(app.status, crate::models::AppStatus::Pending))
             .collect::<Vec<_>>();
-        
         if !pending_apps.is_empty() {
             info!(topology_id = %id, pending_count = pending_apps.len(), "Found pending applications for running topology, activating them");
             if let Err(e) = activate_pending_applications(&state, &id).await {
@@ -269,7 +296,7 @@ async fn activate_pending_applications(
     info!(topology_id = %topology_id, pending_count = pending_apps.len(), "Activating pending applications");
     
     for app in pending_apps {
-        info!(topology_id = %topology_id, app_id = %app.id, app_name = %app.name, "Activating pending application");
+        info!(topology_id = %topology_id, app_id = %app.id, image_name = %app.image_name, "Activating pending application");
         
         // Update status to deploying
         state.db.update_application_status(&app.id.to_string(), &AppStatus::Deploying, Some(&app.release_name)).await?;

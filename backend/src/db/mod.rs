@@ -43,11 +43,10 @@ struct ApplicationRow {
     id: String,
     topology_id: String,
     node_selector: Option<String>,  // JSON array of node IDs
-    chart_type: Option<String>,     // 'predefined' or 'custom'
-    chart_reference: Option<String>, // Full chart reference
-    name: String,
+    image_name: Option<String>, // Full image reference
+    // name: String, // Eliminado
     chart: String,  // Keep for backward compatibility during migration
-    version: Option<String>,
+    // version: Option<String>,
     namespace: String,
     values: Option<String>,
     status: String,
@@ -256,17 +255,14 @@ impl Database {
             .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
         sqlx::query(
-            "INSERT INTO applications (id, topology_id, node_selector, chart_type, chart_reference, name, chart, version, namespace, \"values\", status, release_name, created_at, updated_at) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO applications (id, topology_id, node_selector, image_name, chart, namespace, \"values\", status, release_name, created_at, updated_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(app.id.to_string())
         .bind(app.topology_id.to_string())
         .bind(node_selector_json)
-        .bind(app.chart_type.to_string())
-        .bind(&app.chart_reference)
-        .bind(&app.name)
-        .bind(&app.chart_reference) // Keep chart for backward compatibility
-        .bind(&app.version)
+        .bind(&app.image_name)
+        .bind(&app.image_name) // Keep chart for backward compatibility
         .bind(&app.namespace)
         .bind(app.values.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()))
         .bind(app.status.to_string())
@@ -282,7 +278,7 @@ impl Database {
     /// Get an application by ID
     pub async fn get_application(&self, id: &str) -> Result<Option<Application>, sqlx::Error> {
         let row: Option<ApplicationRow> = sqlx::query_as(
-            "SELECT id, topology_id, node_selector, chart_type, chart_reference, name, chart, version, namespace, \"values\", status, release_name, created_at, updated_at 
+              "SELECT id, topology_id, node_selector, image_name, chart, namespace, \"values\", status, release_name, created_at, updated_at 
              FROM applications WHERE id = ?",
         )
         .bind(id)
@@ -295,7 +291,7 @@ impl Database {
     /// List all applications for a topology
     pub async fn list_applications(&self, topology_id: &str) -> Result<Vec<Application>, sqlx::Error> {
         let rows: Vec<ApplicationRow> = sqlx::query_as(
-            "SELECT id, topology_id, node_selector, chart_type, chart_reference, name, chart, version, namespace, \"values\", status, release_name, created_at, updated_at 
+              "SELECT id, topology_id, node_selector, image_name, chart, namespace, \"values\", status, release_name, created_at, updated_at 
              FROM applications WHERE topology_id = ? ORDER BY created_at",
         )
         .bind(topology_id)
@@ -308,7 +304,7 @@ impl Database {
     /// List all applications for a specific node
     pub async fn list_applications_by_node(&self, node_id: &str) -> Result<Vec<Application>, sqlx::Error> {
         let rows: Vec<ApplicationRow> = sqlx::query_as(
-            "SELECT id, topology_id, node_selector, chart_type, chart_reference, name, chart, version, namespace, \"values\", status, release_name, created_at, updated_at 
+              "SELECT id, topology_id, node_selector, image_name, chart, namespace, \"values\", status, release_name, created_at, updated_at 
              FROM applications WHERE node_selector LIKE ? ORDER BY created_at",
         )
         .bind(format!("%\"{}\"", node_id))
@@ -347,24 +343,18 @@ impl Database {
         sqlx::query(
             "UPDATE applications SET 
                 node_selector = ?,
-                chart_type = ?,
-                chart_reference = ?,
-                name = ?, 
-                chart = ?, 
-                version = ?, 
-                namespace = ?, 
-                \"values\" = ?, 
-                status = ?, 
-                release_name = ?, 
-                updated_at = ? 
-             WHERE id = ?",
+                image_name = ?,
+                chart = ?,
+                namespace = ?,
+                \"values\" = ?,
+                status = ?,
+                release_name = ?,
+                updated_at = ?
+             WHERE id = ?"
         )
         .bind(node_selector_json)
-        .bind(app.chart_type.to_string())
-        .bind(&app.chart_reference)
-        .bind(&app.name)
-        .bind(&app.chart_reference) // Keep chart for backward compatibility
-        .bind(&app.version)
+        .bind(&app.image_name)
+        .bind(&app.image_name)
         .bind(&app.namespace)
         .bind(app.values.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()))
         .bind(app.status.to_string())
@@ -448,7 +438,7 @@ impl Database {
 
     /// Helper to convert row to Application
     fn row_to_application(row: ApplicationRow) -> Result<Application, sqlx::Error> {
-        use crate::models::{AppStatus, ChartType};
+        use crate::models::AppStatus;
         use uuid::Uuid;
 
         let status = match row.status.to_lowercase().as_str() {
@@ -473,24 +463,15 @@ impl Database {
             Vec::new()
         };
 
-        // Parse chart_type, default to Predefined if None
-        let chart_type = if let Some(chart_type_str) = row.chart_type {
-            ChartType::from(chart_type_str)
-        } else {
-            ChartType::Predefined
-        };
-
         // Use chart_reference if available, otherwise fall back to chart for backward compatibility
-        let chart_reference = row.chart_reference.unwrap_or_else(|| row.chart.clone());
+        let image_name = row.image_name.unwrap_or_else(|| row.chart.clone());
 
         Ok(Application {
             id: Uuid::parse_str(&row.id).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
             topology_id: Uuid::parse_str(&row.topology_id).map_err(|e| sqlx::Error::Decode(Box::new(e)))?,
             node_selector,
-            chart_type,
-            chart_reference,
-            name: row.name,
-            version: row.version,
+            image_name,
+            // name: row.name, // Eliminado
             namespace: row.namespace,
             values,
             status,

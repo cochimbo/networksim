@@ -65,7 +65,7 @@ pub enum DeploymentState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeStatusInfo {
     pub node_id: String,
-    pub name: String,
+    // pub name: String, // Eliminado
     pub status: NodeStatus,
     pub pod_name: Option<String>,
     pub pod_ip: Option<String>,
@@ -112,7 +112,7 @@ impl DeploymentManager {
                         node.id.clone(),
                         NodeStatusInfo {
                             node_id: node.id.clone(),
-                            name: node.name.clone(),
+                            // name: node.name.clone(), // Eliminado
                             status: NodeStatus::Failed,
                             pod_name: None,
                             pod_ip: None,
@@ -187,7 +187,7 @@ impl DeploymentManager {
 
         Ok(NodeStatusInfo {
             node_id: node.id.clone(),
-            name: node.name.clone(),
+            // name: node.name.clone(), // Eliminado
             status: NodeStatus::from(phase),
             pod_name: Some(pod_name),
             pod_ip,
@@ -248,7 +248,7 @@ impl DeploymentManager {
                 node_id.clone(),
                 NodeStatusInfo {
                     node_id,
-                    name: node_name,
+                    // name: node_name, // Eliminado
                     status: NodeStatus::from(phase),
                     pod_name,
                     pod_ip,
