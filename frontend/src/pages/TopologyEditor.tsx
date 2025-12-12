@@ -388,7 +388,6 @@ export default function TopologyEditor() {
         });
         
         setNodes((prev) => [...prev, newNode]);
-        setTool('select');
       } else if (event.target === cy) {
         // Click on empty canvas clears link source and selection
         setLinkSource(null);
