@@ -2,13 +2,34 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import cytoscape, { Core } from 'cytoscape';
-import { Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize, Play, Square, Loader2 } from 'lucide-react';
+import {
+  Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize,
+  Play, Square, Loader2, Zap, Bookmark, Activity, TestTube, Grid3X3,
+  ChevronUp, ChevronDown, Clock, Film, BarChart3, FileDown, LayoutTemplate
+} from 'lucide-react';
 import { topologyApi, clusterApi, deploymentApi, chaosApi, diagnosticApi, Topology, Node, Link, ContainerInfo } from '../services/api';
 import { ChaosPanel } from '../components/ChaosPanel';
 import { NodePropertiesModal } from '../components/NodePropertiesModal';
 import { DeploymentModal, DeploymentAction, DeploymentPhase } from '../components/DeploymentModal';
 import { ApplicationsPanel } from '../components/ApplicationsPanel';
 import { useWebSocketEvents, WebSocketEvent } from '../contexts/WebSocketContext';
+import { useToast } from '../components/Toast';
+
+// New components
+import { TabPanel, useTabs } from '../components/TabPanel';
+import ChaosPresets from '../components/ChaosPresets';
+import LiveMetrics from '../components/LiveMetrics';
+import TestRunner from '../components/TestRunner';
+import EventTimeline from '../components/EventTimeline';
+import NetworkMatrix from '../components/NetworkMatrix';
+import ExportImport from '../components/ExportImport';
+import ChaosScenarios from '../components/ChaosScenarios';
+import MetricsComparison from '../components/MetricsComparison';
+import ImpactDashboard from '../components/ImpactDashboard';
+import AppToAppTest from '../components/AppToAppTest';
+import { TemplateSelector } from '../components/TemplateSelector';
+import { ExportReport } from '../components/ExportReport';
+import { applicationsApi, GeneratedTopology } from '../services/api';
 
 // Node status from K8s
 type NodeStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'unknown';
@@ -21,8 +42,8 @@ const STATUS_COLORS: Record<NodeStatus, string> = {
 };
 
 export default function TopologyEditor() {
-    // Estado para el modal de propiedades de nodo
-    const [nodeModal, setNodeModal] = useState<{ open: boolean; node: any } | null>(null);
+  // Estado para el modal de propiedades de nodo
+  const [nodeModal, setNodeModal] = useState<{ open: boolean; node: any } | null>(null);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -45,10 +66,49 @@ export default function TopologyEditor() {
     message?: string;
   } | null>(null);
 
+  // Toast notifications
+  const toast = useToast();
+
+  // Template selector and export report modals
+  const [showTemplateSelector, setShowTemplateSelector] = useState(!id); // Show on new topology
+  const [showExportReport, setShowExportReport] = useState(false);
+
+  // New state for tabs and bottom panel
+  const { activeTab: rightTab, setActiveTab: setRightTab } = useTabs('chaos');
+  const { activeTab: leftTab, setActiveTab: setLeftTab } = useTabs('apps');
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
+  const [bottomPanelTab, setBottomPanelTab] = useState<'metrics' | 'events' | 'comparison'>('metrics');
+
+  // Tooltip state
+  const [tooltip, setTooltip] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    nodeId: string;
+    nodeName: string;
+    apps: { name: string; status: string }[];
+    chaosConditions: { type: string; status: string }[];
+    nodeStatus: string;
+  } | null>(null);
+
+  // Edge context menu state
+  const [edgeContextMenu, setEdgeContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    sourceId: string;
+    targetId: string;
+    sourceName: string;
+    targetName: string;
+    activeChaos: { id: string; type: string; status: string }[];
+  } | null>(null);
+
   // Refs to access current values in event handlers
   const toolRef = useRef(tool);
   const nodesRef = useRef(nodes);
   const linkSourceRef = useRef(linkSource);
+  const applicationsRef = useRef<any[]>([]);
+  const chaosConditionsRef = useRef<any[]>([]);
 
   // Keep refs in sync
   useEffect(() => { toolRef.current = tool; }, [tool]);
@@ -60,12 +120,12 @@ export default function TopologyEditor() {
     if (event.type === 'node:status' && event.data.topology_id === id) {
       const nodeId = String(event.data.node_id);
       const status = (event.data.status as NodeStatus) || 'unknown';
-      
+
       setNodeStatuses(prev => ({
         ...prev,
         [nodeId]: status
       }));
-      
+
       // Update node color in Cytoscape
       if (cyInstance.current) {
         const node = cyInstance.current.$(`#${nodeId}`);
@@ -75,7 +135,19 @@ export default function TopologyEditor() {
         }
       }
     }
-  }, [id]);
+
+    // Handle app events - refetch applications list
+    if ((event.type === 'app:deployed' || event.type === 'app:uninstalled' || event.type === 'app:status_changed') &&
+        event.data.topology_id === id) {
+      queryClient.invalidateQueries({ queryKey: ['applications', id] });
+
+      if (event.type === 'app:deployed') {
+        toast.success(`App deployed: ${event.data.image || 'Unknown'}`);
+      } else if (event.type === 'app:uninstalled') {
+        toast.info('App uninstalled');
+      }
+    }
+  }, [id, queryClient, toast]);
 
   useWebSocketEvents(handleWsEvent);
 
@@ -98,9 +170,13 @@ export default function TopologyEditor() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['topologies'] });
+      toast.success('Topology saved successfully');
       if (isNewTopology) {
         navigate(`/topologies/${data.id}`);
       }
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || 'Failed to save topology');
     },
   });
 
@@ -135,6 +211,18 @@ export default function TopologyEditor() {
     refetchInterval: 3000,
   });
 
+  // Applications in this topology
+  const { data: applications = [] } = useQuery({
+    queryKey: ['applications', id],
+    queryFn: () => applicationsApi.listByTopology(id!),
+    enabled: !isNewTopology,
+    refetchInterval: 5000,
+  });
+
+  // Sync refs for applications and chaosConditions (for event handlers)
+  useEffect(() => { applicationsRef.current = applications; }, [applications]);
+  useEffect(() => { chaosConditionsRef.current = chaosConditions || []; }, [chaosConditions]);
+
   // Check if THIS topology is deployed
   const isThisTopologyDeployed = deploymentStatus?.status === 'running' || deploymentStatus?.status === 'pending' || deploymentStatus?.status === 'deploying';
 
@@ -146,10 +234,10 @@ export default function TopologyEditor() {
     refetchInterval: 5000,
   });
 
-  // Check if ANY topology is deployed (for global blocking)
+  // Check if ANY topology is deployed (for deploy button blocking)
   const isAnyDeployed = activeDeployment !== null && activeDeployment !== undefined;
-  // For UI blocking purposes
-  const isDeployed = isAnyDeployed;
+  // For UI blocking purposes - only block if THIS topology is deployed
+  const isDeployed = isThisTopologyDeployed;
   const isClusterReady = clusterStatus?.connected ?? false;
 
   // Deploy mutation
@@ -160,15 +248,17 @@ export default function TopologyEditor() {
     },
     onSuccess: () => {
       setDeployModal({ show: true, action: 'deploy', phase: 'success' });
+      toast.success('Topology deployed successfully');
       refetchDeployment();
       queryClient.invalidateQueries({ queryKey: ['deployment-status', id] });
       queryClient.invalidateQueries({ queryKey: ['applications', id] });
       queryClient.invalidateQueries({ queryKey: ['active-deployment'] });
     },
     onError: (error: any) => {
-      setDeployModal({ 
-        show: true, 
-        action: 'deploy', 
+      toast.error(error?.response?.data?.message || error.message || 'Deploy failed');
+      setDeployModal({
+        show: true,
+        action: 'deploy',
         phase: 'error',
         message: error?.response?.data?.message || error.message || 'Deploy failed'
       });
@@ -183,6 +273,7 @@ export default function TopologyEditor() {
     },
     onSuccess: () => {
       setDeployModal({ show: true, action: 'destroy', phase: 'success' });
+      toast.success('Topology stopped successfully');
       refetchDeployment();
       queryClient.invalidateQueries({ queryKey: ['deployment-status', id] });
       queryClient.invalidateQueries({ queryKey: ['applications', id] });
@@ -190,9 +281,10 @@ export default function TopologyEditor() {
       setNodeStatuses({});
     },
     onError: (error: any) => {
-      setDeployModal({ 
-        show: true, 
-        action: 'destroy', 
+      toast.error(error?.response?.data?.message || error.message || 'Stop failed');
+      setDeployModal({
+        show: true,
+        action: 'destroy',
         phase: 'error',
         message: error?.response?.data?.message || error.message || 'Stop failed'
       });
@@ -211,7 +303,7 @@ export default function TopologyEditor() {
     if (!container) return;
 
     cyContainerRef.current = container;
-    
+
     cyInstance.current = cytoscape({
       container: container,
       style: [
@@ -233,6 +325,14 @@ export default function TopologyEditor() {
           style: {
             'border-width': 3,
             'border-color': '#0369a1',
+          },
+        },
+        {
+          selector: 'node[appCount]',
+          style: {
+            'border-width': 3,
+            'border-color': '#22c55e',
+            'border-style': 'solid',
           },
         },
         {
@@ -263,7 +363,7 @@ export default function TopologyEditor() {
         {
           selector: 'edge.chaos-delay',
           style: {
-            'line-color': '#f59e0b', // amber
+            'line-color': '#f59e0b',
             'width': 4,
             'target-arrow-color': '#f59e0b',
             'label': '⏱️',
@@ -277,7 +377,7 @@ export default function TopologyEditor() {
         {
           selector: 'edge.chaos-loss',
           style: {
-            'line-color': '#ef4444', // red
+            'line-color': '#ef4444',
             'width': 4,
             'target-arrow-color': '#ef4444',
             'line-style': 'dashed',
@@ -292,7 +392,7 @@ export default function TopologyEditor() {
         {
           selector: 'edge.chaos-bandwidth',
           style: {
-            'line-color': '#8b5cf6', // violet
+            'line-color': '#8b5cf6',
             'width': 4,
             'target-arrow-color': '#8b5cf6',
             'label': '📊',
@@ -306,7 +406,7 @@ export default function TopologyEditor() {
         {
           selector: 'edge.chaos-corrupt',
           style: {
-            'line-color': '#f97316', // orange
+            'line-color': '#f97316',
             'width': 4,
             'target-arrow-color': '#f97316',
             'line-style': 'dotted',
@@ -321,7 +421,7 @@ export default function TopologyEditor() {
         {
           selector: 'edge.chaos-duplicate',
           style: {
-            'line-color': '#06b6d4', // cyan
+            'line-color': '#06b6d4',
             'width': 4,
             'target-arrow-color': '#06b6d4',
             'label': '📋',
@@ -335,7 +435,7 @@ export default function TopologyEditor() {
         {
           selector: 'edge.chaos-partition',
           style: {
-            'line-color': '#dc2626', // red-600
+            'line-color': '#dc2626',
             'width': 6,
             'target-arrow-color': '#dc2626',
             'line-style': 'dashed',
@@ -347,10 +447,68 @@ export default function TopologyEditor() {
             'text-margin-y': -12,
           },
         },
+        // New chaos type styles
+        {
+          selector: 'edge.chaos-stress-cpu',
+          style: {
+            'line-color': '#ec4899',
+            'width': 4,
+            'target-arrow-color': '#ec4899',
+            'label': '💻',
+            'font-size': 14,
+            'text-background-color': '#ec4899',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -10,
+          },
+        },
+        {
+          selector: 'edge.chaos-pod-kill',
+          style: {
+            'line-color': '#b91c1c',
+            'width': 5,
+            'target-arrow-color': '#b91c1c',
+            'line-style': 'dashed',
+            'label': '💀',
+            'font-size': 14,
+            'text-background-color': '#b91c1c',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -10,
+          },
+        },
+        {
+          selector: 'edge.chaos-io-delay',
+          style: {
+            'line-color': '#6366f1',
+            'width': 4,
+            'target-arrow-color': '#6366f1',
+            'label': '💾',
+            'font-size': 14,
+            'text-background-color': '#6366f1',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -10,
+          },
+        },
+        {
+          selector: 'edge.chaos-http-abort',
+          style: {
+            'line-color': '#10b981',
+            'width': 4,
+            'target-arrow-color': '#10b981',
+            'label': '🌐',
+            'font-size': 14,
+            'text-background-color': '#10b981',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'text-margin-y': -10,
+          },
+        },
         {
           selector: 'edge.chaos-multiple',
           style: {
-            'line-color': '#7c3aed', // purple-600
+            'line-color': '#7c3aed',
             'width': 5,
             'target-arrow-color': '#7c3aed',
             'line-style': 'solid',
@@ -359,6 +517,45 @@ export default function TopologyEditor() {
             'text-background-opacity': 0.9,
             'text-background-padding': '2px',
             'text-margin-y': -8,
+          },
+        },
+        // Test result edges
+        {
+          selector: 'edge.test-success',
+          style: {
+            'line-color': '#22c55e',
+            'width': 3,
+            'line-style': 'dashed',
+            'target-arrow-color': '#22c55e',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'bezier',
+            'label': 'data(label)',
+            'font-size': 11,
+            'color': '#22c55e',
+            'text-background-color': '#ffffff',
+            'text-background-opacity': 0.9,
+            'text-background-padding': '3px',
+            'text-margin-y': -12,
+            'z-index': 1000,
+          },
+        },
+        {
+          selector: 'edge.test-failure',
+          style: {
+            'line-color': '#ef4444',
+            'width': 3,
+            'line-style': 'dashed',
+            'target-arrow-color': '#ef4444',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'bezier',
+            'label': 'data(label)',
+            'font-size': 11,
+            'color': '#ef4444',
+            'text-background-color': '#ffffff',
+            'text-background-opacity': 0.9,
+            'text-background-padding': '3px',
+            'text-margin-y': -12,
+            'z-index': 1000,
           },
         },
       ],
@@ -380,16 +577,15 @@ export default function TopologyEditor() {
           position: { x: pos.x, y: pos.y },
           config: {},
         };
-        
+
         cy.add({
           group: 'nodes',
           data: { id: newNode.id, name: newNode.name },
           position: { x: pos.x, y: pos.y },
         });
-        
+
         setNodes((prev) => [...prev, newNode]);
       } else if (event.target === cy) {
-        // Click on empty canvas clears link source and selection
         setLinkSource(null);
         setSelectedElement(null);
       }
@@ -431,27 +627,6 @@ export default function TopologyEditor() {
       const node = event.target;
       setNodeModal({ open: true, node: { ...node, data: node.data() } });
     });
-      {/* Modal de propiedades de nodo */}
-      <NodePropertiesModal
-        open={!!nodeModal?.open}
-        node={nodeModal?.node}
-        onClose={() => setNodeModal(null)}
-        onChange={newNode => {
-          // Actualizar nombre en el grafo y en el estado
-          if (cyInstance.current && newNode?.data?.id) {
-            cyInstance.current.$(`#${newNode.data.id}`).data('name', newNode.data.name);
-          }
-          setNodes(prev => prev.map(n => n.id === newNode.data.id ? { ...n, name: newNode.data.name } : n));
-          setNodeModal(modal => modal ? { ...modal, node: newNode } : null);
-          // Actualizar selectedElement si es el nodo seleccionado
-          if (selectedElement?.type === 'node' && selectedElement.data.id === newNode.data.id) {
-            setSelectedElement({
-              type: 'node',
-              data: { id: newNode.data.id, name: newNode.data.name }
-            });
-          }
-        }}
-      />
 
     // Select edge
     cy.on('tap', 'edge', (event) => {
@@ -473,6 +648,94 @@ export default function TopologyEditor() {
       );
     });
 
+    // Node tooltip on mouseover
+    cy.on('mouseover', 'node', (event) => {
+      const node = event.target;
+      const nodeId = node.id();
+      const nodeName = node.data('name') || nodeId;
+      const containerRect = container.getBoundingClientRect();
+      const renderedPos = node.renderedPosition();
+
+      // Get apps deployed on this node
+      const nodeApps = (applicationsRef.current || [])
+        .filter((app: any) => app.node_selector?.includes(nodeId))
+        .map((app: any) => ({
+          name: app.image_name?.split('/').pop()?.split(':')[0] || app.image_name || 'Unknown',
+          status: app.status || 'unknown',
+        }));
+
+      // Get chaos conditions affecting this node
+      const nodeChaos = (chaosConditionsRef.current || [])
+        .filter((c: any) => c.source_node_id === nodeId || c.target_node_id === nodeId)
+        .filter((c: any) => c.status === 'active')
+        .map((c: any) => ({
+          type: c.chaos_type,
+          status: c.status,
+        }));
+
+      // Get node status from data
+      const nodeStatus = node.data('status') || 'unknown';
+
+      setTooltip({
+        visible: true,
+        x: containerRect.left + renderedPos.x + 20,
+        y: containerRect.top + renderedPos.y - 10,
+        nodeId,
+        nodeName,
+        apps: nodeApps,
+        chaosConditions: nodeChaos,
+        nodeStatus,
+      });
+    });
+
+    cy.on('mouseout', 'node', () => {
+      setTooltip(null);
+    });
+
+    // Edge context menu on right-click
+    cy.on('cxttap', 'edge', (event) => {
+      event.originalEvent.preventDefault();
+      const edge = event.target;
+      const sourceId = edge.data('source');
+      const targetId = edge.data('target');
+      const containerRect = container.getBoundingClientRect();
+      const renderedPos = edge.renderedMidpoint();
+
+      // Get source and target node names
+      const sourceNode = cy.$(`#${sourceId}`);
+      const targetNode = cy.$(`#${targetId}`);
+      const sourceName = sourceNode.data('name') || sourceId;
+      const targetName = targetNode.data('name') || targetId;
+
+      // Get active chaos conditions on this edge
+      const edgeChaos = (chaosConditionsRef.current || [])
+        .filter((c: any) =>
+          (c.source_node_id === sourceId && (!c.target_node_id || c.target_node_id === targetId)) ||
+          (c.source_node_id === targetId && (!c.target_node_id || c.target_node_id === sourceId))
+        )
+        .map((c: any) => ({
+          id: c.id,
+          type: c.chaos_type,
+          status: c.status,
+        }));
+
+      setEdgeContextMenu({
+        visible: true,
+        x: containerRect.left + renderedPos.x,
+        y: containerRect.top + renderedPos.y,
+        sourceId,
+        targetId,
+        sourceName,
+        targetName,
+        activeChaos: edgeChaos,
+      });
+    });
+
+    // Close context menu on click elsewhere
+    cy.on('tap', () => {
+      setEdgeContextMenu(null);
+    });
+
     setCyReady(true);
   }, []);
 
@@ -483,7 +746,7 @@ export default function TopologyEditor() {
     const cy = cyInstance.current;
 
     // Clear all chaos classes from edges
-    cy.edges().removeClass('chaos-delay chaos-loss chaos-bandwidth chaos-corrupt chaos-duplicate chaos-partition chaos-multiple');
+    cy.edges().removeClass('chaos-delay chaos-loss chaos-bandwidth chaos-corrupt chaos-duplicate chaos-partition chaos-stress-cpu chaos-pod-kill chaos-io-delay chaos-http-abort chaos-multiple');
 
     // Collect all conditions affecting each edge
     const edgeConditions = new Map<string, string[]>();
@@ -494,11 +757,9 @@ export default function TopologyEditor() {
         const chaosType = condition.chaos_type;
 
         if (condition.target_node_id) {
-          // Condition targets a specific node pair
           const sourceNode = condition.source_node_id;
           const targetNode = condition.target_node_id;
 
-          // Find edges between these nodes (in both directions)
           const edges = cy.edges().filter(edge => {
             const source = edge.data('source');
             const target = edge.data('target');
@@ -514,10 +775,7 @@ export default function TopologyEditor() {
             edgeConditions.get(edgeId)!.push(chaosType);
           });
         } else {
-          // Condition affects all traffic from source node
           const sourceNode = condition.source_node_id;
-
-          // Find all edges from this source node
           const edges = cy.edges().filter(edge => edge.data('source') === sourceNode);
           edges.forEach(edge => {
             const edgeId = edge.id();
@@ -535,10 +793,8 @@ export default function TopologyEditor() {
       if (edge.length === 0) return;
 
       if (types.length === 1) {
-        // Single condition - apply specific class
         edge.addClass(`chaos-${types[0]}`);
       } else if (types.length > 1) {
-        // Multiple conditions - create combined label
         const icons = types.map(type => {
           const iconMap: Record<string, string> = {
             'delay': '⏱️',
@@ -546,12 +802,15 @@ export default function TopologyEditor() {
             'bandwidth': '📊',
             'corrupt': '🔧',
             'duplicate': '📋',
-            'partition': '🚫'
+            'partition': '🚫',
+            'stress-cpu': '💻',
+            'pod-kill': '💀',
+            'io-delay': '💾',
+            'http-abort': '🌐'
           };
           return iconMap[type] || '❓';
         }).join('');
 
-        // Apply multiple class and set custom label
         edge.addClass('chaos-multiple');
         edge.style('label', icons);
       }
@@ -569,7 +828,6 @@ export default function TopologyEditor() {
       const cy = cyInstance.current;
       cy.elements().remove();
 
-      // Add nodes
       topology.nodes.forEach((node) => {
         cy.add({
           group: 'nodes',
@@ -578,7 +836,6 @@ export default function TopologyEditor() {
         });
       });
 
-      // Add edges
       topology.links.forEach((link) => {
         cy.add({
           group: 'edges',
@@ -595,6 +852,41 @@ export default function TopologyEditor() {
     updateEdgeChaosStyles();
   }, [updateEdgeChaosStyles]);
 
+  // Update node styles based on apps
+  useEffect(() => {
+    if (!cyInstance.current || !applications) return;
+
+    const cy = cyInstance.current;
+
+    // Reset all node badges
+    cy.nodes().forEach(node => {
+      const nodeId = node.id();
+      const nodeApps = applications.filter((app: any) =>
+        app.node_selector.includes(nodeId) && app.status === 'deployed'
+      );
+
+      if (nodeApps.length > 0) {
+        // Node has apps - show badge
+        node.style({
+          'border-width': 3,
+          'border-color': '#22c55e', // green
+          'border-style': 'solid',
+        });
+        // Add app count as secondary label
+        const appCount = nodeApps.length;
+        node.data('appCount', appCount);
+      } else {
+        // Reset style (only if not selected)
+        if (!node.selected()) {
+          node.style({
+            'border-width': 0,
+          });
+        }
+        node.removeData('appCount');
+      }
+    });
+  }, [applications, cyReady]);
+
   const handleSave = () => {
     saveMutation.mutate({
       name,
@@ -608,21 +900,194 @@ export default function TopologyEditor() {
     if (!selectedElement || !cyInstance.current) return;
 
     const cy = cyInstance.current;
-    
+
     if (selectedElement.type === 'node') {
-      // Remove node and connected edges
       const nodeId = selectedElement.data.id;
       cy.$(`#${nodeId}`).remove();
       setNodes((prev) => prev.filter((n) => n.id !== nodeId));
       setLinks((prev) => prev.filter((l) => l.source !== nodeId && l.target !== nodeId));
     } else {
-      // Remove edge
       const edgeId = selectedElement.data.id;
       cy.$(`#${edgeId}`).remove();
       setLinks((prev) => prev.filter((l) => l.id !== edgeId));
     }
 
     setSelectedElement(null);
+  };
+
+  // Handle preset application - refresh chaos conditions
+  const handlePresetApplied = () => {
+    queryClient.invalidateQueries({ queryKey: ['chaos-conditions', id] });
+    toast.success('Preset applied successfully');
+  };
+
+  // Apply quick chaos from edge context menu
+  const handleQuickChaos = async (chaosType: string, sourceId: string, targetId: string) => {
+    if (!id) return;
+
+    const defaultParams: Record<string, any> = {
+      delay: { latency: '100ms', jitter: '20ms' },
+      loss: { loss: '10' },
+      bandwidth: { rate: '1mbps', buffer: 10000, limit: 10000 },
+      corrupt: { corrupt: '5' },
+      duplicate: { duplicate: '5' },
+      partition: {},
+    };
+
+    try {
+      await chaosApi.create({
+        topology_id: id,
+        source_node_id: sourceId,
+        target_node_id: targetId,
+        chaos_type: chaosType as any,
+        direction: 'to',
+        params: defaultParams[chaosType] || {},
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['chaos-conditions', id] });
+      toast.success(`${chaosType} chaos applied`);
+      setEdgeContextMenu(null);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to apply chaos');
+    }
+  };
+
+  // Stop chaos condition from edge context menu
+  const handleStopChaos = async (conditionId: string) => {
+    if (!id) return;
+
+    try {
+      await chaosApi.stop(id, conditionId);
+      queryClient.invalidateQueries({ queryKey: ['chaos-conditions', id] });
+      toast.success('Chaos stopped');
+      setEdgeContextMenu(null);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to stop chaos');
+    }
+  };
+
+  // Handle app-to-app test result - draw temporary edge on graph
+  const handleAppTestResult = useCallback((result: {
+    from_app: { node_id: string; app_name: string };
+    to_app: { node_id: string; app_name: string };
+    success: boolean;
+    latency_ms: number | null;
+  }) => {
+    if (!cyInstance.current) return;
+
+    const cy = cyInstance.current;
+    const edgeId = `test-${Date.now()}`;
+    const sourceNodeId = result.from_app.node_id;
+    const targetNodeId = result.to_app.node_id;
+
+    // Create label with latency
+    const label = result.latency_ms != null
+      ? `${result.latency_ms.toFixed(1)}ms`
+      : result.success ? '✓' : '✗';
+
+    // Add temporary edge
+    cy.add({
+      group: 'edges',
+      data: {
+        id: edgeId,
+        source: sourceNodeId,
+        target: targetNodeId,
+        label: label,
+      },
+      classes: result.success ? 'test-success' : 'test-failure',
+    });
+
+    // Show toast notification
+    if (result.success) {
+      toast.success(`Test passed: ${result.from_app.app_name} → ${result.to_app.app_name} (${label})`);
+    } else {
+      toast.error(`Test failed: ${result.from_app.app_name} → ${result.to_app.app_name}`);
+    }
+
+    // Remove edge after 10 seconds
+    setTimeout(() => {
+      if (cyInstance.current) {
+        const edge = cyInstance.current.$(`#${edgeId}`);
+        if (edge.length > 0) {
+          edge.remove();
+        }
+      }
+    }, 10000);
+  }, [toast]);
+
+  // Handle topology import
+  const handleImport = (data: any) => {
+    if (data.topology) {
+      setName(data.topology.name || 'Imported Topology');
+      setDescription(data.topology.description || '');
+
+      const importedNodes = data.topology.nodes || [];
+      const importedLinks = data.topology.links || [];
+
+      setNodes(importedNodes);
+      setLinks(importedLinks);
+
+      // Update cytoscape
+      if (cyInstance.current) {
+        const cy = cyInstance.current;
+        cy.elements().remove();
+
+        importedNodes.forEach((node: Node) => {
+          cy.add({
+            group: 'nodes',
+            data: { id: node.id, name: node.name },
+            position: { x: node.position.x, y: node.position.y },
+          });
+        });
+
+        importedLinks.forEach((link: Link) => {
+          cy.add({
+            group: 'edges',
+            data: { id: link.id, source: link.source, target: link.target },
+          });
+        });
+
+        cy.fit();
+      }
+
+      toast.success(`Imported topology with ${importedNodes.length} nodes`);
+    }
+  };
+
+  // Handle template selection
+  const handleTemplateSelect = (generated: GeneratedTopology) => {
+    setName(generated.name);
+    setDescription(generated.description);
+    setNodes(generated.nodes);
+    setLinks(generated.links);
+
+    // Update cytoscape
+    if (cyInstance.current) {
+      const cy = cyInstance.current;
+      cy.elements().remove();
+
+      generated.nodes.forEach((node: Node) => {
+        cy.add({
+          group: 'nodes',
+          data: { id: node.id, name: node.name },
+          position: { x: node.position.x, y: node.position.y },
+        });
+      });
+
+      generated.links.forEach((link: Link) => {
+        cy.add({
+          group: 'edges',
+          data: { id: link.id, source: link.source, target: link.target },
+        });
+      });
+
+      cy.fit();
+    }
+
+    setShowTemplateSelector(false);
+    if (generated.nodes.length > 0) {
+      toast.success(`Created topology from template with ${generated.nodes.length} nodes`);
+    }
   };
 
   if (isLoading) {
@@ -633,10 +1098,13 @@ export default function TopologyEditor() {
     );
   }
 
+  // Chaos conditions count for badge
+  const activeChaosCount = chaosConditions?.filter(c => c.status === 'active').length || 0;
+
   return (
     <div className="flex flex-col h-full -m-6">
       {/* Toolbar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center gap-4">
         {/* Name input */}
         <input
           type="text"
@@ -721,10 +1189,10 @@ export default function TopologyEditor() {
               title={
                 isThisTopologyDeployed
                   ? "Topology is already deployed. Stop it first to redeploy."
-                  : isAnyDeployed 
+                  : isAnyDeployed
                     ? `Another topology is deployed (${activeDeployment?.topology_id.slice(0, 8)}...). Stop it first.`
-                    : nodes.length === 0 
-                      ? "Add nodes before deploying" 
+                    : nodes.length === 0
+                      ? "Add nodes before deploying"
                       : "Deploy to Kubernetes"
               }
             >
@@ -773,6 +1241,21 @@ export default function TopologyEditor() {
 
         <div className="h-6 w-px bg-gray-200" />
 
+        {/* Bottom Panel Toggle */}
+        {id && isThisTopologyDeployed && (
+          <button
+            onClick={() => setBottomPanelOpen(!bottomPanelOpen)}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-sm transition-colors ${
+              bottomPanelOpen ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100 text-gray-600'
+            }`}
+            title="Toggle metrics panel"
+          >
+            <Activity className="h-4 w-4" />
+            <span>Metrics</span>
+            {bottomPanelOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
+          </button>
+        )}
+
         {/* Actions */}
         <button
           onClick={handleDeleteSelected}
@@ -785,6 +1268,39 @@ export default function TopologyEditor() {
 
         <div className="flex-1" />
 
+        {/* Export/Import */}
+        <ExportImport
+          topology={{ name, description, nodes, links }}
+          chaosConditions={chaosConditions}
+          onImport={handleImport}
+        />
+
+        {/* Template button - only for new topologies */}
+        {!id && (
+          <button
+            onClick={() => setShowTemplateSelector(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            title="Choose from template"
+          >
+            <LayoutTemplate className="h-4 w-4" />
+            <span className="text-sm">Template</span>
+          </button>
+        )}
+
+        {/* Export Report button - only for existing topologies */}
+        {id && (
+          <button
+            onClick={() => setShowExportReport(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            title="Export report"
+          >
+            <FileDown className="h-4 w-4" />
+            <span className="text-sm">Report</span>
+          </button>
+        )}
+
+        <div className="h-6 w-px bg-gray-200 dark:bg-gray-700" />
+
         {/* Save */}
         <button
           onClick={handleSave}
@@ -796,37 +1312,237 @@ export default function TopologyEditor() {
         </button>
       </div>
 
-      {/* Canvas y Chaos Panel en el centro */}
-      <div className="flex-1 flex">
-        {/* Left Panel - Applications */}
-        {id && (
-          <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full">
-            <ApplicationsPanel
-              topologyId={id}
-              nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
-              selectedNode={selectedElement?.type === 'node' ? { id: selectedElement.data.id, name: selectedElement.data.name } : null}
-              isTopologyDeployed={isThisTopologyDeployed}
-            />
-          </div>
-        )}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Canvas y Panels */}
+        <div className="flex-1 flex min-h-0">
+          {/* Left Panel - Applications & Network */}
+          {id && (
+            <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
+              <TabPanel
+                tabs={[
+                  { id: 'apps', label: 'Apps', icon: <Circle size={14} /> },
+                  { id: 'impact', label: 'Impact', icon: <Activity size={14} />, badge: (chaosConditions?.filter(c => c.status === 'active').length || 0) > 0 ? (chaosConditions?.filter(c => c.status === 'active').length || 0) : undefined, badgeColor: 'warning' as const },
+                  { id: 'network', label: 'Network', icon: <Grid3X3 size={14} /> },
+                ]}
+                activeTab={leftTab}
+                onTabChange={setLeftTab}
+              >
+                {leftTab === 'apps' && (
+                  <ApplicationsPanel
+                    topologyId={id}
+                    nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                    selectedNode={selectedElement?.type === 'node' ? { id: selectedElement.data.id, name: selectedElement.data.name } : null}
+                    isTopologyDeployed={isThisTopologyDeployed}
+                  />
+                )}
+                {leftTab === 'impact' && (
+                  <ImpactDashboard
+                    topologyId={id}
+                    nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                    isDeployed={isThisTopologyDeployed}
+                  />
+                )}
+                {leftTab === 'network' && (
+                  <NetworkMatrix
+                    topologyId={id}
+                    nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                    onNodeSelect={(nodeId) => {
+                      if (cyInstance.current) {
+                        const node = cyInstance.current.$(`#${nodeId}`);
+                        if (node.length > 0) {
+                          cyInstance.current.nodes().unselect();
+                          node.select();
+                          setSelectedElement({ type: 'node', data: { id: nodeId, name: node.data('name') } });
+                        }
+                      }
+                    }}
+                  />
+                )}
+              </TabPanel>
+            </div>
+          )}
 
-        {/* Cytoscape canvas - columna principal */}
-        <div ref={cyRef} className="flex-1 bg-gray-50" />
+          {/* Cytoscape canvas - main area */}
+          <div ref={cyRef} className="flex-1 bg-gray-50 min-h-0" />
 
-        {/* Right Panel - Chaos */}
-        {id && (
-          <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-full">
-            <ChaosPanel
-              topologyId={id}
-              nodes={nodes}
-              links={links}
-              onClose={() => {}} // No close button, always visible
-            />
+          {/* Right Panel - Chaos, Presets, Scenarios, Tests */}
+          {id && (
+            <div className="w-96 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full">
+              <TabPanel
+                tabs={[
+                  {
+                    id: 'chaos',
+                    label: 'Chaos',
+                    icon: <Zap size={14} />,
+                    badge: activeChaosCount > 0 ? activeChaosCount : undefined,
+                    badgeColor: 'warning'
+                  },
+                  { id: 'presets', label: 'Presets', icon: <Bookmark size={14} /> },
+                  { id: 'scenarios', label: 'Scenarios', icon: <Film size={14} /> },
+                  { id: 'tests', label: 'Tests', icon: <TestTube size={14} /> },
+                ]}
+                activeTab={rightTab}
+                onTabChange={setRightTab}
+              >
+                {rightTab === 'chaos' && (
+                  <ChaosPanel
+                    topologyId={id}
+                    nodes={nodes}
+                    links={links}
+                    applications={applications}
+                    onClose={() => {}}
+                  />
+                )}
+                {rightTab === 'presets' && (
+                  <ChaosPresets
+                    topologyId={id}
+                    selectedSourceNode={selectedElement?.type === 'node' ? selectedElement.data.id : undefined}
+                    selectedTargetNode={undefined}
+                    onApply={handlePresetApplied}
+                  />
+                )}
+                {rightTab === 'scenarios' && (
+                  <ChaosScenarios
+                    topologyId={id}
+                    nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                  />
+                )}
+                {rightTab === 'tests' && (
+                  <div className="h-full overflow-auto p-4 space-y-4">
+                    <AppToAppTest
+                      topologyId={id}
+                      applications={applications}
+                      nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                      onTestComplete={handleAppTestResult}
+                    />
+                    <TestRunner
+                      topologyId={id}
+                      onTestComplete={() => {
+                        queryClient.invalidateQueries({ queryKey: ['chaos-conditions', id] });
+                      }}
+                    />
+                  </div>
+                )}
+              </TabPanel>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Panel - Metrics, Events, Comparison (collapsible) */}
+        {id && isThisTopologyDeployed && bottomPanelOpen && (
+          <div className="h-72 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex flex-col">
+            {/* Bottom Panel Tabs */}
+            <div className="flex items-center border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-2">
+              <button
+                onClick={() => setBottomPanelTab('metrics')}
+                className={`px-3 py-2 text-sm font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+                  bottomPanelTab === 'metrics'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <Activity size={14} />
+                Live Metrics
+              </button>
+              <button
+                onClick={() => setBottomPanelTab('events')}
+                className={`px-3 py-2 text-sm font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+                  bottomPanelTab === 'events'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <Clock size={14} />
+                Events
+              </button>
+              <button
+                onClick={() => setBottomPanelTab('comparison')}
+                className={`px-3 py-2 text-sm font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
+                  bottomPanelTab === 'comparison'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <BarChart3 size={14} />
+                Compare
+              </button>
+              <div className="flex-1" />
+              <button
+                onClick={() => setBottomPanelOpen(false)}
+                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+              >
+                <ChevronDown size={16} />
+              </button>
+            </div>
+
+            {/* Bottom Panel Content */}
+            <div className="flex-1 overflow-hidden">
+              {bottomPanelTab === 'metrics' && (
+                <div className="h-full p-2">
+                  <LiveMetrics topologyId={id} refreshInterval={5000} chaosConditions={chaosConditions} />
+                </div>
+              )}
+              {bottomPanelTab === 'events' && (
+                <EventTimeline topologyId={id} maxEvents={50} compact />
+              )}
+              {bottomPanelTab === 'comparison' && (
+                <MetricsComparison topologyId={id} />
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Modal de propiedades de nodo (siempre fuera de cualquier callback) */}
+      {/* Chaos Legend Panel - horizontal */}
+      <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-3">
+        <div className="flex flex-wrap gap-4 justify-center">
+          {/* Network chaos */}
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-yellow-600 text-lg">⏱️</span>
+            <span className="text-gray-700 dark:text-gray-300">Delay</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-red-500 text-lg">📉</span>
+            <span className="text-gray-700 dark:text-gray-300">Loss</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-purple-600 text-lg">📊</span>
+            <span className="text-gray-700 dark:text-gray-300">Bandwidth</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-orange-600 text-lg">🔧</span>
+            <span className="text-gray-700 dark:text-gray-300">Corrupt</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-cyan-600 text-lg">📋</span>
+            <span className="text-gray-700 dark:text-gray-300">Duplicate</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-red-700 text-lg">🚫</span>
+            <span className="text-gray-700 dark:text-gray-300">Partition</span>
+          </div>
+          {/* New chaos types */}
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-pink-500 text-lg">💻</span>
+            <span className="text-gray-700 dark:text-gray-300">CPU Stress</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-red-800 text-lg">💀</span>
+            <span className="text-gray-700 dark:text-gray-300">Pod Kill</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-indigo-500 text-lg">💾</span>
+            <span className="text-gray-700 dark:text-gray-300">I/O Delay</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-emerald-500 text-lg">🌐</span>
+            <span className="text-gray-700 dark:text-gray-300">HTTP Abort</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Node Properties Modal */}
       <NodePropertiesModal
         open={!!nodeModal?.open}
         node={nodeModal?.node}
@@ -840,38 +1556,6 @@ export default function TopologyEditor() {
         }}
       />
 
-      {/* Chaos Legend Panel - horizontal distribution */}
-      <div className="bg-white border-t border-gray-200 p-4">
-        <div className="flex flex-wrap gap-6 justify-center">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-yellow-600 text-lg">⏱️</span>
-            <span className="text-gray-700">Delay</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-red-500 text-lg">📉</span>
-            <span className="text-gray-700">Packet Loss</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-purple-600 text-lg">📊</span>
-            <span className="text-gray-700">Bandwidth</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-orange-600 text-lg">🔧</span>
-            <span className="text-gray-700">Corrupt</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-cyan-600 text-lg">📋</span>
-            <span className="text-gray-700">Duplicate</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-red-700 text-lg">🚫</span>
-            <span className="text-gray-700">Partition</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Panel de propiedades eliminado. Ahora se usará un modal al hacer doble click en un nodo. */}
-
       {/* Deployment Modal */}
       {deployModal?.show && (
         <DeploymentModal
@@ -880,6 +1564,152 @@ export default function TopologyEditor() {
           message={deployModal.message}
           nodeCount={nodes.length}
           onClose={() => setDeployModal(null)}
+        />
+      )}
+
+      {/* Node Tooltip */}
+      {tooltip && tooltip.visible && (
+        <div
+          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 max-w-xs pointer-events-none"
+          style={{
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: 'translateY(-50%)',
+          }}
+        >
+          <div className="font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+            <Circle className="h-3 w-3 text-primary-500" />
+            {tooltip.nodeName}
+          </div>
+
+          {/* Apps */}
+          {tooltip.apps.length > 0 ? (
+            <div className="mb-2">
+              <div className="text-xs font-medium text-gray-500 mb-1">Apps ({tooltip.apps.length})</div>
+              <div className="space-y-1">
+                {tooltip.apps.map((app, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-xs">
+                    <span className={`w-2 h-2 rounded-full ${
+                      app.status === 'deployed' ? 'bg-green-500' :
+                      app.status === 'pending' ? 'bg-yellow-500' :
+                      app.status === 'failed' ? 'bg-red-500' : 'bg-gray-400'
+                    }`} />
+                    <span className="text-gray-700 dark:text-gray-300">{app.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400 mb-2">No apps deployed</div>
+          )}
+
+          {/* Chaos Conditions */}
+          {tooltip.chaosConditions.length > 0 && (
+            <div className="mb-2">
+              <div className="text-xs font-medium text-amber-600 mb-1 flex items-center gap-1">
+                <Zap className="h-3 w-3" />
+                Active Chaos ({tooltip.chaosConditions.length})
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {tooltip.chaosConditions.map((chaos, idx) => (
+                  <span
+                    key={idx}
+                    className="px-1.5 py-0.5 text-xs rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200"
+                  >
+                    {chaos.type}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Edge Context Menu */}
+      {edgeContextMenu && edgeContextMenu.visible && (
+        <div
+          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 min-w-[200px]"
+          style={{
+            left: edgeContextMenu.x,
+            top: edgeContextMenu.y,
+            transform: 'translate(-50%, -50%)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="text-xs text-gray-500">Edge</div>
+            <div className="font-medium text-gray-900 dark:text-white text-sm">
+              {edgeContextMenu.sourceName} → {edgeContextMenu.targetName}
+            </div>
+          </div>
+
+          {/* Active Chaos */}
+          {edgeContextMenu.activeChaos.length > 0 && (
+            <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+              <div className="text-xs text-amber-600 font-medium mb-1">Active Chaos</div>
+              {edgeContextMenu.activeChaos.map((chaos) => (
+                <div key={chaos.id} className="flex items-center justify-between text-sm py-1">
+                  <span className="text-gray-700 dark:text-gray-300">{chaos.type}</span>
+                  {chaos.status === 'active' && (
+                    <button
+                      onClick={() => handleStopChaos(chaos.id)}
+                      className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                    >
+                      Stop
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Quick Chaos Actions */}
+          <div className="py-1">
+            <div className="px-3 py-1 text-xs text-gray-500">Apply Chaos</div>
+            {[
+              { type: 'delay', icon: '⏱️', label: 'Delay (100ms)' },
+              { type: 'loss', icon: '📉', label: 'Packet Loss (10%)' },
+              { type: 'bandwidth', icon: '📊', label: 'Bandwidth (1mbps)' },
+              { type: 'partition', icon: '🚫', label: 'Partition' },
+            ].map((item) => (
+              <button
+                key={item.type}
+                onClick={() => handleQuickChaos(item.type, edgeContextMenu.sourceId, edgeContextMenu.targetId)}
+                className="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+              >
+                <span>{item.icon}</span>
+                <span className="text-gray-700 dark:text-gray-300">{item.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Close */}
+          <div className="border-t border-gray-200 dark:border-gray-700 py-1">
+            <button
+              onClick={() => setEdgeContextMenu(null)}
+              className="w-full px-3 py-1.5 text-left text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Template Selector Modal */}
+      {showTemplateSelector && (
+        <TemplateSelector
+          onSelect={handleTemplateSelect}
+          onCancel={() => setShowTemplateSelector(false)}
+        />
+      )}
+
+      {/* Export Report Modal */}
+      {showExportReport && id && (
+        <ExportReport
+          topologyId={id}
+          topologyName={name}
+          onClose={() => setShowExportReport(false)}
         />
       )}
     </div>

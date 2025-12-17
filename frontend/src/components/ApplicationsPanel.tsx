@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Play, Trash2, Package } from 'lucide-react';
 import { applicationsApi, DeployAppRequest, AppRuntimeStatus } from '../services/api';
 import envIcon from '../assets/icons/env-icon.png';
+import { SkeletonList } from './Skeleton';
 import './ApplicationsPanel.css';
 
 interface ApplicationsPanelProps {
@@ -87,7 +88,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
   }, [selectedNode]);
 
   // Query para obtener aplicaciones de la topología
-  const { data: applications = [] } = useQuery({
+  const { data: applications = [], isLoading: isLoadingApps } = useQuery({
     queryKey: ['applications', topologyId],
     queryFn: () => applicationsApi.listByTopology(topologyId),
     refetchInterval: isTopologyDeployed ? 5000 : false, // Refetch cada 5 segundos cuando la topología está desplegada
@@ -236,7 +237,9 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
         {deleteError && (
           <div className="mb-2 text-red-600 text-sm font-semibold">{deleteError}</div>
         )}
-        {(selectedNode ? applications.filter(app => app.node_selector.includes(selectedNode.id)) : applications).length === 0 ? (
+        {isLoadingApps ? (
+          <SkeletonList count={3} />
+        ) : (selectedNode ? applications.filter(app => app.node_selector.includes(selectedNode.id)) : applications).length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>{selectedNode ? `No applications on ${selectedNode.name}` : 'No applications configured'}</p>

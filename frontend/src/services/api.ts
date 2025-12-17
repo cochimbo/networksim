@@ -129,9 +129,15 @@ export const deploymentApi = {
 };
 
 // Chaos Types
-export type ChaosType = 'delay' | 'loss' | 'bandwidth' | 'corrupt' | 'duplicate' | 'partition';
+// NetworkChaos types
+export type NetworkChaosType = 'delay' | 'loss' | 'bandwidth' | 'corrupt' | 'duplicate' | 'partition';
+// New chaos types (StressChaos, PodChaos, IOChaos, HTTPChaos)
+export type NewChaosType = 'stress-cpu' | 'pod-kill' | 'io-delay' | 'http-abort';
+export type ChaosType = NetworkChaosType | NewChaosType;
+
 export type ChaosDirection = 'to' | 'from' | 'both';
 
+// NetworkChaos params
 export interface DelayParams {
   latency: string;
   jitter?: string;
@@ -159,7 +165,47 @@ export interface DuplicateParams {
   correlation?: string;
 }
 
-export type ChaosParams = DelayParams | LossParams | BandwidthParams | CorruptParams | DuplicateParams | Record<string, unknown>;
+// New chaos type params
+export interface StressCpuParams {
+  workers?: number;
+  load?: number; // 0-100
+}
+
+export interface PodKillParams {
+  grace_period?: number;
+}
+
+export interface IoDelayParams {
+  delay: string;
+  path?: string;
+  percent?: number;
+  methods?: string[];
+}
+
+export interface HttpAbortParams {
+  code?: number;
+  method?: string;
+  path?: string;
+  port?: number;
+}
+
+export type ChaosParams =
+  | DelayParams
+  | LossParams
+  | BandwidthParams
+  | CorruptParams
+  | DuplicateParams
+  | StressCpuParams
+  | PodKillParams
+  | IoDelayParams
+  | HttpAbortParams
+  | Record<string, unknown>;
+
+// Helper to check if a chaos type requires a target node
+export function chaosTypeRequiresTarget(type: ChaosType): boolean {
+  const networkTypes: ChaosType[] = ['delay', 'loss', 'bandwidth', 'corrupt', 'duplicate', 'partition'];
+  return networkTypes.includes(type);
+}
 
 export interface CreateChaosRequest {
   topology_id: string;
@@ -386,4 +432,426 @@ export const applicationsApi = {
   },
 };
 
-export default api;
+// ============================================================
+// NEW APIs: Live Metrics, Events, Presets, Test Runner
+// ============================================================
+
+// Events Types
+export interface Event {
+  id: number;
+  topology_id?: string;
+  event_type: string;
+  event_subtype?: string;
+  severity: 'info' | 'success' | 'warning' | 'error';
+  title: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+  source_type?: string;
+  source_id?: string;
+  created_at: string;
+}
+
+export interface EventsResponse {
+  events: Event[];
+  total: number;
+  has_more: boolean;
+}
+
+// Network Metrics Types
+export interface NetworkMetric {
+  id: number;
+  topology_id: string;
+  source_node_id: string;
+  target_node_id: string;
+  latency_ms?: number;
+  packet_loss_percent?: number;
+  bandwidth_bps?: number;
+  jitter_ms?: number;
+  is_connected: boolean;
+  measured_at: string;
+}
+
+export interface NodeMetric {
+  id: number;
+  topology_id: string;
+  node_id: string;
+  pod_name?: string;
+  cpu_usage_percent?: number;
+  memory_usage_bytes?: number;
+  memory_limit_bytes?: number;
+  rx_bytes?: number;
+  tx_bytes?: number;
+  status: string;
+  measured_at: string;
+}
+
+export interface MetricsSummary {
+  total_nodes: number;
+  total_pairs: number;
+  connected_pairs: number;
+  blocked_pairs: number;
+  linked_connected: number;
+  linked_blocked: number;
+  unlinked_blocked: number;
+  avg_latency_ms?: number;
+  max_latency_ms?: number;
+  total_packet_loss_events: number;
+}
+
+export interface LiveMetricsSnapshot {
+  topology_id: string;
+  timestamp: string;
+  network_metrics: NetworkMetric[];
+  node_metrics: NodeMetric[];
+  summary: MetricsSummary;
+}
+
+export interface AggregatedMetrics {
+  interval: string;
+  data_points: {
+    timestamp: string;
+    avg_latency_ms?: number;
+    max_latency_ms?: number;
+    min_latency_ms?: number;
+    avg_packet_loss?: number;
+    sample_count: number;
+  }[];
+}
+
+// Preset Types
+export interface ChaosPreset {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  icon?: string;
+  chaos_type: string;
+  direction: string;
+  duration?: string;
+  params: Record<string, unknown>;
+  is_builtin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Test Run Types
+export interface TestRun {
+  id: string;
+  topology_id: string;
+  test_type: string;
+  status: 'pending' | 'running' | 'passed' | 'failed' | 'cancelled';
+  total_tests: number;
+  passed_tests: number;
+  failed_tests: number;
+  started_at?: string;
+  completed_at?: string;
+  duration_ms?: number;
+  results?: any;
+  error_message?: string;
+  created_at: string;
+}
+
+// Diagnostic Types
+export interface DiagnosticReport {
+  topology_id: string;
+  timestamp: string;
+  summary: {
+    total_nodes: number;
+    total_tests: number;
+    passed_tests: number;
+    failed_tests: number;
+    success_rate: number;
+    unexpected_connections: number;
+    missing_connections: number;
+  };
+  connectivity_tests: {
+    from_node: string;
+    to_node: string;
+    expected: 'allow' | 'deny';
+    actual: 'connected' | 'blocked' | 'unknown' | 'error';
+    latency_ms?: number;
+    status: 'pass' | 'fail' | 'warning' | 'skipped';
+  }[];
+  connectivity_matrix: Record<string, Record<string, boolean>>;
+}
+
+// Events API
+export const eventsApi = {
+  list: async (params?: Record<string, string>): Promise<EventsResponse> => {
+    const response = await api.get('/api/events', { params });
+    return response.data;
+  },
+
+  listByTopology: async (topologyId: string, params?: Record<string, string>): Promise<EventsResponse> => {
+    const response = await api.get(`/api/topologies/${topologyId}/events`, { params });
+    return response.data;
+  },
+
+  create: async (data: Partial<Event>): Promise<Event> => {
+    const response = await api.post('/api/events', data);
+    return response.data;
+  },
+
+  stats: async (params?: Record<string, string>): Promise<any> => {
+    const response = await api.get('/api/events/stats', { params });
+    return response.data;
+  },
+};
+
+// Live Metrics API
+export const metricsApi = {
+  getLive: async (topologyId: string): Promise<LiveMetricsSnapshot> => {
+    const response = await api.get(`/api/topologies/${topologyId}/metrics/live`);
+    return response.data;
+  },
+
+  getHistory: async (topologyId: string, params?: Record<string, string>): Promise<NetworkMetric[]> => {
+    const response = await api.get(`/api/topologies/${topologyId}/metrics/history`, { params });
+    return response.data;
+  },
+
+  getAggregated: async (topologyId: string, params?: { interval?: string; since?: string }): Promise<AggregatedMetrics> => {
+    const response = await api.get(`/api/topologies/${topologyId}/metrics/aggregated`, { params });
+    return response.data;
+  },
+};
+
+// Presets API
+export const presetsApi = {
+  list: async (): Promise<ChaosPreset[]> => {
+    const response = await api.get('/api/presets');
+    return response.data;
+  },
+
+  get: async (id: string): Promise<ChaosPreset> => {
+    const response = await api.get(`/api/presets/${id}`);
+    return response.data;
+  },
+
+  create: async (data: Partial<ChaosPreset>): Promise<ChaosPreset> => {
+    const response = await api.post('/api/presets', data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/api/presets/${id}`);
+  },
+
+  apply: async (topologyId: string, presetId: string, data: { source_node_id: string; target_node_id?: string; duration?: string }): Promise<any> => {
+    const response = await api.post(`/api/topologies/${topologyId}/presets/${presetId}/apply`, data);
+    return response.data;
+  },
+};
+
+// Test Runner API
+export const testRunnerApi = {
+  list: async (topologyId: string, params?: Record<string, string>): Promise<TestRun[]> => {
+    const response = await api.get(`/api/topologies/${topologyId}/tests`, { params });
+    return response.data;
+  },
+
+  get: async (topologyId: string, testId: string): Promise<TestRun> => {
+    const response = await api.get(`/api/topologies/${topologyId}/tests/${testId}`);
+    return response.data;
+  },
+
+  start: async (topologyId: string, data: { test_type: string; options?: any }): Promise<TestRun> => {
+    const response = await api.post(`/api/topologies/${topologyId}/tests`, data);
+    return response.data;
+  },
+
+  cancel: async (topologyId: string, testId: string): Promise<TestRun> => {
+    const response = await api.post(`/api/topologies/${topologyId}/tests/${testId}/cancel`);
+    return response.data;
+  },
+};
+
+// Diagnostic API (extended)
+export const diagnosticApiExtended = {
+  ...diagnosticApi,
+
+  runDiagnostic: async (topologyId: string): Promise<DiagnosticReport> => {
+    const response = await api.get(`/api/topologies/${topologyId}/diagnostic`);
+    return response.data;
+  },
+};
+
+// ============================================================
+// Templates API
+// ============================================================
+
+export interface TemplateNode {
+  name: string;
+  position: Position;
+  config: NodeConfig;
+}
+
+export interface TemplateLink {
+  source_index: number;
+  target_index: number;
+  properties?: LinkProperties;
+}
+
+export interface TemplatePreview {
+  nodes: TemplateNode[];
+  links: TemplateLink[];
+}
+
+export interface TopologyTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  icon: string;
+  node_count: number;
+  preview: TemplatePreview;
+}
+
+export interface GeneratedTopology {
+  name: string;
+  description: string;
+  nodes: Node[];
+  links: Link[];
+}
+
+export const templatesApi = {
+  list: async (): Promise<TopologyTemplate[]> => {
+    const response = await api.get('/api/templates');
+    return response.data;
+  },
+
+  get: async (templateId: string): Promise<TopologyTemplate> => {
+    const response = await api.get(`/api/templates/${templateId}`);
+    return response.data;
+  },
+
+  generate: async (templateId: string): Promise<GeneratedTopology> => {
+    const response = await api.post(`/api/templates/${templateId}/generate`);
+    return response.data;
+  },
+};
+
+// ============================================================
+// Reports API
+// ============================================================
+
+export interface TopologyReport {
+  generated_at: string;
+  topology: {
+    id: string;
+    name: string;
+    description?: string;
+    node_count: number;
+    link_count: number;
+    nodes: Array<{ id: string; name: string }>;
+    created_at: string;
+  };
+  chaos_summary: {
+    total_conditions: number;
+    active_conditions: number;
+    conditions_by_type: Array<{ chaos_type: string; count: number }>;
+    conditions: Array<{
+      id: string;
+      chaos_type: string;
+      source_node: string;
+      target_node?: string;
+      status: string;
+      duration?: string;
+      params: Record<string, unknown>;
+    }>;
+  };
+  applications: Array<{
+    id: string;
+    image: string;
+    node_id: string;
+    status: string;
+  }>;
+  events: Array<{
+    id: string;
+    event_type: string;
+    message: string;
+    created_at: string;
+  }>;
+  statistics: {
+    total_chaos_experiments: number;
+    unique_chaos_types: number;
+    affected_nodes: number;
+    total_events: number;
+    deployed_apps: number;
+  };
+}
+
+export const reportsApi = {
+  getJson: async (topologyId: string): Promise<TopologyReport> => {
+    const response = await api.get(`/api/topologies/${topologyId}/report`);
+    return response.data;
+  },
+
+  downloadHtml: async (topologyId: string): Promise<void> => {
+    const response = await api.get(`/api/topologies/${topologyId}/report/html`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `report-${topologyId}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+};
+
+// Convenience wrapper for components
+const apiWrapper = {
+  // Existing
+  ...api,
+
+  // Topologies
+  listTopologies: topologyApi.list,
+  getTopology: topologyApi.get,
+  createTopology: topologyApi.create,
+  updateTopology: topologyApi.update,
+  deleteTopology: topologyApi.delete,
+  deployTopology: topologyApi.deploy,
+  destroyDeployment: topologyApi.destroy,
+  getDeploymentStatus: topologyApi.status,
+
+  // Chaos
+  listChaos: chaosApi.list,
+  createChaos: chaosApi.create,
+  startChaos: chaosApi.start,
+  stopChaos: chaosApi.stop,
+  deleteChaos: chaosApi.delete,
+
+  // Events
+  listEvents: eventsApi.list,
+  listTopologyEvents: eventsApi.listByTopology,
+  createEvent: eventsApi.create,
+  getEventStats: eventsApi.stats,
+
+  // Metrics
+  getLiveMetrics: metricsApi.getLive,
+  getMetricsHistory: metricsApi.getHistory,
+  getAggregatedMetrics: metricsApi.getAggregated,
+
+  // Presets
+  listPresets: presetsApi.list,
+  getPreset: presetsApi.get,
+  createPreset: presetsApi.create,
+  deletePreset: presetsApi.delete,
+  applyPreset: presetsApi.apply,
+
+  // Test Runner
+  listTestRuns: testRunnerApi.list,
+  getTestRun: testRunnerApi.get,
+  startTest: testRunnerApi.start,
+  cancelTest: testRunnerApi.cancel,
+
+  // Diagnostic
+  runDiagnostic: diagnosticApiExtended.runDiagnostic,
+  getNodeContainers: diagnosticApi.getNodeContainers,
+};
+
+export default apiWrapper;

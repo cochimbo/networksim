@@ -59,6 +59,20 @@ impl From<K8sDeploymentStatus> for DeploymentResponse {
 /// Deploy a topology to K3s
 ///
 /// POST /api/topologies/:id/deploy
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{id}/deploy",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Deployment started", body = super::openapi::DeploymentStatusSchema),
+        (status = 400, description = "Cannot deploy empty topology"),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn deploy(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -135,6 +149,18 @@ pub async fn deploy(
 /// Destroy a deployment
 ///
 /// DELETE /api/topologies/:id/deploy
+#[utoipa::path(
+    delete,
+    path = "/api/topologies/{id}/deploy",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Deployment destroyed"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn destroy(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -189,6 +215,19 @@ pub async fn destroy(
 /// Get deployment status
 ///
 /// GET /api/topologies/:id/status
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{id}/status",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Deployment status", body = super::openapi::DeploymentStatusSchema),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn status(
     State(state): State<AppState>,
     Path(id): Path<String>,

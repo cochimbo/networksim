@@ -4,7 +4,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::api::AppState;
+use crate::api::{AppState, Event};
 use crate::error::{AppError, AppResult};
 use crate::helm::types::DeployAppRequest;
 use crate::k8s::{DeploymentManager, DeploymentState};
@@ -209,7 +209,15 @@ pub async fn uninstall(
     }
 
     if uninstall_errors.is_empty() {
+        let topology_id_str = app.topology_id.to_string();
         state.db.delete_application(&app_id.to_string()).await?;
+
+        // Broadcast app uninstalled event
+        let _ = state.event_tx.send(Event::AppUninstalled {
+            topology_id: topology_id_str,
+            app_id: app_id.to_string(),
+        });
+
         Ok(Json(serde_json::json!({
             "message": format!("Application {} uninstalled successfully", app_id)
         })))
@@ -423,7 +431,14 @@ pub async fn deploy_topology(
         if deployment_errors.is_empty() {
             state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&release_name)).await?;
             tracing::info!("✅ Topology-wide application deployment completed successfully");
-            
+
+            // Broadcast app deployed event
+            let _ = state.event_tx.send(Event::AppDeployed {
+                topology_id: topology_id.to_string(),
+                app_id: app.id.to_string(),
+                image: app.image_name.clone(),
+            });
+
             // Return the application with updated status
             let updated_app = state.db.get_application(&app.id.to_string()).await?
                 .ok_or_else(|| AppError::internal("Failed to retrieve updated application"))?;

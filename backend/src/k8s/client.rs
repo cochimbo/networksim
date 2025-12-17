@@ -254,6 +254,24 @@ impl K8sClient {
         Ok(())
     }
 
+    /// Delete a secret
+    #[instrument(skip(self))]
+    pub async fn delete_secret(&self, name: &str, namespace: &str) -> Result<()> {
+        use k8s_openapi::api::core::v1::Secret;
+        let secrets: Api<Secret> = Api::namespaced(self.client.clone(), namespace);
+        match secrets.delete(name, &DeleteParams::default()).await {
+            Ok(_) => {
+                info!(name, namespace, "Deleted secret");
+                Ok(())
+            }
+            Err(kube::Error::Api(e)) if e.code == 404 => {
+                // Secret doesn't exist, that's fine
+                Ok(())
+            }
+            Err(e) => Err(e.into()),
+        }
+    }
+
     /// Delete all resources for a topology deployment
     #[instrument(skip(self))]
     pub async fn cleanup_deployment(&self, topology_id: &str) -> Result<()> {

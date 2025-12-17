@@ -1,13 +1,19 @@
 // Singleton WebSocket manager - independent of React lifecycle
 
-export type EventType = 
+export type EventType =
   | 'topology:created'
   | 'topology:updated'
   | 'topology:deleted'
   | 'deployment:status'
   | 'node:status'
   | 'chaos:applied'
-  | 'chaos:removed';
+  | 'chaos:removed'
+  | 'chaos:updated'
+  | 'test:started'
+  | 'test:completed'
+  | 'app:deployed'
+  | 'app:uninstalled'
+  | 'app:status_changed';
 
 export interface WebSocketEvent {
   type: EventType;

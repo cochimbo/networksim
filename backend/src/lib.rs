@@ -17,8 +17,11 @@ use axum::{
 };
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::api::AppState;
+use crate::api::openapi::ApiDoc;
 
 /// Create the application router with the given state
 pub fn create_router(state: AppState) -> Router {
@@ -86,8 +89,100 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/topologies/:topology_id/apps/:app_id/status", get(api::applications::status))
         // WebSocket
         .route("/ws/events", get(api::ws::ws_handler))
-        // Metrics
+        // Metrics (Prometheus)
         .route("/metrics", get(api::metrics::metrics_handler))
+        // Live Metrics
+        .route(
+            "/api/topologies/:id/metrics/live",
+            get(api::live_metrics::get_live_metrics),
+        )
+        .route(
+            "/api/topologies/:id/metrics/history",
+            get(api::live_metrics::get_metrics_history),
+        )
+        .route(
+            "/api/topologies/:id/metrics/aggregated",
+            get(api::live_metrics::get_aggregated_metrics),
+        )
+        .route(
+            "/api/topologies/:id/metrics/by-app",
+            get(api::live_metrics::get_metrics_by_app),
+        )
+        // Events
+        .route("/api/events", get(api::events::list_events))
+        .route("/api/events", post(api::events::create_event))
+        .route("/api/events/stats", get(api::events::event_stats))
+        .route(
+            "/api/topologies/:id/events",
+            get(api::events::list_topology_events),
+        )
+        // Presets
+        .route("/api/presets", get(api::presets::list_presets))
+        .route("/api/presets", post(api::presets::create_preset))
+        .route("/api/presets/:id", get(api::presets::get_preset))
+        .route("/api/presets/:id", delete(api::presets::delete_preset))
+        .route(
+            "/api/topologies/:topology_id/presets/:preset_id/apply",
+            post(api::presets::apply_preset),
+        )
+        // Registry Configuration
+        .route("/api/registries", get(api::registry::list_registries))
+        .route("/api/registries", post(api::registry::create_registry))
+        .route("/api/registries/default", get(api::registry::get_default_registry))
+        .route("/api/registries/:id", get(api::registry::get_registry))
+        .route("/api/registries/:id", put(api::registry::update_registry))
+        .route("/api/registries/:id", delete(api::registry::delete_registry))
+        .route("/api/registries/:id/test", post(api::registry::test_registry))
+        // Test Runner
+        .route("/api/topologies/:id/tests", get(api::test_runner::list_tests))
+        .route("/api/topologies/:id/tests", post(api::test_runner::start_test))
+        .route(
+            "/api/topologies/:topology_id/tests/:test_id",
+            get(api::test_runner::get_test),
+        )
+        .route(
+            "/api/topologies/:topology_id/tests/:test_id/cancel",
+            post(api::test_runner::cancel_test),
+        )
+        // =========================================================================
+        // API v1 - Standardized endpoints with new features
+        // =========================================================================
+        // Chaos affected apps (new)
+        .route(
+            "/api/v1/chaos/:condition_id/affected-apps",
+            get(api::chaos::affected_apps),
+        )
+        // App-to-app tests (new)
+        .route(
+            "/api/v1/topologies/:id/tests/app-to-app",
+            post(api::diagnostic::run_app_to_app_test),
+        )
+        // v1 aliases for existing endpoints (for gradual migration)
+        .route("/api/v1/topologies", get(api::topologies::list))
+        .route("/api/v1/topologies", post(api::topologies::create))
+        .route("/api/v1/topologies/:id", get(api::topologies::get))
+        .route("/api/v1/topologies/:id", put(api::topologies::update))
+        .route("/api/v1/topologies/:id", delete(api::topologies::delete))
+        .route("/api/v1/topologies/:id/deploy", post(api::deploy::deploy))
+        .route("/api/v1/topologies/:id/deploy", delete(api::deploy::destroy))
+        .route("/api/v1/topologies/:id/status", get(api::deploy::status))
+        .route("/api/v1/topologies/:id/chaos", get(api::chaos::list))
+        .route("/api/v1/topologies/:id/chaos", delete(api::chaos::delete_all))
+        .route("/api/v1/chaos", post(api::chaos::create))
+        .route("/api/v1/presets", get(api::presets::list_presets))
+        .route("/api/v1/presets", post(api::presets::create_preset))
+        .route("/api/v1/presets/:id", get(api::presets::get_preset))
+        .route("/api/v1/presets/:id", delete(api::presets::delete_preset))
+        .route("/api/v1/cluster/status", get(api::health::cluster_status))
+        // Templates
+        .route("/api/templates", get(api::templates::list))
+        .route("/api/templates/:template_id", get(api::templates::get))
+        .route("/api/templates/:template_id/generate", post(api::templates::generate))
+        // Reports
+        .route("/api/topologies/:id/report", get(api::reports::generate_report))
+        .route("/api/topologies/:id/report/html", get(api::reports::generate_html_report))
+        // OpenAPI / Swagger UI
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         // State and middleware
         .with_state(state)
         .layer(TraceLayer::new_for_http())

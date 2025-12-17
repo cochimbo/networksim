@@ -22,6 +22,15 @@ pub async fn health_check() -> Json<HealthResponse> {
     })
 }
 
+/// Get Kubernetes cluster connection status
+#[utoipa::path(
+    get,
+    path = "/api/cluster/status",
+    tag = "cluster",
+    responses(
+        (status = 200, description = "Cluster status", body = super::openapi::ClusterStatusSchema),
+    )
+)]
 pub async fn cluster_status(State(state): State<AppState>) -> Json<ClusterStatusResponse> {
     let connected = state.k8s.is_some();
     let message = if connected {

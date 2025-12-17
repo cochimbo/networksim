@@ -18,3 +18,13 @@ body {
   height: 100vh;
   width: 100vw;
 }
+
+/* Dark mode base styles */
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  background-color: #111827;
+  color: #f3f4f6;
+}
