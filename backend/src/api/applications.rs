@@ -28,7 +28,7 @@ pub async fn deploy(
 
     // Create application record
     let app_id = Uuid::new_v4();
-    let deployment_name = format!("app-{}-{}", app_id.simple(), node_id);
+    let deployment_name = crate::k8s::resources::make_deployment_name(&app_id.simple().to_string(), &node_id);
     let namespace = k8s.namespace().to_string();
 
     tracing::info!("🆔 Generated application ID: {}", app_id);
@@ -190,7 +190,7 @@ pub async fn uninstall(
     // For each node, delete the corresponding deployment
     let mut uninstall_errors = Vec::new();
     for node_id in &app.node_selector {
-        let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+        let deployment_name = crate::k8s::resources::make_deployment_name(&app.id.simple().to_string(), node_id);
         match k8s.delete_deployment(&deployment_name).await {
             Ok(_) => {
                 tracing::info!("✅ Deployment {} deleted successfully", deployment_name);
@@ -466,7 +466,7 @@ pub async fn deploy_application_to_node(
     // Create a separate deployment for the application
     use crate::k8s::resources::create_application_deployment;
     
-    let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+    let deployment_name = crate::k8s::resources::make_deployment_name(&app.id.simple().to_string(), node_id);
     
     // Check if deployment already exists
     if k8s.deployment_exists(&deployment_name, "networksim-sim").await? {
@@ -526,7 +526,7 @@ pub async fn status(
     let mut all_running = true;
 
     for node_id in &app.node_selector {
-        let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+        let deployment_name = crate::k8s::resources::make_deployment_name(&app.id.simple().to_string(), node_id);
         match k8s.check_deployment_ready(&deployment_name, "networksim-sim").await {
             Ok(is_ready) => {
                 node_statuses.push(serde_json::json!({

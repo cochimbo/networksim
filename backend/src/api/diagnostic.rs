@@ -743,7 +743,7 @@ pub async fn run_app_to_app_test(
     // Get source app pod
     let from_node_id = from_app.node_selector.first()
         .ok_or_else(|| AppError::bad_request("Source app has no node selector"))?;
-    let from_deployment = format!("app-{}-{}", from_app.id.simple(), from_node_id);
+    let from_deployment = crate::k8s::resources::make_deployment_name(&from_app.id.simple().to_string(), from_node_id);
 
     let from_pod = get_pod_for_deployment(&pods, &from_deployment).await?;
     let from_pod_ip = from_pod.status.as_ref()
@@ -752,7 +752,7 @@ pub async fn run_app_to_app_test(
     // Get target app pod
     let to_node_id = to_app.node_selector.first()
         .ok_or_else(|| AppError::bad_request("Target app has no node selector"))?;
-    let to_deployment = format!("app-{}-{}", to_app.id.simple(), to_node_id);
+    let to_deployment = crate::k8s::resources::make_deployment_name(&to_app.id.simple().to_string(), to_node_id);
 
     let to_pod = get_pod_for_deployment(&pods, &to_deployment).await?;
     let to_pod_ip = to_pod.status.as_ref()
@@ -983,7 +983,7 @@ async fn run_ping_test(
         "sh".to_string(),
         "-c".to_string(),
         format!(
-            "ping -c 3 -W {} {} 2>&1 | grep -oP 'time=\\K[0-9.]+' | awk '{{sum+=$1; count++}} END {{if(count>0) print \"OK \" sum/count; else print \"FAIL\"}}'",
+            "ping -c 3 -W {} {} 2>&1 | sed -n 's/.*time=\\([0-9.]*\\).*/\\1/p' | awk '{{sum+=$1; count++}} END {{if(count>0) print \"OK \" sum/count; else print \"FAIL\"}}'",
             timeout_secs, to_ip
         ),
     ];

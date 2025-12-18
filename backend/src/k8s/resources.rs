@@ -594,12 +594,14 @@ pub fn create_application_container(app: &Application) -> Container {
 pub fn create_application_deployment(app: &Application, node_id: &str, topology_id: &str) -> Deployment {
     use k8s_openapi::api::apps::v1::{DeploymentSpec, DeploymentStrategy};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
-    
-    let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+    // Build a kubernetes-safe deployment name (max 63 chars)
+    let deployment_name = make_deployment_name(&app.id.simple().to_string(), node_id);
     
     let mut labels = BTreeMap::new();
     labels.insert("app.kubernetes.io/name".to_string(), app.image_name.replace(":", "-"));
     labels.insert("app.kubernetes.io/managed-by".to_string(), "networksim".to_string());
+    // Ensure the instance label is set so lookups by app.kubernetes.io/instance work
+    labels.insert("app.kubernetes.io/instance".to_string(), deployment_name.clone());
     labels.insert("networksim.io/topology".to_string(), topology_id.to_string());
     labels.insert("networksim.io/node".to_string(), node_id.to_string());
     labels.insert("networksim.io/application".to_string(), app.id.to_string());
@@ -644,5 +646,16 @@ pub fn create_application_deployment(app: &Application, node_id: &str, topology_
         },
         spec: Some(deployment_spec),
         ..Default::default()
+    }
+}
+
+/// Create a deployment name safe for Kubernetes label/value and resource name limits.
+/// It will lowercase the input and truncate to 63 characters if necessary.
+pub fn make_deployment_name(app_id_simple: &str, node_id: &str) -> String {
+    let name = format!("app-{}-{}", app_id_simple, node_id).to_lowercase();
+    if name.len() > 63 {
+        name[..63].to_string()
+    } else {
+        name
     }
 }

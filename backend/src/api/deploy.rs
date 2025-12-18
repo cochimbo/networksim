@@ -171,7 +171,7 @@ pub async fn destroy(
     let applications = state.db.list_applications(&id).await?;
     for app in applications {
         tracing::info!("Marking application {} as Pending before destroying topology", app.id);
-        if let Err(e) = state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Pending, Some(&format!("app-{}-{}", app.id.simple(), app.node_selector.first().unwrap_or(&"".to_string())))).await {
+        if let Err(e) = state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Pending, Some(&crate::k8s::resources::make_deployment_name(&app.id.simple().to_string(), app.node_selector.first().unwrap_or(&"".to_string())))).await {
             tracing::warn!("Failed to mark application {} as Pending: {}", app.id, e);
         }
     }
