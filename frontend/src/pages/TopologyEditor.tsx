@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ResizablePanel } from '../components/ResizablePanel';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import cytoscape, { Core } from 'cytoscape';
@@ -43,6 +44,9 @@ const STATUS_COLORS: Record<NodeStatus, string> = {
 
 export default function TopologyEditor() {
   // Estado para el modal de propiedades de nodo
+  // Panel widths for resizable panels
+  const [leftPanelWidth, setLeftPanelWidth] = useState(320);
+  const [rightPanelWidth, setRightPanelWidth] = useState(380);
   const [nodeModal, setNodeModal] = useState<{ open: boolean; node: any } | null>(null);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -1318,114 +1322,128 @@ export default function TopologyEditor() {
         <div className="flex-1 flex min-h-0">
           {/* Left Panel - Applications & Network */}
           {id && (
-            <div className="w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
-              <TabPanel
-                tabs={[
-                  { id: 'apps', label: 'Apps', icon: <Circle size={14} /> },
-                  { id: 'impact', label: 'Impact', icon: <Activity size={14} />, badge: (chaosConditions?.filter(c => c.status === 'active').length || 0) > 0 ? (chaosConditions?.filter(c => c.status === 'active').length || 0) : undefined, badgeColor: 'warning' as const },
-                  { id: 'network', label: 'Network', icon: <Grid3X3 size={14} /> },
-                ]}
-                activeTab={leftTab}
-                onTabChange={setLeftTab}
-              >
-                {leftTab === 'apps' && (
-                  <ApplicationsPanel
-                    topologyId={id}
-                    nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
-                    selectedNode={selectedElement?.type === 'node' ? { id: selectedElement.data.id, name: selectedElement.data.name } : null}
-                    isTopologyDeployed={isThisTopologyDeployed}
-                  />
-                )}
-                {leftTab === 'impact' && (
-                  <ImpactDashboard
-                    topologyId={id}
-                    nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
-                    isDeployed={isThisTopologyDeployed}
-                  />
-                )}
-                {leftTab === 'network' && (
-                  <NetworkMatrix
-                    topologyId={id}
-                    nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
-                    onNodeSelect={(nodeId) => {
-                      if (cyInstance.current) {
-                        const node = cyInstance.current.$(`#${nodeId}`);
-                        if (node.length > 0) {
-                          cyInstance.current.nodes().unselect();
-                          node.select();
-                          setSelectedElement({ type: 'node', data: { id: nodeId, name: node.data('name') } });
+            <ResizablePanel minWidth={220} maxWidth={600} defaultWidth={leftPanelWidth} side="left" key="left"
+              // @ts-ignore
+              setWidth={setLeftPanelWidth}
+            >
+              <div className="bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
+                <TabPanel
+                  tabs={[
+                    { id: 'apps', label: 'Apps', icon: <Circle size={14} /> },
+                    { id: 'impact', label: 'Impact', icon: <Activity size={14} />, badge: (chaosConditions?.filter(c => c.status === 'active').length || 0) > 0 ? (chaosConditions?.filter(c => c.status === 'active').length || 0) : undefined, badgeColor: 'warning' as const },
+                    { id: 'network', label: 'Network', icon: <Grid3X3 size={14} /> },
+                  ]}
+                  activeTab={leftTab}
+                  onTabChange={setLeftTab}
+                >
+                  {leftTab === 'apps' && (
+                    <ApplicationsPanel
+                      topologyId={id}
+                      nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                      selectedNode={selectedElement?.type === 'node' ? { id: selectedElement.data.id, name: selectedElement.data.name } : null}
+                      isTopologyDeployed={isThisTopologyDeployed}
+                    />
+                  )}
+                  {leftTab === 'impact' && (
+                    <ImpactDashboard
+                      topologyId={id}
+                      nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                      isDeployed={isThisTopologyDeployed}
+                    />
+                  )}
+                  {leftTab === 'network' && (
+                    <NetworkMatrix
+                      topologyId={id}
+                      nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                      onNodeSelect={(nodeId) => {
+                        if (cyInstance.current) {
+                          const node = cyInstance.current.$(`#${nodeId}`);
+                          if (node.length > 0) {
+                            cyInstance.current.nodes().unselect();
+                            node.select();
+                            setSelectedElement({ type: 'node', data: { id: nodeId, name: node.data('name') } });
+                          }
                         }
-                      }
-                    }}
-                  />
-                )}
-              </TabPanel>
-            </div>
+                      }}
+                    />
+                  )}
+                </TabPanel>
+              </div>
+            </ResizablePanel>
           )}
 
           {/* Cytoscape canvas - main area */}
-          <div ref={cyRef} className="flex-1 bg-gray-50 min-h-0" />
+          <div
+            ref={cyRef}
+            className="bg-gray-50 min-h-0"
+            style={{ flex: '1 1 0%', minWidth: 0, width: `calc(100% - ${leftPanelWidth + rightPanelWidth}px)` }}
+          />
 
           {/* Right Panel - Chaos, Presets, Scenarios, Tests */}
           {id && (
-            <div className="w-96 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full">
-              <TabPanel
-                tabs={[
-                  {
-                    id: 'chaos',
-                    label: 'Chaos',
-                    icon: <Zap size={14} />,
-                    badge: activeChaosCount > 0 ? activeChaosCount : undefined,
-                    badgeColor: 'warning'
-                  },
-                  { id: 'presets', label: 'Presets', icon: <Bookmark size={14} /> },
-                  { id: 'scenarios', label: 'Scenarios', icon: <Film size={14} /> },
-                  { id: 'tests', label: 'Tests', icon: <TestTube size={14} /> },
-                ]}
-                activeTab={rightTab}
-                onTabChange={setRightTab}
-              >
-                {rightTab === 'chaos' && (
-                  <ChaosPanel
-                    topologyId={id}
-                    nodes={nodes}
-                    links={links}
-                    applications={applications}
-                    onClose={() => {}}
-                  />
-                )}
-                {rightTab === 'presets' && (
-                  <ChaosPresets
-                    topologyId={id}
-                    selectedSourceNode={selectedElement?.type === 'node' ? selectedElement.data.id : undefined}
-                    selectedTargetNode={undefined}
-                    onApply={handlePresetApplied}
-                  />
-                )}
-                {rightTab === 'scenarios' && (
-                  <ChaosScenarios
-                    topologyId={id}
-                    nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
-                  />
-                )}
-                {rightTab === 'tests' && (
-                  <div className="h-full overflow-auto p-4 space-y-4">
-                    <AppToAppTest
+            <ResizablePanel minWidth={260} maxWidth={700} defaultWidth={rightPanelWidth} side="right" key="right"
+              // @ts-ignore
+              setWidth={setRightPanelWidth}
+            >
+              <div className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full">
+                <TabPanel
+                  tabs={[
+                    {
+                      id: 'chaos',
+                      label: 'Chaos',
+                      icon: <Zap size={14} />,
+                      badge: activeChaosCount > 0 ? activeChaosCount : undefined,
+                      badgeColor: 'warning'
+                    },
+                    { id: 'presets', label: 'Presets', icon: <Bookmark size={14} /> },
+                    { id: 'scenarios', label: 'Scenarios', icon: <Film size={14} /> },
+                    { id: 'tests', label: 'Tests', icon: <TestTube size={14} /> },
+                  ]}
+                  activeTab={rightTab}
+                  onTabChange={setRightTab}
+                >
+                  {rightTab === 'chaos' && (
+                    <ChaosPanel
                       topologyId={id}
+                      nodes={nodes}
+                      links={links}
                       applications={applications}
-                      nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
-                      onTestComplete={handleAppTestResult}
+                      onClose={() => {}}
                     />
-                    <TestRunner
+                  )}
+                  {rightTab === 'presets' && (
+                    <ChaosPresets
                       topologyId={id}
-                      onTestComplete={() => {
-                        queryClient.invalidateQueries({ queryKey: ['chaos-conditions', id] });
-                      }}
+                      selectedSourceNode={selectedElement?.type === 'node' ? selectedElement.data.id : undefined}
+                      selectedTargetNode={undefined}
+                      onApply={handlePresetApplied}
                     />
-                  </div>
-                )}
-              </TabPanel>
-            </div>
+                  )}
+                  {rightTab === 'scenarios' && (
+                    <ChaosScenarios
+                      topologyId={id}
+                      nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                    />
+                  )}
+                  {rightTab === 'tests' && (
+                    <div className="h-full overflow-auto p-4 space-y-4">
+                      <AppToAppTest
+                        topologyId={id}
+                        applications={applications}
+                        nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                        onTestComplete={handleAppTestResult}
+                      />
+                      <TestRunner
+                        topologyId={id}
+                        onTestComplete={() => {
+                          queryClient.invalidateQueries({ queryKey: ['chaos-conditions', id] });
+                        }}
+                      />
+                    </div>
+                  )}
+                </TabPanel>
+              </div>
+            </ResizablePanel>
           )}
         </div>
 
