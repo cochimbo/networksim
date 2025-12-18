@@ -752,6 +752,12 @@ export default function TopologyEditor() {
     // Clear all chaos classes from edges
     cy.edges().removeClass('chaos-delay chaos-loss chaos-bandwidth chaos-corrupt chaos-duplicate chaos-partition chaos-stress-cpu chaos-pod-kill chaos-io-delay chaos-http-abort chaos-multiple');
 
+    // Also remove any inline styles (labels) previously set on edges so stale icons don't persist
+    cy.edges().forEach(edge => {
+      // removeStyle removes inline styles set via ele.style()
+      try { edge.removeStyle(); } catch (e) { /* defensive: ignore if not supported */ }
+    });
+
     // Collect all conditions affecting each edge
     const edgeConditions = new Map<string, string[]>();
 
@@ -780,7 +786,13 @@ export default function TopologyEditor() {
           });
         } else {
           const sourceNode = condition.source_node_id;
-          const edges = cy.edges().filter(edge => edge.data('source') === sourceNode);
+          // When no specific target is set, affect all edges connected to the source node
+          // (both outgoing and incoming) so the UI shows partition/chaos on all links.
+          const edges = cy.edges().filter(edge => {
+            const src = edge.data('source');
+            const tgt = edge.data('target');
+            return src === sourceNode || tgt === sourceNode;
+          });
           edges.forEach(edge => {
             const edgeId = edge.id();
             if (!edgeConditions.has(edgeId)) {
