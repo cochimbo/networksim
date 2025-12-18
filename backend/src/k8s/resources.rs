@@ -527,15 +527,88 @@ pub fn create_application_container(app: &Application) -> Container {
 
     // Add custom values as environment variables if they exist
     if let Some(values) = &app.values {
-        if let Some(obj) = values.as_object() {
-            for (key, value) in obj {
-                if let Some(str_val) = value.as_str() {
+        // Build a set of existing env var NAMES to avoid overwriting defaults
+        let mut existing_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for ev in &env_vars {
+            existing_names.insert(ev.name.clone());
+        }
+
+        // Helper to sanitize and validate an env var name
+        let sanitize_name = |s: &str| -> String {
+            let mut out = s
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c.to_ascii_uppercase() } else { '_' })
+                .collect::<String>();
+            // If first char is a digit, prefix with '_'
+            if out.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                out = format!("_{}", out);
+            }
+            out
+        };
+
+        // Support multiple shapes coming from the frontend:
+        // - { "env": [ {"name":"FOO","value":"bar"}, ... ] }
+        // - [ {"name":"FOO","value":"bar"}, ... ]
+        // - { "FOO": "bar", ... }
+        if let Some(env_array) = values.get("env").and_then(|v| v.as_array()) {
+            for item in env_array {
+                let raw_name = item.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                let raw_value = item.get("value").and_then(|v| v.as_str()).unwrap_or("");
+                let name = sanitize_name(raw_name);
+                if name.is_empty() {
+                    tracing::warn!("Skipping env var with empty name in app {}", app.id);
+                    continue;
+                }
+                if existing_names.contains(&name) {
+                    tracing::info!("Skipping env var '{}' for app {} to avoid overwriting existing variable", name, app.id);
+                    continue;
+                }
+                existing_names.insert(name.clone());
+                env_vars.push(EnvVar {
+                    name,
+                    value: Some(raw_value.to_string()),
+                    ..Default::default()
+                });
+            }
+        } else if let Some(arr) = values.as_array() {
+            for item in arr {
+                if let Some(raw_name) = item.get("name").and_then(|n| n.as_str()) {
+                    let raw_value = item.get("value").and_then(|v| v.as_str()).unwrap_or("");
+                    let name = sanitize_name(raw_name);
+                    if name.is_empty() {
+                        tracing::warn!("Skipping env var with empty name in app {}", app.id);
+                        continue;
+                    }
+                    if existing_names.contains(&name) {
+                        tracing::info!("Skipping env var '{}' for app {} to avoid overwriting existing variable", name, app.id);
+                        continue;
+                    }
+                    existing_names.insert(name.clone());
                     env_vars.push(EnvVar {
-                        name: format!("APP_{}", key.to_uppercase()),
-                        value: Some(str_val.to_string()),
+                        name,
+                        value: Some(raw_value.to_string()),
                         ..Default::default()
                     });
                 }
+            }
+        } else if let Some(obj) = values.as_object() {
+            for (key, value) in obj {
+                let sval = if let Some(s) = value.as_str() { s.to_string() } else { value.to_string() };
+                let name = sanitize_name(key);
+                if name.is_empty() {
+                    tracing::warn!("Skipping env var with empty name (key='{}') in app {}", key, app.id);
+                    continue;
+                }
+                if existing_names.contains(&name) {
+                    tracing::info!("Skipping env var '{}' (from key='{}') for app {} to avoid overwriting existing variable", name, key, app.id);
+                    continue;
+                }
+                existing_names.insert(name.clone());
+                env_vars.push(EnvVar {
+                    name,
+                    value: Some(sval),
+                    ..Default::default()
+                });
             }
         }
     }

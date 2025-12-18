@@ -270,7 +270,37 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                     </div>
                     <div className="flex gap-1">
                       <button
-                        onClick={() => setShowEnvEditor({ appId: app.id, env: [] })}
+                        onClick={async () => {
+                          if (isTopologyDeployed) return;
+                          console.log('ApplicationsPanel: opening EnvVarsEditor, fetching latest app', { topologyId, appId: app.id });
+                          try {
+                            const freshApp = await applicationsApi.get(topologyId, app.id);
+                            console.log('ApplicationsPanel: fetched app for EnvVarsEditor', { appId: app.id, envvalues: freshApp.envvalues, values: (freshApp as any).values });
+                            const rawEnv = freshApp.envvalues || (freshApp as any).values;
+                            let envList: Array<{ name: string; value: string }> = [];
+                            if (Array.isArray(rawEnv?.env)) {
+                              envList = rawEnv.env;
+                            } else if (Array.isArray(rawEnv)) {
+                              envList = rawEnv;
+                            } else if (rawEnv && typeof rawEnv === 'object') {
+                              envList = Object.entries(rawEnv).map(([k, v]) => ({ name: k, value: v == null ? '' : String(v) }));
+                            }
+                            console.log('ApplicationsPanel: normalized env for editor', { appId: app.id, envList });
+                            setShowEnvEditor({ appId: app.id, env: envList });
+                          } catch (e) {
+                            console.error('ApplicationsPanel: Failed to fetch app before opening env editor, falling back to cached values', e);
+                            const fallbackRaw = app.envvalues || (app as any).values;
+                            let fallbackList: Array<{ name: string; value: string }> = [];
+                            if (Array.isArray(fallbackRaw?.env)) {
+                              fallbackList = fallbackRaw.env;
+                            } else if (Array.isArray(fallbackRaw)) {
+                              fallbackList = fallbackRaw;
+                            } else if (fallbackRaw && typeof fallbackRaw === 'object') {
+                              fallbackList = Object.entries(fallbackRaw).map(([k, v]) => ({ name: k, value: v == null ? '' : String(v) }));
+                            }
+                            setShowEnvEditor({ appId: app.id, env: fallbackList });
+                          }
+                        }}
                         disabled={isTopologyDeployed}
                         className="p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         title={isTopologyDeployed ? "Cannot edit env vars while topology is deployed" : "Editar variables de entorno"}
@@ -307,10 +337,16 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
             initialVars={showEnvEditor.env}
             onSave={async (vars) => {
               console.log('ApplicationsPanel: saving env for app', showEnvEditor.appId, vars);
+              const payload = { env: vars };
+              console.log('ApplicationsPanel: PUT payload for updateAppValues', payload);
               try {
-                // Call backend to update app values
-                await applicationsApi.updateAppValues(topologyId, showEnvEditor.appId, { ...(vars ? { env: vars } : {}) });
-                console.log('ApplicationsPanel: updateAppValues success');
+                // Call backend to update app envvalues (send array inside object)
+                const res = await applicationsApi.updateAppValues(topologyId, showEnvEditor.appId, payload);
+                console.log('ApplicationsPanel: updateAppValues success', res);
+                // Invalidate applications list so UI reflects persisted changes
+                queryClient.invalidateQueries({ queryKey: ['applications', topologyId] });
+                // Also refresh runtime statuses after a short delay
+                setTimeout(reloadAllAppStatuses, 500);
               } catch (e:any) {
                 console.error('ApplicationsPanel: updateAppValues failed', e);
                 alert('No se pudo guardar las variables en la aplicación: ' + (e?.message || e));

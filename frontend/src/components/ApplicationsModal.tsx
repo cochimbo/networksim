@@ -41,7 +41,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
   const [deployForm, setDeployForm] = useState<DeployAppRequest>({
     chart: '',
     node_selector: [nodeId], // Single node for per-node deployment
-    values: {},
+    envvalues: {},
   });
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [logs, setLogs] = useState<string>('');
@@ -72,7 +72,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
       setDeployForm({
         chart: '',
         node_selector: [nodeId],
-        values: {},
+        envvalues: {},
       });
     },
     onError: (error) => {
@@ -135,7 +135,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
     setDeployForm({
       chart: '',
       node_selector: [nodeId],
-      values: {},
+      envvalues: {},
     });
     setChartValidationError('');
   };
@@ -300,7 +300,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                                       >
                                         Editar variables de entorno
                                       </button>
-                                      {Array.isArray(deployForm.values?.env) && deployForm.values.env.length > 0 && (
+                                      {Array.isArray((deployForm as any).envvalues?.env) && (deployForm as any).envvalues.env.length > 0 && (
                                         <div className="mt-2 max-h-24 overflow-y-auto border rounded bg-gray-50 text-xs">
                                           <table className="min-w-full">
                                             <thead>
@@ -310,7 +310,7 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                                               </tr>
                                             </thead>
                                             <tbody>
-                                              {deployForm.values.env.map((v: any, i: number) => (
+                                              {(deployForm as any).envvalues.env.map((v: any, i: number) => (
                                                 <tr key={i}>
                                                   <td className="p-1">{v.name}</td>
                                                   <td className="p-1">{v.value}</td>
@@ -322,13 +322,13 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                                       )}
                                       {showEnvEditor && (
                                         <EnvVarsEditor
-                                          initialVars={deployForm.values?.env || []}
+                                          initialVars={(deployForm as any).envvalues?.env || []}
                                           onSave={async vars => {
                                             console.log('ApplicationsModal: onSave called with vars', vars);
                                             setDeployForm(prev => ({
                                               ...prev,
-                                              values: {
-                                                ...prev.values,
+                                              envvalues: {
+                                                ...(prev as any).envvalues,
                                                 env: vars
                                               }
                                             }));
@@ -337,16 +337,16 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                                               console.log('ApplicationsModal: sending createAppDraft', {
                                                 chart: deployForm.chart,
                                                 node_selector: deployForm.node_selector,
-                                                values: {
-                                                  ...(deployForm.values || {}),
+                                                envvalues: {
+                                                  ...((deployForm as any).envvalues || {}),
                                                   env: vars,
                                                 }
                                               });
                                               const resp = await applicationsApi.createAppDraft(topologyId, {
                                                 chart: deployForm.chart,
                                                 node_selector: deployForm.node_selector,
-                                                values: {
-                                                  ...(deployForm.values || {}),
+                                                envvalues: {
+                                                  ...((deployForm as any).envvalues || {}),
                                                   env: vars,
                                                 }
                                               });
