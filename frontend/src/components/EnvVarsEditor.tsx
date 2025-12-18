@@ -21,14 +21,21 @@ export default function EnvVarsEditor({ initialVars, onSave, onClose }: EnvVarsE
   const handleAdd = () => setVars([...vars, { name: '', value: '' }]);
   const handleDelete = (idx: number) => setVars(vars => vars.filter((_, i) => i !== idx));
 
-  const handleSave = () => onSave(vars.filter(v => v.name.trim() !== ''));
+  // Log when user saves from the editor to help debugging persistence
+  const handleSaveWithLog = () => {
+    const filtered = vars.filter(v => v.name.trim() !== '');
+    console.log('EnvVarsEditor: saving vars', filtered);
+    onSave(filtered);
+  };
 
   const handleLoad = () => {
     const saved = localStorage.getItem('envVarsPreset');
+    console.log('EnvVarsEditor: loading preset', saved);
     if (saved) setVars(JSON.parse(saved));
   };
   const handleSavePreset = () => {
     localStorage.setItem('envVarsPreset', JSON.stringify(vars));
+    console.log('EnvVarsEditor: saved preset', vars);
     alert('Configuración guardada');
   };
 
@@ -66,7 +73,7 @@ export default function EnvVarsEditor({ initialVars, onSave, onClose }: EnvVarsE
         </div>
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 border rounded">Cancelar</button>
-          <button onClick={handleSave} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Guardar y aplicar</button>
+          <button onClick={handleSaveWithLog} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Guardar y aplicar</button>
         </div>
       </div>
     </div>

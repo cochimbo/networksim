@@ -80,7 +80,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/chaos", post(api::chaos::create))
         // Applications
         .route("/api/topologies/:topology_id/apps", post(api::applications::deploy_topology))
+        .route("/api/topologies/:topology_id/apps/draft", post(api::applications::create_draft))
         .route("/api/topologies/:topology_id/apps", get(api::applications::list_by_topology))
+        .route("/api/topologies/:topology_id/apps/:app_id", put(api::applications::update_application))
         .route("/api/topologies/:topology_id/nodes/:node_id/apps", post(api::applications::deploy))
         .route("/api/topologies/:topology_id/nodes/:node_id/apps", get(api::applications::list_by_node))
         .route("/api/topologies/:topology_id/apps/:app_id", get(api::applications::get))

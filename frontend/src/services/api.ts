@@ -355,7 +355,7 @@ export interface Application {
   image_name: string; // Full image reference
   chart: string; // Keep for backward compatibility
   namespace: string;
-  values?: Record<string, any>;
+  envvalues?: Record<string, any>;
   status: AppStatus;
   release_name: string;
   created_at: string;
@@ -366,7 +366,7 @@ export interface DeployAppRequest {
   chart: string;
   node_selector: string[]; // List of node IDs where to deploy
   // namespace is now fixed to simulation namespace for network policies
-  values?: Record<string, any>;
+  envvalues?: Record<string, any>;
 }
 
 export interface AppLogs {
@@ -394,6 +394,29 @@ export const applicationsApi = {
   deployTopology: async (topologyId: string, request: DeployAppRequest): Promise<Application> => {
     const response = await api.post(`/api/topologies/${topologyId}/apps`, request);
     return response.data;
+  },
+
+  createAppDraft: async (topologyId: string, request: DeployAppRequest): Promise<Application> => {
+    try {
+      console.log('applicationsApi.createAppDraft - request', { topologyId, request });
+      const response = await api.post(`/api/topologies/${topologyId}/apps/draft`, request);
+      console.log('applicationsApi.createAppDraft - response', { status: response.status, data: response.data });
+      return response.data;
+    } catch (e) {
+      console.error('applicationsApi.createAppDraft - error', e);
+      throw e;
+    }
+  },
+  updateAppValues: async (topologyId: string, appId: string, values: Record<string, any> | null): Promise<Application> => {
+    try {
+      console.log('applicationsApi.updateAppValues - request', { topologyId, appId, values });
+      const response = await api.put(`/api/topologies/${topologyId}/apps/${appId}`, { envvalues: values });
+      console.log('applicationsApi.updateAppValues - response', { status: response.status, data: response.data });
+      return response.data;
+    } catch (e) {
+      console.error('applicationsApi.updateAppValues - error', e);
+      throw e;
+    }
   },
 
   listByTopology: async (topologyId: string): Promise<Application[]> => {

@@ -292,7 +292,10 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                                       </label>
                                       <button
                                         type="button"
-                                        onClick={() => setShowEnvEditor(true)}
+                                        onClick={() => {
+                                          console.log('ApplicationsModal: opening EnvVarsEditor', { deployForm });
+                                          setShowEnvEditor(true);
+                                        }}
                                         className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
                                       >
                                         Editar variables de entorno
@@ -320,7 +323,8 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                                       {showEnvEditor && (
                                         <EnvVarsEditor
                                           initialVars={deployForm.values?.env || []}
-                                          onSave={vars => {
+                                          onSave={async vars => {
+                                            console.log('ApplicationsModal: onSave called with vars', vars);
                                             setDeployForm(prev => ({
                                               ...prev,
                                               values: {
@@ -328,6 +332,30 @@ export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClos
                                                 env: vars
                                               }
                                             }));
+                                            // Persist as an application draft in the backend
+                                            try {
+                                              console.log('ApplicationsModal: sending createAppDraft', {
+                                                chart: deployForm.chart,
+                                                node_selector: deployForm.node_selector,
+                                                values: {
+                                                  ...(deployForm.values || {}),
+                                                  env: vars,
+                                                }
+                                              });
+                                              const resp = await applicationsApi.createAppDraft(topologyId, {
+                                                chart: deployForm.chart,
+                                                node_selector: deployForm.node_selector,
+                                                values: {
+                                                  ...(deployForm.values || {}),
+                                                  env: vars,
+                                                }
+                                              });
+                                              console.log('ApplicationsModal: createAppDraft response', resp);
+                                              alert('Variables guardadas en la aplicación (borrador)');
+                                            } catch (e: any) {
+                                              console.error('ApplicationsModal: Failed to save app draft', e);
+                                              alert('No se pudo guardar el borrador: ' + (e?.message || e));
+                                            }
                                             setShowEnvEditor(false);
                                           }}
                                           onClose={() => setShowEnvEditor(false)}

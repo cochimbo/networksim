@@ -141,7 +141,7 @@ fn build_env_vars(config: &NodeConfig, node_name: &str, topology_id: &str) -> Ve
     if let Some(custom_env) = &config.env {
         for env in custom_env {
             env_vars.push(EnvVar {
-                // name: env.name.clone(), // Eliminado si no existe en el modelo
+                name: env.name.clone(),
                 value: Some(env.value.clone()),
                 ..Default::default()
             });

@@ -69,7 +69,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
   const [deployForm, setDeployForm] = useState<any>({
     chart: '',
     node_selector: selectedNode ? [selectedNode.id] : [],
-    values: {},
+    envvalues: {},
   });
   // Eliminado: const [logs, setLogs] = useState<string>('');
   const [chartValidationError, setChartValidationError] = useState<string>('');
@@ -136,7 +136,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
       setDeployForm({
         chart: '',
         node_selector: [],
-        values: {},
+        envvalues: {},
       });
       // Recargar estados de runtime después de un pequeño delay para que la DB se actualice
       setTimeout(reloadAllAppStatuses, 1000);
@@ -173,7 +173,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
     const deployPayload = {
       chart: deployForm.chart,
       node_selector: deployForm.node_selector,
-      values: deployForm.values && Object.keys(deployForm.values).length > 0 ? deployForm.values : undefined
+      envvalues: deployForm.envvalues && Object.keys(deployForm.envvalues).length > 0 ? deployForm.envvalues : undefined
     };
     // eslint-disable-next-line no-console
     console.log('Deploy payload:', deployPayload);
@@ -305,8 +305,16 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
         {showEnvEditor && (
           <EnvVarsEditor
             initialVars={showEnvEditor.env}
-            onSave={(_vars) => {
-              // Aquí deberías guardar las variables en el backend o en el estado de la app
+            onSave={async (vars) => {
+              console.log('ApplicationsPanel: saving env for app', showEnvEditor.appId, vars);
+              try {
+                // Call backend to update app values
+                await applicationsApi.updateAppValues(topologyId, showEnvEditor.appId, { ...(vars ? { env: vars } : {}) });
+                console.log('ApplicationsPanel: updateAppValues success');
+              } catch (e:any) {
+                console.error('ApplicationsPanel: updateAppValues failed', e);
+                alert('No se pudo guardar las variables en la aplicación: ' + (e?.message || e));
+              }
               setShowEnvEditor(null);
             }}
             onClose={() => setShowEnvEditor(null)}

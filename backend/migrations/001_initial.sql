@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS applications (
     chart_type TEXT, -- <--- columna agregada
     chart TEXT,
     namespace TEXT,
-    "values" TEXT,
+    envvalues TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
     release_name TEXT,
     created_at TEXT NOT NULL,

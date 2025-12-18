@@ -9,6 +9,7 @@ use crate::error::{AppError, AppResult};
 use crate::helm::types::DeployAppRequest;
 use crate::k8s::{DeploymentManager, DeploymentState};
 use crate::models::Application;
+use serde::Deserialize;
 
 /// Deploy an application to a node
 pub async fn deploy(
@@ -17,8 +18,8 @@ pub async fn deploy(
     Json(request): Json<DeployAppRequest>,
 ) -> AppResult<Json<Application>> {
     tracing::info!("🚀 ===== STARTING APPLICATION DEPLOYMENT =====");
-    tracing::info!("📋 Request details: topology_id={}, node_id={}, image={}, values={:?}",
-                   topology_id, node_id, request.chart, request.values);
+    tracing::info!("📋 Request details: topology_id={}, node_id={}, image={}, envvalues={:?}",
+                   topology_id, node_id, request.chart, request.envvalues);
 
     let k8s = state.k8s.as_ref().ok_or_else(|| {
         tracing::error!("❌ K8s client not available");
@@ -42,7 +43,7 @@ pub async fn deploy(
         node_selector: vec![node_id.clone()],
         image_name: request.chart.clone(),
         namespace: namespace.clone(),
-        values: request.values.clone(),
+        values: request.envvalues.clone(),
         status: crate::models::AppStatus::Pending,
         release_name: deployment_name.clone(),
         created_at: chrono::Utc::now(),
@@ -452,6 +453,70 @@ pub async fn deploy_topology(
         tracing::info!("📅 Application scheduled for deployment when topology is started");
         Ok(Json(app))
     }
+}
+
+/// Create an application draft (save values/env without attempting k8s deployment)
+pub async fn create_draft(
+    State(state): State<AppState>,
+    Path(topology_id): Path<Uuid>,
+    Json(request): Json<DeployAppRequest>,
+) -> AppResult<Json<Application>> {
+    tracing::info!("create_draft - topology={}, chart={}, node_selector_len={}, envvalues_present={}",
+        topology_id, request.chart, request.node_selector.len(), request.envvalues.is_some());
+
+    let app_id = Uuid::new_v4();
+    let release_name = format!("app-{}", app_id.simple());
+    let namespace = "networksim-sim".to_string();
+
+    let app = Application {
+        id: app_id,
+        topology_id,
+        node_selector: request.node_selector.clone(),
+        image_name: request.chart.clone(),
+        namespace: namespace.clone(),
+        values: request.envvalues.clone(),
+        status: crate::models::AppStatus::Pending,
+        release_name: release_name.clone(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+
+    match state.db.create_application(&app).await {
+        Ok(_) => {
+            tracing::info!("create_draft - saved application draft id={}", app.id);
+            Ok(Json(app))
+        }
+        Err(e) => {
+            tracing::error!("create_draft - failed to save draft: {}", e);
+            Err(e.into())
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateAppValuesRequest {
+    #[serde(rename = "envvalues")]
+    pub envvalues: Option<serde_json::Value>,
+}
+
+/// Update an existing application's values (env, etc.)
+pub async fn update_application(
+    State(state): State<AppState>,
+    Path((topology_id, app_id)): Path<(Uuid, Uuid)>,
+    Json(request): Json<UpdateAppValuesRequest>,
+) -> AppResult<Json<Application>> {
+    tracing::info!("update_application - topology={}, app_id={}, has_envvalues={}", topology_id, app_id, request.envvalues.is_some());
+
+    let mut app = state.db.get_application(&app_id.to_string()).await?
+        .ok_or_else(|| AppError::NotFound(format!("Application {} not found", app_id)))?;
+
+    app.values = request.envvalues.clone();
+    app.updated_at = chrono::Utc::now();
+
+    state.db.update_application(&app).await?;
+
+    tracing::info!("update_application - updated app {}", app.id);
+    Ok(Json(app))
 }
 
 /// Deploy application as sidecar to a specific node
