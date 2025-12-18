@@ -199,6 +199,39 @@ POST   /api/v1/topologies/:id/tests/app-to-app  # Run connectivity test
 
 ## Topology Templates
 
+## Environment variables (per-application)
+
+- Where they live: environment variables edited in the UI are persisted per-application as JSON in the database column `envvalues` (historically `values`). The backend accepts the key `envvalues` in API requests and maps it to the application model.
+
+- Accepted JSON shapes (frontend will normalize any of these):
+	- { "env": [{ "name": "FOO", "value": "bar" }, ...] }
+	- [ { "name": "FOO", "value": "bar" }, ... ]
+	- { "FOO": "bar", "BLA": "x" }
+
+- Flow:
+	1. UI: open Applications panel → click the env icon to fetch the latest application (GET `/api/topologies/:topologyId/apps/:appId`) and open the `EnvVarsEditor` populated with the normalized env list.
+	2. UI: edit/add/remove vars → click "Guardar y aplicar". The frontend sends a PUT to `/api/topologies/:topologyId/apps/:appId` with body `{ "envvalues": { ... } }`.
+	3. Backend: `update_application` stores the JSON in the application row and on deployment the k8s spec builder (`create_application_container`) converts the JSON into container `env` entries.
+
+- Sanitization and policy:
+	- Env var names are sanitized (non-alphanumerics → `_`, converted to upper-case). If name starts with a digit a leading `_` is added.
+	- The deployment logic will NOT overwrite built-in variables such as `APPLICATION_NAME` or `APPLICATION_CHART`; if a user variable collides it is skipped and a log message is emitted.
+
+- How to verify (no DB needed):
+	1. Open the app in the UI and save/envvars as usual.
+	2. Check the pod environment from the host:
+		 - List pods: `kubectl -n networksim-sim get pods`
+		 - Choose an app pod and run: `kubectl -n networksim-sim exec <pod> -- sh -c 'printenv | grep -i LONCHA'`
+	3. Inspect the Deployment spec to see which env keys were applied:
+		 - `kubectl -n networksim-sim get deployment <deployment-name> -o yaml`
+	4. Backend logs (tail `/tmp/networksim-backend.log`) include traces when an application is updated or when env variables are skipped due to conflicts.
+
+- Example requests:
+	- Save env via frontend (PUT body): `{ "envvalues": { "env": [{ "name": "LONCHA", "value": "QUESO" }] } }`
+	- Create draft (POST): `POST /api/topologies/:id/apps/draft` with body `{ "chart": "busybox", "node_selector": ["node-1"], "envvalues": { "env": [...] } }`
+
+Notes: the frontend normalizes several input shapes so small format differences (array vs map) do not affect the final container environment.
+
 | Template | Nodes | Description |
 |----------|-------|-------------|
 | **Microservices** | 8 | API Gateway → Services → Databases |
