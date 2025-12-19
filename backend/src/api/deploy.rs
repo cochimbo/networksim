@@ -59,6 +59,20 @@ impl From<K8sDeploymentStatus> for DeploymentResponse {
 /// Deploy a topology to K3s
 ///
 /// POST /api/topologies/:id/deploy
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{id}/deploy",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Deployment started", body = super::openapi::DeploymentStatusSchema),
+        (status = 400, description = "Cannot deploy empty topology"),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn deploy(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -87,7 +101,7 @@ pub async fn deploy(
     sqlx::query(
         "INSERT OR REPLACE INTO deployments (id, topology_id, status, deploy_command_state, created_at, updated_at) VALUES (?, ?, 'pending', 'deploying', datetime('now'), datetime('now'))"
     )
-    .bind(&format!("deploy-{}", id))
+    .bind(format!("deploy-{}", id))
     .bind(&id)
     .execute(state.db.pool())
     .await
@@ -135,6 +149,18 @@ pub async fn deploy(
 /// Destroy a deployment
 ///
 /// DELETE /api/topologies/:id/deploy
+#[utoipa::path(
+    delete,
+    path = "/api/topologies/{id}/deploy",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Deployment destroyed"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn destroy(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -145,7 +171,7 @@ pub async fn destroy(
     let applications = state.db.list_applications(&id).await?;
     for app in applications {
         tracing::info!("Marking application {} as Pending before destroying topology", app.id);
-        if let Err(e) = state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Pending, Some(&format!("app-{}-{}", app.id.simple(), app.node_selector.first().unwrap_or(&"".to_string())))).await {
+        if let Err(e) = state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Pending, Some(&crate::k8s::resources::make_deployment_name(&app.id.simple().to_string(), app.node_selector.first().unwrap_or(&"".to_string())))).await {
             tracing::warn!("Failed to mark application {} as Pending: {}", app.id, e);
         }
     }
@@ -166,7 +192,7 @@ pub async fn destroy(
     if let Err(e) = sqlx::query(
         "INSERT OR REPLACE INTO deployments (id, topology_id, status, deploy_command_state, created_at, updated_at) VALUES (?, ?, 'stopped', 'stopped', datetime('now'), datetime('now'))"
     )
-    .bind(&format!("deploy-{}", id))
+    .bind(format!("deploy-{}", id))
     .bind(&id)
     .execute(state.db.pool())
     .await {
@@ -189,6 +215,19 @@ pub async fn destroy(
 /// Get deployment status
 ///
 /// GET /api/topologies/:id/status
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{id}/status",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Deployment status", body = super::openapi::DeploymentStatusSchema),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn status(
     State(state): State<AppState>,
     Path(id): Path<String>,

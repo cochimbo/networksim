@@ -2,8 +2,17 @@ pub mod applications;
 pub mod chaos;
 pub mod deploy;
 pub mod diagnostic;
+pub mod events;
 pub mod health;
+pub mod live_metrics;
 pub mod metrics;
+pub mod openapi;
+pub mod presets;
+pub mod registry;
+pub mod reports;
+pub mod response;
+pub mod templates;
+pub mod test_runner;
 pub mod topologies;
 pub mod ws;
 
@@ -70,4 +79,14 @@ pub enum Event {
     ChaosRemoved { id: String },
     #[serde(rename = "chaos:updated")]
     ChaosUpdated { id: String },
+    #[serde(rename = "test:started")]
+    TestStarted { id: String, test_type: String },
+    #[serde(rename = "test:completed")]
+    TestCompleted { id: String, status: String },
+    #[serde(rename = "app:deployed")]
+    AppDeployed { topology_id: String, app_id: String, image: String },
+    #[serde(rename = "app:uninstalled")]
+    AppUninstalled { topology_id: String, app_id: String },
+    #[serde(rename = "app:status_changed")]
+    AppStatusChanged { topology_id: String, app_id: String, status: String },
 }

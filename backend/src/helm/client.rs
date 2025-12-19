@@ -98,12 +98,11 @@ impl HelmClient {
             Ok(stdout.to_string())
         } else {
             error!("Helm install failed: {}", stderr);
-            Err(anyhow::anyhow!("Helm install failed: {}", stderr).into())
+            Err(anyhow::anyhow!("Helm install failed: {}", stderr))
         }
     }
 
     /// Instalar RabbitMQ usando kubectl directamente (para evitar problemas con imágenes bloqueadas)
-
     /// Desinstalar un release Helm
     pub async fn uninstall_release(&self, release_name: &str) -> Result<String> {
         info!("Uninstalling Helm release: {}", release_name);
@@ -127,7 +126,7 @@ impl HelmClient {
             Ok(stdout.to_string())
         } else {
             error!("Helm uninstall failed: {}", stderr);
-            Err(anyhow::anyhow!("Helm uninstall failed: {}", stderr).into())
+            Err(anyhow::anyhow!("Helm uninstall failed: {}", stderr))
         }
     }
 
@@ -183,14 +182,14 @@ impl HelmClient {
             .context("Failed to get pod name")?;
 
         if !pod_output.status.success() {
-            return Err(anyhow::anyhow!("No pods found for release: {}", release_name).into());
+            return Err(anyhow::anyhow!("No pods found for release: {}", release_name));
         }
 
         let pod_name_output = String::from_utf8_lossy(&pod_output.stdout);
         let pod_name = pod_name_output.trim();
 
         if pod_name.is_empty() {
-            return Err(anyhow::anyhow!("No pods found for release: {}", release_name).into());
+            return Err(anyhow::anyhow!("No pods found for release: {}", release_name));
         }
 
         let output = Command::new("kubectl")
@@ -211,7 +210,7 @@ impl HelmClient {
         if output.status.success() {
             Ok(stdout.to_string())
         } else {
-            Err(anyhow::anyhow!("Failed to get logs: {}", stderr).into())
+            Err(anyhow::anyhow!("Failed to get logs: {}", stderr))
         }
     }
 }

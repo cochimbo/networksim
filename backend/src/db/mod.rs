@@ -48,7 +48,7 @@ struct ApplicationRow {
     chart: String,  // Keep for backward compatibility during migration
     // version: Option<String>,
     namespace: String,
-    values: Option<String>,
+    envvalues: Option<String>,
     status: String,
     release_name: Option<String>,
     created_at: String,
@@ -58,13 +58,17 @@ struct ApplicationRow {
 impl Database {
     pub async fn new(database_url: &str) -> Result<Self> {
         // Create database file if it doesn't exist
-        let db_path = database_url.trim_start_matches("sqlite://");
+        // If the URL contains SQLite URI query params (e.g. "?mode=rwc"), strip them
+        let mut db_path = database_url.trim_start_matches("sqlite://").to_string();
+        if let Some(idx) = db_path.find('?') {
+            db_path.truncate(idx);
+        }
         if db_path != ":memory:" {
-            if let Some(parent) = std::path::Path::new(db_path).parent() {
+            if let Some(parent) = std::path::Path::new(&db_path).parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            if !std::path::Path::new(db_path).exists() {
-                std::fs::File::create(db_path)?;
+            if !std::path::Path::new(&db_path).exists() {
+                std::fs::File::create(&db_path)?;
             }
         }
 
@@ -254,8 +258,19 @@ impl Database {
         let node_selector_json = serde_json::to_string(&app.node_selector)
             .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
-        sqlx::query(
-            "INSERT INTO applications (id, topology_id, node_selector, image_name, chart, namespace, \"values\", status, release_name, created_at, updated_at) 
+        // Log attempt to insert application (help debug missing persistence)
+        tracing::info!("DB:create_application - id={}, topology_id={}, has_values={}",
+            app.id, app.topology_id, app.values.is_some());
+
+        if let Some(vals) = &app.values {
+            match serde_json::to_string(vals) {
+                Ok(s) => tracing::debug!("DB:create_application - values serialized (len={})", s.len()),
+                Err(e) => tracing::warn!("DB:create_application - failed serializing values: {}", e),
+            }
+        }
+
+        let res = sqlx::query(
+            "INSERT INTO applications (id, topology_id, node_selector, image_name, chart, namespace, envvalues, status, release_name, created_at, updated_at) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(app.id.to_string())
@@ -264,23 +279,32 @@ impl Database {
         .bind(&app.image_name)
         .bind(&app.image_name) // Keep chart for backward compatibility
         .bind(&app.namespace)
-        .bind(app.values.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()))
+                .bind(app.values.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()))
         .bind(app.status.to_string())
         .bind(&app.release_name)
         .bind(app.created_at.to_rfc3339())
         .bind(app.updated_at.to_rfc3339())
         .execute(&self.pool)
-        .await?;
+        .await;
 
-        Ok(())
+        match res {
+            Ok(_) => {
+                tracing::info!("DB:create_application - insert successful: id={}", app.id);
+                Ok(())
+            }
+            Err(e) => {
+                tracing::error!("DB:create_application - insert failed: {}", e);
+                Err(e)
+            }
+        }
     }
 
     /// Get an application by ID
     pub async fn get_application(&self, id: &str) -> Result<Option<Application>, sqlx::Error> {
-        let row: Option<ApplicationRow> = sqlx::query_as(
-              "SELECT id, topology_id, node_selector, image_name, chart, namespace, \"values\", status, release_name, created_at, updated_at 
+          let row: Option<ApplicationRow> = sqlx::query_as(
+              "SELECT id, topology_id, node_selector, image_name, chart, namespace, envvalues, status, release_name, created_at, updated_at 
              FROM applications WHERE id = ?",
-        )
+          )
         .bind(id)
         .fetch_optional(&self.pool)
         .await?;
@@ -290,10 +314,10 @@ impl Database {
 
     /// List all applications for a topology
     pub async fn list_applications(&self, topology_id: &str) -> Result<Vec<Application>, sqlx::Error> {
-        let rows: Vec<ApplicationRow> = sqlx::query_as(
-              "SELECT id, topology_id, node_selector, image_name, chart, namespace, \"values\", status, release_name, created_at, updated_at 
+          let rows: Vec<ApplicationRow> = sqlx::query_as(
+              "SELECT id, topology_id, node_selector, image_name, chart, namespace, envvalues, status, release_name, created_at, updated_at 
              FROM applications WHERE topology_id = ? ORDER BY created_at",
-        )
+          )
         .bind(topology_id)
         .fetch_all(&self.pool)
         .await?;
@@ -303,10 +327,10 @@ impl Database {
 
     /// List all applications for a specific node
     pub async fn list_applications_by_node(&self, node_id: &str) -> Result<Vec<Application>, sqlx::Error> {
-        let rows: Vec<ApplicationRow> = sqlx::query_as(
-              "SELECT id, topology_id, node_selector, image_name, chart, namespace, \"values\", status, release_name, created_at, updated_at 
+          let rows: Vec<ApplicationRow> = sqlx::query_as(
+              "SELECT id, topology_id, node_selector, image_name, chart, namespace, envvalues, status, release_name, created_at, updated_at 
              FROM applications WHERE node_selector LIKE ? ORDER BY created_at",
-        )
+          )
         .bind(format!("%\"{}\"", node_id))
         .fetch_all(&self.pool)
         .await?;
@@ -346,7 +370,7 @@ impl Database {
                 image_name = ?,
                 chart = ?,
                 namespace = ?,
-                \"values\" = ?,
+                envvalues = ?,
                 status = ?,
                 release_name = ?,
                 updated_at = ?
@@ -360,7 +384,7 @@ impl Database {
         .bind(app.status.to_string())
         .bind(&app.release_name)
         .bind(app.updated_at.to_rfc3339())
-        .bind(&app.id)
+        .bind(app.id.to_string())
         .execute(&self.pool)
         .await?;
 
@@ -450,7 +474,7 @@ impl Database {
             _ => AppStatus::Pending,
         };
 
-        let values = if let Some(values_str) = row.values {
+        let values = if let Some(values_str) = row.envvalues {
             Some(serde_json::from_str(&values_str).map_err(|e| sqlx::Error::Decode(Box::new(e)))?)
         } else {
             None

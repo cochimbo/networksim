@@ -29,6 +29,10 @@ impl From<&ChaosType> for ChaosAction {
             ChaosType::Corrupt => ChaosAction::Corrupt,
             ChaosType::Duplicate => ChaosAction::Duplicate,
             ChaosType::Partition => ChaosAction::Partition,
+            // Non-NetworkChaos types don't have a ChaosAction - should use create_chaos_manifest instead
+            ChaosType::StressCpu | ChaosType::PodKill | ChaosType::IoDelay | ChaosType::HttpAbort => {
+                panic!("ChaosAction only applies to NetworkChaos types")
+            }
         }
     }
 }
@@ -112,6 +116,46 @@ pub struct DuplicateSpec {
     pub correlation: Option<String>,
 }
 
+/// Create a chaos manifest based on type (dispatches to specific builders)
+#[allow(clippy::too_many_arguments)]
+pub fn create_chaos_manifest(
+    name: &str,
+    namespace: &str,
+    topology_id: &str,
+    source_node_id: &str,
+    target_node_id: Option<&str>,
+    chaos_type: &ChaosType,
+    direction: &ChaosDirection,
+    duration: Option<&str>,
+    params: &serde_json::Value,
+) -> serde_json::Value {
+    match chaos_type.crd_kind() {
+        ChaosCrdKind::NetworkChaos => create_network_chaos(
+            name,
+            namespace,
+            topology_id,
+            source_node_id,
+            target_node_id,
+            chaos_type,
+            direction,
+            duration,
+            params,
+        ),
+        ChaosCrdKind::StressChaos => create_stress_chaos(
+            name, namespace, topology_id, source_node_id, duration, params,
+        ),
+        ChaosCrdKind::PodChaos => create_pod_chaos(
+            name, namespace, topology_id, source_node_id, duration, params,
+        ),
+        ChaosCrdKind::IOChaos => create_io_chaos(
+            name, namespace, topology_id, source_node_id, duration, params,
+        ),
+        ChaosCrdKind::HTTPChaos => create_http_chaos(
+            name, namespace, topology_id, source_node_id, duration, params,
+        ),
+    }
+}
+
 /// Create a NetworkChaos manifest
 #[allow(clippy::too_many_arguments)]
 pub fn create_network_chaos(
@@ -132,6 +176,8 @@ pub fn create_network_chaos(
         ChaosType::Corrupt => "corrupt",
         ChaosType::Duplicate => "duplicate",
         ChaosType::Partition => "partition",
+        // Non-network types should use create_chaos_manifest dispatcher
+        _ => panic!("Invalid chaos type for NetworkChaos: {:?}", chaos_type),
     };
 
     // Source selector
@@ -260,12 +306,250 @@ pub fn create_network_chaos(
                 "loss": "100"
             });
         }
+        // Non-NetworkChaos types are handled by their own builders
+        ChaosType::StressCpu | ChaosType::PodKill | ChaosType::IoDelay | ChaosType::HttpAbort => {
+            unreachable!("Non-NetworkChaos types should use create_chaos_manifest")
+        }
     }
 
     // Build the full NetworkChaos resource
     json!({
         "apiVersion": "chaos-mesh.org/v1alpha1",
         "kind": "NetworkChaos",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app.kubernetes.io/managed-by": "networksim",
+                "networksim.io/topology": topology_id,
+                "networksim.io/chaos": "true"
+            }
+        },
+        "spec": spec
+    })
+}
+
+// ============================================================================
+// New Chaos Type Builders
+// ============================================================================
+
+/// Create a StressChaos manifest for CPU stress
+pub fn create_stress_chaos(
+    name: &str,
+    namespace: &str,
+    topology_id: &str,
+    node_id: &str,
+    duration: Option<&str>,
+    params: &serde_json::Value,
+) -> serde_json::Value {
+    let stress_params: StressCpuParams =
+        serde_json::from_value(params.clone()).unwrap_or_default();
+
+    let workers = stress_params.workers.unwrap_or(1);
+    let load = stress_params.load.unwrap_or(80);
+
+    let mut source_labels = BTreeMap::new();
+    source_labels.insert(
+        "networksim.io/topology".to_string(),
+        topology_id.to_string(),
+    );
+    source_labels.insert("networksim.io/node".to_string(), node_id.to_string());
+
+    let mut spec = json!({
+        "mode": "all",
+        "selector": {
+            "namespaces": [namespace],
+            "labelSelectors": source_labels
+        },
+        "stressors": {
+            "cpu": {
+                "workers": workers,
+                "load": load
+            }
+        }
+    });
+
+    if let Some(dur) = duration {
+        spec["duration"] = json!(dur);
+    }
+
+    json!({
+        "apiVersion": "chaos-mesh.org/v1alpha1",
+        "kind": "StressChaos",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app.kubernetes.io/managed-by": "networksim",
+                "networksim.io/topology": topology_id,
+                "networksim.io/chaos": "true"
+            }
+        },
+        "spec": spec
+    })
+}
+
+/// Create a PodChaos manifest for pod-kill action
+pub fn create_pod_chaos(
+    name: &str,
+    namespace: &str,
+    topology_id: &str,
+    node_id: &str,
+    duration: Option<&str>,
+    params: &serde_json::Value,
+) -> serde_json::Value {
+    let pod_params: PodKillParams = serde_json::from_value(params.clone()).unwrap_or_default();
+
+    let mut source_labels = BTreeMap::new();
+    source_labels.insert(
+        "networksim.io/topology".to_string(),
+        topology_id.to_string(),
+    );
+    source_labels.insert("networksim.io/node".to_string(), node_id.to_string());
+
+    let mut spec = json!({
+        "action": "pod-kill",
+        "mode": "all",
+        "selector": {
+            "namespaces": [namespace],
+            "labelSelectors": source_labels
+        }
+    });
+
+    if let Some(grace) = pod_params.grace_period {
+        spec["gracePeriod"] = json!(grace);
+    }
+
+    if let Some(dur) = duration {
+        spec["duration"] = json!(dur);
+    }
+
+    json!({
+        "apiVersion": "chaos-mesh.org/v1alpha1",
+        "kind": "PodChaos",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app.kubernetes.io/managed-by": "networksim",
+                "networksim.io/topology": topology_id,
+                "networksim.io/chaos": "true"
+            }
+        },
+        "spec": spec
+    })
+}
+
+/// Create an IOChaos manifest for I/O delay
+pub fn create_io_chaos(
+    name: &str,
+    namespace: &str,
+    topology_id: &str,
+    node_id: &str,
+    duration: Option<&str>,
+    params: &serde_json::Value,
+) -> serde_json::Value {
+    let io_params: IoDelayParams = serde_json::from_value(params.clone()).unwrap_or_else(|_| {
+        IoDelayParams {
+            delay: "100ms".to_string(),
+            path: None,
+            percent: None,
+            methods: None,
+        }
+    });
+
+    let mut source_labels = BTreeMap::new();
+    source_labels.insert(
+        "networksim.io/topology".to_string(),
+        topology_id.to_string(),
+    );
+    source_labels.insert("networksim.io/node".to_string(), node_id.to_string());
+
+    let mut spec = json!({
+        "action": "latency",
+        "mode": "all",
+        "selector": {
+            "namespaces": [namespace],
+            "labelSelectors": source_labels
+        },
+        "delay": io_params.delay,
+        "path": io_params.path.unwrap_or_else(|| "/".to_string()),
+        "percent": io_params.percent.unwrap_or(100),
+        "volumePath": "/",
+    });
+
+    if let Some(methods) = io_params.methods {
+        spec["methods"] = json!(methods);
+    }
+
+    if let Some(dur) = duration {
+        spec["duration"] = json!(dur);
+    }
+
+    json!({
+        "apiVersion": "chaos-mesh.org/v1alpha1",
+        "kind": "IOChaos",
+        "metadata": {
+            "name": name,
+            "namespace": namespace,
+            "labels": {
+                "app.kubernetes.io/managed-by": "networksim",
+                "networksim.io/topology": topology_id,
+                "networksim.io/chaos": "true"
+            }
+        },
+        "spec": spec
+    })
+}
+
+/// Create an HTTPChaos manifest for HTTP abort
+pub fn create_http_chaos(
+    name: &str,
+    namespace: &str,
+    topology_id: &str,
+    node_id: &str,
+    duration: Option<&str>,
+    params: &serde_json::Value,
+) -> serde_json::Value {
+    let http_params: HttpAbortParams = serde_json::from_value(params.clone()).unwrap_or_default();
+
+    let mut source_labels = BTreeMap::new();
+    source_labels.insert(
+        "networksim.io/topology".to_string(),
+        topology_id.to_string(),
+    );
+    source_labels.insert("networksim.io/node".to_string(), node_id.to_string());
+
+    let mut spec = json!({
+        "mode": "all",
+        "selector": {
+            "namespaces": [namespace],
+            "labelSelectors": source_labels
+        },
+        "target": "Request",
+        "abort": true,
+        "code": http_params.code.unwrap_or(500)
+    });
+
+    if let Some(method) = http_params.method {
+        spec["method"] = json!(method);
+    }
+
+    if let Some(path) = http_params.path {
+        spec["path"] = json!(path);
+    }
+
+    if let Some(port) = http_params.port {
+        spec["port"] = json!(port);
+    }
+
+    if let Some(dur) = duration {
+        spec["duration"] = json!(dur);
+    }
+
+    json!({
+        "apiVersion": "chaos-mesh.org/v1alpha1",
+        "kind": "HTTPChaos",
         "metadata": {
             "name": name,
             "namespace": namespace,

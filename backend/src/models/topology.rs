@@ -48,7 +48,7 @@ pub struct NodeConfig {
 /// Environment variable
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnvVar {
-    // pub name: String, // Eliminado
+    pub name: String,
     pub value: String,
 }
 

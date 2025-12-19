@@ -1,14 +1,38 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     Json,
 };
 use chrono::Utc;
+use serde::Deserialize;
 use sqlx::FromRow;
 use uuid::Uuid;
 
 use crate::api::{AppState, Event};
 use crate::error::{AppError, AppResult};
 use crate::models::{CreateTopologyRequest, Topology, UpdateTopologyRequest};
+
+/// Optional pagination parameters
+#[derive(Debug, Deserialize)]
+pub struct OptionalPaginationParams {
+    /// Page number (1-indexed)
+    pub page: Option<u32>,
+    /// Items per page (max: 100)
+    pub per_page: Option<u32>,
+}
+
+/// Paginated response for topologies
+#[derive(Debug, serde::Serialize)]
+pub struct PaginatedTopologies {
+    pub items: Vec<Topology>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub per_page: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_pages: Option<u32>,
+}
 
 #[derive(FromRow)]
 struct TopologyRow {
@@ -20,13 +44,44 @@ struct TopologyRow {
     updated_at: String,
 }
 
-/// List all topologies
-pub async fn list(State(state): State<AppState>) -> AppResult<Json<Vec<Topology>>> {
-    let rows: Vec<TopologyRow> = sqlx::query_as(
-        "SELECT id, name, description, data, created_at, updated_at FROM topologies ORDER BY updated_at DESC"
+/// List all topologies with optional pagination
+#[utoipa::path(
+    get,
+    path = "/api/topologies",
+    tag = "topologies",
+    params(
+        ("page" = Option<u32>, Query, description = "Page number (1-indexed)"),
+        ("per_page" = Option<u32>, Query, description = "Items per page (max 100)")
+    ),
+    responses(
+        (status = 200, description = "List of all topologies", body = Vec<super::openapi::TopologySchema>),
+        (status = 500, description = "Internal server error")
     )
-    .fetch_all(state.db.pool())
-    .await?;
+)]
+pub async fn list(
+    State(state): State<AppState>,
+    Query(params): Query<OptionalPaginationParams>,
+) -> AppResult<Json<Vec<Topology>>> {
+    let rows: Vec<TopologyRow> = if let (Some(page), Some(per_page)) = (params.page, params.per_page) {
+        // Pagination requested
+        let per_page = per_page.min(100);
+        let offset = ((page.saturating_sub(1)) as i64) * (per_page as i64);
+
+        sqlx::query_as(
+            "SELECT id, name, description, data, created_at, updated_at FROM topologies ORDER BY updated_at DESC LIMIT ? OFFSET ?"
+        )
+        .bind(per_page as i64)
+        .bind(offset)
+        .fetch_all(state.db.pool())
+        .await?
+    } else {
+        // No pagination - return all
+        sqlx::query_as(
+            "SELECT id, name, description, data, created_at, updated_at FROM topologies ORDER BY updated_at DESC"
+        )
+        .fetch_all(state.db.pool())
+        .await?
+    };
 
     let topologies: Vec<Topology> = rows
         .into_iter()
@@ -48,6 +103,17 @@ pub async fn list(State(state): State<AppState>) -> AppResult<Json<Vec<Topology>
 }
 
 /// Create a new topology
+#[utoipa::path(
+    post,
+    path = "/api/topologies",
+    tag = "topologies",
+    request_body = super::openapi::CreateTopologyRequest,
+    responses(
+        (status = 200, description = "Topology created successfully", body = super::openapi::TopologySchema),
+        (status = 400, description = "Invalid topology data"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn create(
     State(state): State<AppState>,
     Json(req): Json<CreateTopologyRequest>,
@@ -94,6 +160,19 @@ pub async fn create(
 }
 
 /// Get a topology by ID
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{id}",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Topology found", body = super::openapi::TopologySchema),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn get(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -129,6 +208,20 @@ pub async fn get(
 }
 
 /// Update a topology
+#[utoipa::path(
+    put,
+    path = "/api/topologies/{id}",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    request_body = super::openapi::UpdateTopologyRequest,
+    responses(
+        (status = 200, description = "Topology updated", body = super::openapi::TopologySchema),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 #[axum::debug_handler]
 pub async fn update(
     State(state): State<AppState>,
@@ -177,6 +270,19 @@ pub async fn update(
 }
 
 /// Delete a topology
+#[utoipa::path(
+    delete,
+    path = "/api/topologies/{id}",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Topology deleted"),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<String>,

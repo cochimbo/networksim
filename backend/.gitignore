@@ -3,3 +3,6 @@ target/
 Cargo.lock
 *.db
 sqlite::memory:
+
+# Ignorar cualquier variante de networksim.db, incluyendo parámetros como ?mode=rwc
+networksim.db*

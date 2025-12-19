@@ -4,11 +4,12 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::api::AppState;
+use crate::api::{AppState, Event};
 use crate::error::{AppError, AppResult};
 use crate::helm::types::DeployAppRequest;
 use crate::k8s::{DeploymentManager, DeploymentState};
 use crate::models::Application;
+use serde::Deserialize;
 
 /// Deploy an application to a node
 pub async fn deploy(
@@ -17,7 +18,7 @@ pub async fn deploy(
     Json(request): Json<DeployAppRequest>,
 ) -> AppResult<Json<Application>> {
     tracing::info!("🚀 ===== STARTING APPLICATION DEPLOYMENT =====");
-    tracing::info!("📋 Request details: topology_id={}, node_id={}, image={}, values={:?}",
+    tracing::info!("📋 Request details: topology_id={}, node_id={}, image={}, envvalues={:?}",
                    topology_id, node_id, request.chart, request.values);
 
     let k8s = state.k8s.as_ref().ok_or_else(|| {
@@ -28,7 +29,7 @@ pub async fn deploy(
 
     // Create application record
     let app_id = Uuid::new_v4();
-    let deployment_name = format!("app-{}-{}", app_id.simple(), node_id);
+    let deployment_name = crate::k8s::resources::make_deployment_name(&app_id.simple().to_string(), &node_id);
     let namespace = k8s.namespace().to_string();
 
     tracing::info!("🆔 Generated application ID: {}", app_id);
@@ -166,7 +167,7 @@ pub async fn uninstall_application_by_id(
     } else {
         // Update status back to deployed if uninstall partially failed
         state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&app.release_name)).await?;
-        Err(format!("Partial uninstall failure: {}", uninstall_errors.join(", ")).into())
+            Err(format!("Partial uninstall failure: {}", uninstall_errors.join(", ")).into())
     }
 }
 
@@ -190,7 +191,7 @@ pub async fn uninstall(
     // For each node, delete the corresponding deployment
     let mut uninstall_errors = Vec::new();
     for node_id in &app.node_selector {
-        let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+        let deployment_name = crate::k8s::resources::make_deployment_name(&app.id.simple().to_string(), node_id);
         match k8s.delete_deployment(&deployment_name).await {
             Ok(_) => {
                 tracing::info!("✅ Deployment {} deleted successfully", deployment_name);
@@ -209,13 +210,21 @@ pub async fn uninstall(
     }
 
     if uninstall_errors.is_empty() {
+        let topology_id_str = app.topology_id.to_string();
         state.db.delete_application(&app_id.to_string()).await?;
+
+        // Broadcast app uninstalled event
+        let _ = state.event_tx.send(Event::AppUninstalled {
+            topology_id: topology_id_str,
+            app_id: app_id.to_string(),
+        });
+
         Ok(Json(serde_json::json!({
             "message": format!("Application {} uninstalled successfully", app_id)
         })))
     } else {
         state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&app.release_name)).await?;
-        Err(AppError::internal(&format!("Partial uninstall failure: {}", uninstall_errors.join(", "))).into())
+        Err(AppError::internal(&format!("Partial uninstall failure: {}", uninstall_errors.join(", "))))
     }
 }
 
@@ -292,7 +301,7 @@ pub async fn logs(
     }
 
     if all_logs.is_empty() && !errors.is_empty() {
-        return Err(AppError::internal(&format!("Failed to get application logs: {}", errors.join(", "))).into());
+        return Err(AppError::internal(&format!("Failed to get application logs: {}", errors.join(", "))));
     }
 
     let combined_logs = all_logs.join("\n");
@@ -314,7 +323,7 @@ pub async fn deploy_topology(
 
     // Validate node_selector is not empty
     if request.node_selector.is_empty() {
-        return Err(AppError::BadRequest("node_selector cannot be empty".to_string()).into());
+        return Err(AppError::BadRequest("node_selector cannot be empty".to_string()));
     }
 
     // Check if topology is deployed by verifying pods exist for all selected nodes
@@ -338,7 +347,7 @@ pub async fn deploy_topology(
                 }
                 Err(e) => {
                     tracing::error!("❌ Pod {} not found for node {}: {}", pod_name, node_id, e);
-                    return Err(AppError::BadRequest(format!("Cannot deploy application: pod for node '{}' does not exist. Please ensure the topology is deployed and all nodes are running.", node_id)).into());
+                    return Err(AppError::BadRequest(format!("Cannot deploy application: pod for node '{}' does not exist. Please ensure the topology is deployed and all nodes are running.", node_id)));
                 }
             }
         }
@@ -354,7 +363,7 @@ pub async fn deploy_topology(
         
         for node_id in &request.node_selector {
             if !existing_node_ids.contains(node_id) {
-                return Err(AppError::BadRequest(format!("Node '{}' does not exist in topology", node_id)).into());
+                return Err(AppError::BadRequest(format!("Node '{}' does not exist in topology", node_id)));
             }
         }
         tracing::info!("✅ All selected nodes exist in topology definition, scheduling application for deployment");
@@ -423,7 +432,14 @@ pub async fn deploy_topology(
         if deployment_errors.is_empty() {
             state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&release_name)).await?;
             tracing::info!("✅ Topology-wide application deployment completed successfully");
-            
+
+            // Broadcast app deployed event
+            let _ = state.event_tx.send(Event::AppDeployed {
+                topology_id: topology_id.to_string(),
+                app_id: app.id.to_string(),
+                image: app.image_name.clone(),
+            });
+
             // Return the application with updated status
             let updated_app = state.db.get_application(&app.id.to_string()).await?
                 .ok_or_else(|| AppError::internal("Failed to retrieve updated application"))?;
@@ -431,12 +447,76 @@ pub async fn deploy_topology(
         } else {
             state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Failed, Some(&release_name)).await?;
             tracing::error!("❌ Application deployment failed with {} errors", deployment_errors.len());
-            Err(AppError::internal(&format!("Deployment failed: {}", deployment_errors.join(", "))).into())
+            Err(AppError::internal(&format!("Deployment failed: {}", deployment_errors.join(", "))))
         }
     } else {
         tracing::info!("📅 Application scheduled for deployment when topology is started");
         Ok(Json(app))
     }
+}
+
+/// Create an application draft (save values/env without attempting k8s deployment)
+pub async fn create_draft(
+    State(state): State<AppState>,
+    Path(topology_id): Path<Uuid>,
+    Json(request): Json<DeployAppRequest>,
+) -> AppResult<Json<Application>> {
+    tracing::info!("create_draft - topology={}, chart={}, node_selector_len={}, envvalues_present={}",
+        topology_id, request.chart, request.node_selector.len(), request.values.is_some());
+
+    let app_id = Uuid::new_v4();
+    let release_name = format!("app-{}", app_id.simple());
+    let namespace = "networksim-sim".to_string();
+
+    let app = Application {
+        id: app_id,
+        topology_id,
+        node_selector: request.node_selector.clone(),
+        image_name: request.chart.clone(),
+        namespace: namespace.clone(),
+        values: request.values.clone(),
+        status: crate::models::AppStatus::Pending,
+        release_name: release_name.clone(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+
+    match state.db.create_application(&app).await {
+        Ok(_) => {
+            tracing::info!("create_draft - saved application draft id={}", app.id);
+            Ok(Json(app))
+        }
+        Err(e) => {
+            tracing::error!("create_draft - failed to save draft: {}", e);
+            Err(e.into())
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateAppValuesRequest {
+    #[serde(rename = "envvalues")]
+    pub values: Option<serde_json::Value>,
+}
+
+/// Update an existing application's values (env, etc.)
+pub async fn update_application(
+    State(state): State<AppState>,
+    Path((topology_id, app_id)): Path<(Uuid, Uuid)>,
+    Json(request): Json<UpdateAppValuesRequest>,
+) -> AppResult<Json<Application>> {
+    tracing::info!("update_application - topology={}, app_id={}, has_envvalues={}", topology_id, app_id, request.values.is_some());
+
+    let mut app = state.db.get_application(&app_id.to_string()).await?
+        .ok_or_else(|| AppError::NotFound(format!("Application {} not found", app_id)))?;
+
+    app.values = request.values.clone();
+    app.updated_at = chrono::Utc::now();
+
+    state.db.update_application(&app).await?;
+
+    tracing::info!("update_application - updated app {}", app.id);
+    Ok(Json(app))
 }
 
 /// Deploy application as sidecar to a specific node
@@ -451,7 +531,7 @@ pub async fn deploy_application_to_node(
     // Create a separate deployment for the application
     use crate::k8s::resources::create_application_deployment;
     
-    let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+    let deployment_name = crate::k8s::resources::make_deployment_name(&app.id.simple().to_string(), node_id);
     
     // Check if deployment already exists
     if k8s.deployment_exists(&deployment_name, "networksim-sim").await? {
@@ -511,7 +591,7 @@ pub async fn status(
     let mut all_running = true;
 
     for node_id in &app.node_selector {
-        let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+        let deployment_name = crate::k8s::resources::make_deployment_name(&app.id.simple().to_string(), node_id);
         match k8s.check_deployment_ready(&deployment_name, "networksim-sim").await {
             Ok(is_ready) => {
                 node_statuses.push(serde_json::json!({

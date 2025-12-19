@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ChaosType {
+    // ---- NetworkChaos types ----
     /// Network latency/delay
     Delay,
     /// Packet loss
@@ -19,6 +20,19 @@ pub enum ChaosType {
     Duplicate,
     /// Network partition (complete disconnect)
     Partition,
+    // ---- New chaos types ----
+    /// CPU stress (StressChaos)
+    #[serde(rename = "stress-cpu")]
+    StressCpu,
+    /// Pod kill (PodChaos)
+    #[serde(rename = "pod-kill")]
+    PodKill,
+    /// I/O delay (IOChaos)
+    #[serde(rename = "io-delay")]
+    IoDelay,
+    /// HTTP abort (HTTPChaos)
+    #[serde(rename = "http-abort")]
+    HttpAbort,
 }
 
 impl std::fmt::Display for ChaosType {
@@ -30,7 +44,49 @@ impl std::fmt::Display for ChaosType {
             ChaosType::Corrupt => write!(f, "corrupt"),
             ChaosType::Duplicate => write!(f, "duplicate"),
             ChaosType::Partition => write!(f, "partition"),
+            ChaosType::StressCpu => write!(f, "stress-cpu"),
+            ChaosType::PodKill => write!(f, "pod-kill"),
+            ChaosType::IoDelay => write!(f, "io-delay"),
+            ChaosType::HttpAbort => write!(f, "http-abort"),
         }
+    }
+}
+
+/// Kind of Chaos Mesh CRD to use
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChaosCrdKind {
+    NetworkChaos,
+    StressChaos,
+    PodChaos,
+    IOChaos,
+    HTTPChaos,
+}
+
+impl ChaosType {
+    /// Returns the CRD kind for this chaos type
+    pub fn crd_kind(&self) -> ChaosCrdKind {
+        match self {
+            ChaosType::Delay
+            | ChaosType::Loss
+            | ChaosType::Bandwidth
+            | ChaosType::Corrupt
+            | ChaosType::Duplicate
+            | ChaosType::Partition => ChaosCrdKind::NetworkChaos,
+            ChaosType::StressCpu => ChaosCrdKind::StressChaos,
+            ChaosType::PodKill => ChaosCrdKind::PodChaos,
+            ChaosType::IoDelay => ChaosCrdKind::IOChaos,
+            ChaosType::HttpAbort => ChaosCrdKind::HTTPChaos,
+        }
+    }
+
+    /// Returns true if this chaos type requires a target node (NetworkChaos types)
+    pub fn requires_target(&self) -> bool {
+        matches!(self.crd_kind(), ChaosCrdKind::NetworkChaos)
+    }
+
+    /// Returns true if this is a network-based chaos type
+    pub fn is_network_chaos(&self) -> bool {
+        matches!(self.crd_kind(), ChaosCrdKind::NetworkChaos)
     }
 }
 
@@ -90,17 +146,77 @@ pub struct DuplicateParams {
     pub correlation: Option<String>,
 }
 
+// ---- New chaos type parameters ----
+
+/// Parameters for CPU stress (StressChaos)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StressCpuParams {
+    /// Number of CPU stress workers
+    #[serde(default)]
+    pub workers: Option<u32>,
+    /// CPU load percentage (0-100)
+    #[serde(default)]
+    pub load: Option<u32>,
+}
+
+/// Parameters for pod kill (PodChaos)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PodKillParams {
+    /// Grace period in seconds before killing
+    #[serde(default)]
+    pub grace_period: Option<i64>,
+}
+
+/// Parameters for I/O delay (IOChaos)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct IoDelayParams {
+    /// Delay to add to I/O operations (e.g., "100ms")
+    pub delay: String,
+    /// Path to affect (default: "/")
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Percentage of operations to delay (0-100)
+    #[serde(default)]
+    pub percent: Option<u32>,
+    /// I/O methods to affect (read, write, etc.)
+    #[serde(default)]
+    pub methods: Option<Vec<String>>,
+}
+
+/// Parameters for HTTP abort (HTTPChaos)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HttpAbortParams {
+    /// HTTP status code to return (e.g., 500, 429)
+    #[serde(default)]
+    pub code: Option<u16>,
+    /// HTTP method to match (GET, POST, etc.)
+    #[serde(default)]
+    pub method: Option<String>,
+    /// Path pattern to match (e.g., "/api/*")
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Port to intercept
+    #[serde(default)]
+    pub port: Option<u16>,
+}
+
 /// Union of all chaos parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 #[derive(Default)]
 pub enum ChaosParams {
+    // NetworkChaos params
     Delay(DelayParams),
     Loss(LossParams),
     Bandwidth(BandwidthParams),
     Corrupt(CorruptParams),
     Duplicate(DuplicateParams),
-    /// Empty for partition
+    // New chaos type params
+    StressCpu(StressCpuParams),
+    PodKill(PodKillParams),
+    IoDelay(IoDelayParams),
+    HttpAbort(HttpAbortParams),
+    /// Empty for partition and other types without params
     #[default]
     None,
 }

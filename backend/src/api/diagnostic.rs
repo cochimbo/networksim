@@ -111,6 +111,20 @@ pub struct ContainerPort {
 /// Run network diagnostic for a deployed topology
 ///
 /// GET /api/topologies/:id/diagnostic
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{id}/diagnostic",
+    tag = "tests",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Diagnostic report", body = super::openapi::DiagnosticReportSchema),
+        (status = 400, description = "No pods deployed for this topology"),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn run_diagnostic(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -346,13 +360,13 @@ async fn test_pod_connectivity(
 ) -> (ConnectivityStatus, Option<f64>) {
     use k8s_openapi::api::core::v1::Pod;
     use kube::api::{Api, AttachParams};
-    use tokio::io::AsyncWriteExt;
+    use tokio::io::AsyncReadExt;
 
     let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
 
     // Try to exec into the pod and test connectivity
     let ap = AttachParams {
-        stdin: true,
+        stdin: false,
         stdout: true,
         stderr: true,
         tty: false,
@@ -371,23 +385,40 @@ async fn test_pod_connectivity(
 
     match pods.exec(from_pod, command, &ap).await {
         Ok(mut attached) => {
-            // Close stdin
-            if let Some(mut stdin) = attached.stdin() {
-                let _ = stdin.shutdown().await;
-            }
-
-            // Read stdout
+            // Read all stdout with timeout
             let mut stdout_str = String::new();
             if let Some(mut stdout) = attached.stdout() {
-                use tokio::io::AsyncReadExt;
-                let mut buf = [0u8; 256];
-                if let Ok(n) = stdout.read(&mut buf).await {
-                    stdout_str = String::from_utf8_lossy(&buf[..n]).to_string();
+                let mut buf = Vec::new();
+                // Read with timeout
+                let read_result = tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    stdout.read_to_end(&mut buf)
+                ).await;
+
+                if let Ok(Ok(_)) = read_result {
+                    stdout_str = String::from_utf8_lossy(&buf).to_string();
                 }
             }
 
+            // Also try stderr if stdout is empty
+            if stdout_str.is_empty() {
+                if let Some(mut stderr) = attached.stderr() {
+                    let mut buf = Vec::new();
+                    let _ = tokio::time::timeout(
+                        std::time::Duration::from_secs(2),
+                        stderr.read_to_end(&mut buf)
+                    ).await;
+                    let stderr_str = String::from_utf8_lossy(&buf).to_string();
+                    if stderr_str.contains("OK") {
+                        stdout_str = stderr_str;
+                    }
+                }
+            }
+
+            // Wait for the process to complete
+            let _ = attached.join().await;
+
             if stdout_str.contains("OK") {
-                // Could measure latency here with more sophisticated ping parsing
                 (ConnectivityStatus::Connected, Some(1.0))
             } else {
                 (ConnectivityStatus::Blocked, None)
@@ -576,4 +607,413 @@ pub async fn get_node_containers(
     }
 
     Ok(Json(containers))
+}
+
+// ============================================================================
+// App-to-App Tests
+// ============================================================================
+
+/// Request for app-to-app connectivity test
+#[derive(Debug, Deserialize)]
+pub struct AppToAppTestRequest {
+    /// Source application ID
+    pub from_app_id: String,
+    /// Target application ID
+    pub to_app_id: String,
+    /// Test type: "http", "tcp", or "ping"
+    #[serde(default = "default_test_type")]
+    pub test_type: String,
+    /// Target port for TCP/HTTP tests (optional)
+    pub port: Option<u16>,
+    /// HTTP path for HTTP tests (default: "/")
+    pub path: Option<String>,
+    /// Timeout in seconds (default: 5)
+    #[serde(default = "default_timeout")]
+    pub timeout_secs: u32,
+}
+
+fn default_test_type() -> String {
+    "ping".to_string()
+}
+
+fn default_timeout() -> u32 {
+    5
+}
+
+/// Result of an app-to-app test
+#[derive(Debug, Serialize)]
+pub struct AppToAppTestResult {
+    pub from_app: AppTestInfo,
+    pub to_app: AppTestInfo,
+    pub test_type: String,
+    pub success: bool,
+    pub latency_ms: Option<f64>,
+    pub status_code: Option<u16>,
+    pub error: Option<String>,
+    pub chaos_affecting: Vec<ChaosAffectingResult>,
+}
+
+/// App information in test result
+#[derive(Debug, Serialize)]
+pub struct AppTestInfo {
+    pub app_id: String,
+    pub app_name: String,
+    pub node_id: String,
+    pub node_name: String,
+    pub pod_ip: Option<String>,
+}
+
+/// Chaos condition affecting this test
+#[derive(Debug, Serialize)]
+pub struct ChaosAffectingResult {
+    pub condition_id: String,
+    pub chaos_type: String,
+    pub status: String,
+    pub impact: String, // "outbound" or "inbound"
+}
+
+/// Run an app-to-app connectivity test
+///
+/// POST /api/v1/topologies/:id/tests/app-to-app
+#[utoipa::path(
+    post,
+    path = "/api/v1/topologies/{id}/tests/app-to-app",
+    tag = "tests",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Test result"),
+        (status = 400, description = "Invalid test parameters"),
+        (status = 404, description = "Application not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn run_app_to_app_test(
+    State(state): State<AppState>,
+    Path(topology_id): Path<String>,
+    Json(request): Json<AppToAppTestRequest>,
+) -> AppResult<Json<AppToAppTestResult>> {
+    info!(
+        "Running app-to-app test: {} -> {} ({})",
+        request.from_app_id, request.to_app_id, request.test_type
+    );
+
+    // Get K8s client
+    let k8s = state
+        .k8s
+        .as_ref()
+        .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
+
+    // Get topology for node names
+    let topology = state
+        .db
+        .get_topology(&topology_id)
+        .await?
+        .ok_or_else(|| AppError::not_found(&format!("Topology {} not found", topology_id)))?;
+
+    let node_names: HashMap<String, String> = topology
+        .nodes
+        .iter()
+        .map(|n| (n.id.clone(), n.name.clone()))
+        .collect();
+
+    // Get source and target applications
+    let from_app = state
+        .db
+        .get_application(&request.from_app_id)
+        .await?
+        .ok_or_else(|| AppError::not_found(&format!("Source app {} not found", request.from_app_id)))?;
+
+    let to_app = state
+        .db
+        .get_application(&request.to_app_id)
+        .await?
+        .ok_or_else(|| AppError::not_found(&format!("Target app {} not found", request.to_app_id)))?;
+
+    // Verify apps belong to the topology
+    if from_app.topology_id.to_string() != topology_id || to_app.topology_id.to_string() != topology_id {
+        return Err(AppError::bad_request("Apps must belong to the specified topology"));
+    }
+
+    // Get pod info for both apps
+    let client: &Client = k8s.inner();
+    let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
+
+    // Get source app pod
+    let from_node_id = from_app.node_selector.first()
+        .ok_or_else(|| AppError::bad_request("Source app has no node selector"))?;
+    let from_deployment = crate::k8s::resources::make_deployment_name(&from_app.id.simple().to_string(), from_node_id);
+
+    let from_pod = get_pod_for_deployment(&pods, &from_deployment).await?;
+    let from_pod_ip = from_pod.status.as_ref()
+        .and_then(|s| s.pod_ip.clone());
+
+    // Get target app pod
+    let to_node_id = to_app.node_selector.first()
+        .ok_or_else(|| AppError::bad_request("Target app has no node selector"))?;
+    let to_deployment = crate::k8s::resources::make_deployment_name(&to_app.id.simple().to_string(), to_node_id);
+
+    let to_pod = get_pod_for_deployment(&pods, &to_deployment).await?;
+    let to_pod_ip = to_pod.status.as_ref()
+        .and_then(|s| s.pod_ip.clone())
+        .ok_or_else(|| AppError::internal("Target pod has no IP"))?;
+
+    // Get chaos conditions affecting this test
+    let chaos_conditions = state.db.list_chaos_conditions(&topology_id).await?;
+    let mut chaos_affecting = Vec::new();
+
+    for cond in &chaos_conditions {
+        // Check if source node is affected (outbound)
+        if cond.source_node_id == *from_node_id {
+            let affects_target = cond.target_node_id.as_ref()
+                .map(|t| t == to_node_id)
+                .unwrap_or(true); // No target means all traffic affected
+            if affects_target {
+                chaos_affecting.push(ChaosAffectingResult {
+                    condition_id: cond.id.clone(),
+                    chaos_type: format!("{:?}", cond.chaos_type).to_lowercase(),
+                    status: format!("{:?}", cond.status).to_lowercase(),
+                    impact: "outbound".to_string(),
+                });
+            }
+        }
+        // Check if target node is affected (inbound to target)
+        if cond.source_node_id == *to_node_id {
+            let affects_source = cond.target_node_id.as_ref()
+                .map(|t| t == from_node_id)
+                .unwrap_or(true);
+            if affects_source {
+                chaos_affecting.push(ChaosAffectingResult {
+                    condition_id: cond.id.clone(),
+                    chaos_type: format!("{:?}", cond.chaos_type).to_lowercase(),
+                    status: format!("{:?}", cond.status).to_lowercase(),
+                    impact: "inbound".to_string(),
+                });
+            }
+        }
+    }
+
+    // Run the test
+    let from_pod_name = from_pod.metadata.name.clone().unwrap_or_default();
+    let (success, latency_ms, status_code, error) = match request.test_type.as_str() {
+        "http" => {
+            let port = request.port.unwrap_or(80);
+            let path = request.path.as_deref().unwrap_or("/");
+            run_http_test(client, &from_pod_name, &to_pod_ip, port, path, request.timeout_secs).await
+        }
+        "tcp" => {
+            let port = request.port.ok_or_else(|| AppError::bad_request("Port required for TCP test"))?;
+            run_tcp_test(client, &from_pod_name, &to_pod_ip, port, request.timeout_secs).await
+        }
+        "ping" => {
+            run_ping_test(client, &from_pod_name, &to_pod_ip, request.timeout_secs).await
+        }
+        _ => {
+            // Default to ping for unknown types (preserve previous behavior)
+            run_ping_test(client, &from_pod_name, &to_pod_ip, request.timeout_secs).await
+        }
+    };
+
+    Ok(Json(AppToAppTestResult {
+        from_app: AppTestInfo {
+            app_id: from_app.id.to_string(),
+            app_name: from_app.image_name.clone(),
+            node_id: from_node_id.clone(),
+            node_name: node_names.get(from_node_id).cloned().unwrap_or_default(),
+            pod_ip: from_pod_ip,
+        },
+        to_app: AppTestInfo {
+            app_id: to_app.id.to_string(),
+            app_name: to_app.image_name.clone(),
+            node_id: to_node_id.clone(),
+            node_name: node_names.get(to_node_id).cloned().unwrap_or_default(),
+            pod_ip: Some(to_pod_ip),
+        },
+        test_type: request.test_type,
+        success,
+        latency_ms,
+        status_code,
+        error,
+        chaos_affecting,
+    }))
+}
+
+/// Get a pod from a deployment
+async fn get_pod_for_deployment(pods: &Api<Pod>, deployment_name: &str) -> Result<Pod, AppError> {
+    let label_selector = format!("app.kubernetes.io/instance={}", deployment_name);
+    let pod_list = pods
+        .list(&kube::api::ListParams::default().labels(&label_selector))
+        .await
+        .map_err(|e| AppError::internal(&format!("Failed to list pods: {}", e)))?;
+
+    pod_list.items.into_iter().next()
+        .ok_or_else(|| AppError::not_found(&format!("No pod found for deployment {}", deployment_name)))
+}
+
+/// Run HTTP connectivity test
+async fn run_http_test(
+    client: &Client,
+    from_pod: &str,
+    to_ip: &str,
+    port: u16,
+    path: &str,
+    timeout_secs: u32,
+) -> (bool, Option<f64>, Option<u16>, Option<String>) {
+    use kube::api::{Api, AttachParams};
+    use tokio::io::AsyncReadExt;
+
+    let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
+    let ap = AttachParams {
+        stdin: false,
+        stdout: true,
+        stderr: true,
+        tty: false,
+        ..Default::default()
+    };
+
+    // Use wget to test HTTP (more commonly available than curl in minimal containers)
+    let command = vec![
+        "sh".to_string(),
+        "-c".to_string(),
+        format!(
+            "start=$(date +%s%N); wget -q -O /dev/null -T {} --spider http://{}:{}{} 2>&1 && echo \"OK $(( ($(date +%s%N) - $start) / 1000000 ))\" || echo \"FAIL\"",
+            timeout_secs, to_ip, port, path
+        ),
+    ];
+
+    match pods.exec(from_pod, command, &ap).await {
+        Ok(mut attached) => {
+            let mut stdout_str = String::new();
+            if let Some(mut stdout) = attached.stdout() {
+                let mut buf = Vec::new();
+                let _ = tokio::time::timeout(
+                    std::time::Duration::from_secs(timeout_secs as u64 + 2),
+                    stdout.read_to_end(&mut buf)
+                ).await;
+                stdout_str = String::from_utf8_lossy(&buf).to_string();
+            }
+            let _ = attached.join().await;
+
+            if stdout_str.contains("OK") {
+                let latency = stdout_str.split_whitespace()
+                    .last()
+                    .and_then(|s| s.parse::<f64>().ok());
+                (true, latency, Some(200), None)
+            } else {
+                (false, None, None, Some("HTTP request failed".to_string()))
+            }
+        }
+        Err(e) => (false, None, None, Some(format!("Exec failed: {}", e))),
+    }
+}
+
+/// Run TCP connectivity test
+async fn run_tcp_test(
+    client: &Client,
+    from_pod: &str,
+    to_ip: &str,
+    port: u16,
+    timeout_secs: u32,
+) -> (bool, Option<f64>, Option<u16>, Option<String>) {
+    use kube::api::{Api, AttachParams};
+    use tokio::io::AsyncReadExt;
+
+    let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
+    let ap = AttachParams {
+        stdin: false,
+        stdout: true,
+        stderr: true,
+        tty: false,
+        ..Default::default()
+    };
+
+    // Use nc (netcat) to test TCP connection
+    let command = vec![
+        "sh".to_string(),
+        "-c".to_string(),
+        format!(
+            "start=$(date +%s%N); nc -z -w {} {} {} && echo \"OK $(( ($(date +%s%N) - $start) / 1000000 ))\" || echo \"FAIL\"",
+            timeout_secs, to_ip, port
+        ),
+    ];
+
+    match pods.exec(from_pod, command, &ap).await {
+        Ok(mut attached) => {
+            let mut stdout_str = String::new();
+            if let Some(mut stdout) = attached.stdout() {
+                let mut buf = Vec::new();
+                let _ = tokio::time::timeout(
+                    std::time::Duration::from_secs(timeout_secs as u64 + 2),
+                    stdout.read_to_end(&mut buf)
+                ).await;
+                stdout_str = String::from_utf8_lossy(&buf).to_string();
+            }
+            let _ = attached.join().await;
+
+            if stdout_str.contains("OK") {
+                let latency = stdout_str.split_whitespace()
+                    .last()
+                    .and_then(|s| s.parse::<f64>().ok());
+                (true, latency, None, None)
+            } else {
+                (false, None, None, Some(format!("TCP connection to port {} failed", port)))
+            }
+        }
+        Err(e) => (false, None, None, Some(format!("Exec failed: {}", e))),
+    }
+}
+
+/// Run ping connectivity test
+async fn run_ping_test(
+    client: &Client,
+    from_pod: &str,
+    to_ip: &str,
+    timeout_secs: u32,
+) -> (bool, Option<f64>, Option<u16>, Option<String>) {
+    use kube::api::{Api, AttachParams};
+    use tokio::io::AsyncReadExt;
+
+    let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
+    let ap = AttachParams {
+        stdin: false,
+        stdout: true,
+        stderr: true,
+        tty: false,
+        ..Default::default()
+    };
+
+    let command = vec![
+        "sh".to_string(),
+        "-c".to_string(),
+        format!(
+            "ping -c 3 -W {} {} 2>&1 | sed -n 's/.*time=\\([0-9.]*\\).*/\\1/p' | awk '{{sum+=$1; count++}} END {{if(count>0) print \"OK \" sum/count; else print \"FAIL\"}}'",
+            timeout_secs, to_ip
+        ),
+    ];
+
+    match pods.exec(from_pod, command, &ap).await {
+        Ok(mut attached) => {
+            let mut stdout_str = String::new();
+            if let Some(mut stdout) = attached.stdout() {
+                let mut buf = Vec::new();
+                let _ = tokio::time::timeout(
+                    std::time::Duration::from_secs(timeout_secs as u64 + 5),
+                    stdout.read_to_end(&mut buf)
+                ).await;
+                stdout_str = String::from_utf8_lossy(&buf).to_string();
+            }
+            let _ = attached.join().await;
+
+            if stdout_str.contains("OK") {
+                let latency = stdout_str.split_whitespace()
+                    .last()
+                    .and_then(|s| s.parse::<f64>().ok());
+                (true, latency, None, None)
+            } else {
+                (false, None, None, Some("Ping failed".to_string()))
+            }
+        }
+        Err(e) => (false, None, None, Some(format!("Exec failed: {}", e))),
+    }
 }

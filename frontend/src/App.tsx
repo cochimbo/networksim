@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-
 import Layout from './components/Layout';
 import TopologyList from './pages/TopologyList';
 import TopologyEditor from './pages/TopologyEditor';
+import Settings from './pages/Settings';
+import Scenarios from './pages/Scenarios';
 
 // Wrapper to provide key based on route param
 function TopologyEditorWithKey() {
@@ -18,6 +20,8 @@ function App() {
           <Route path="topologies" element={<TopologyList />} />
           <Route path="topologies/new" element={<TopologyEditorWithKey />} />
           <Route path="topologies/:id" element={<TopologyEditorWithKey />} />
+          <Route path="scenarios" element={<Scenarios />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>

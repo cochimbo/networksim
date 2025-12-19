@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Play, Trash2, Package } from 'lucide-react';
 import { applicationsApi, DeployAppRequest, AppRuntimeStatus } from '../services/api';
 import envIcon from '../assets/icons/env-icon.png';
+import { SkeletonList } from './Skeleton';
 import './ApplicationsPanel.css';
 
 interface ApplicationsPanelProps {
@@ -68,7 +69,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
   const [deployForm, setDeployForm] = useState<any>({
     chart: '',
     node_selector: selectedNode ? [selectedNode.id] : [],
-    values: {},
+    envvalues: {},
   });
   // Eliminado: const [logs, setLogs] = useState<string>('');
   const [chartValidationError, setChartValidationError] = useState<string>('');
@@ -87,7 +88,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
   }, [selectedNode]);
 
   // Query para obtener aplicaciones de la topología
-  const { data: applications = [] } = useQuery({
+  const { data: applications = [], isLoading: isLoadingApps } = useQuery({
     queryKey: ['applications', topologyId],
     queryFn: () => applicationsApi.listByTopology(topologyId),
     refetchInterval: isTopologyDeployed ? 5000 : false, // Refetch cada 5 segundos cuando la topología está desplegada
@@ -135,7 +136,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
       setDeployForm({
         chart: '',
         node_selector: [],
-        values: {},
+        envvalues: {},
       });
       // Recargar estados de runtime después de un pequeño delay para que la DB se actualice
       setTimeout(reloadAllAppStatuses, 1000);
@@ -172,7 +173,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
     const deployPayload = {
       chart: deployForm.chart,
       node_selector: deployForm.node_selector,
-      values: deployForm.values && Object.keys(deployForm.values).length > 0 ? deployForm.values : undefined
+      envvalues: deployForm.envvalues && Object.keys(deployForm.envvalues).length > 0 ? deployForm.envvalues : undefined
     };
     // eslint-disable-next-line no-console
     console.log('Deploy payload:', deployPayload);
@@ -236,7 +237,9 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
         {deleteError && (
           <div className="mb-2 text-red-600 text-sm font-semibold">{deleteError}</div>
         )}
-        {(selectedNode ? applications.filter(app => app.node_selector.includes(selectedNode.id)) : applications).length === 0 ? (
+        {isLoadingApps ? (
+          <SkeletonList count={3} />
+        ) : (selectedNode ? applications.filter(app => app.node_selector.includes(selectedNode.id)) : applications).length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>{selectedNode ? `No applications on ${selectedNode.name}` : 'No applications configured'}</p>
@@ -267,7 +270,37 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                     </div>
                     <div className="flex gap-1">
                       <button
-                        onClick={() => setShowEnvEditor({ appId: app.id, env: [] })}
+                        onClick={async () => {
+                          if (isTopologyDeployed) return;
+                          console.log('ApplicationsPanel: opening EnvVarsEditor, fetching latest app', { topologyId, appId: app.id });
+                          try {
+                            const freshApp = await applicationsApi.get(topologyId, app.id);
+                            console.log('ApplicationsPanel: fetched app for EnvVarsEditor', { appId: app.id, envvalues: freshApp.envvalues, values: (freshApp as any).values });
+                            const rawEnv = freshApp.envvalues || (freshApp as any).values;
+                            let envList: Array<{ name: string; value: string }> = [];
+                            if (Array.isArray(rawEnv?.env)) {
+                              envList = rawEnv.env;
+                            } else if (Array.isArray(rawEnv)) {
+                              envList = rawEnv;
+                            } else if (rawEnv && typeof rawEnv === 'object') {
+                              envList = Object.entries(rawEnv).map(([k, v]) => ({ name: k, value: v == null ? '' : String(v) }));
+                            }
+                            console.log('ApplicationsPanel: normalized env for editor', { appId: app.id, envList });
+                            setShowEnvEditor({ appId: app.id, env: envList });
+                          } catch (e) {
+                            console.error('ApplicationsPanel: Failed to fetch app before opening env editor, falling back to cached values', e);
+                            const fallbackRaw = app.envvalues || (app as any).values;
+                            let fallbackList: Array<{ name: string; value: string }> = [];
+                            if (Array.isArray(fallbackRaw?.env)) {
+                              fallbackList = fallbackRaw.env;
+                            } else if (Array.isArray(fallbackRaw)) {
+                              fallbackList = fallbackRaw;
+                            } else if (fallbackRaw && typeof fallbackRaw === 'object') {
+                              fallbackList = Object.entries(fallbackRaw).map(([k, v]) => ({ name: k, value: v == null ? '' : String(v) }));
+                            }
+                            setShowEnvEditor({ appId: app.id, env: fallbackList });
+                          }
+                        }}
                         disabled={isTopologyDeployed}
                         className="p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         title={isTopologyDeployed ? "Cannot edit env vars while topology is deployed" : "Editar variables de entorno"}
@@ -302,8 +335,22 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
         {showEnvEditor && (
           <EnvVarsEditor
             initialVars={showEnvEditor.env}
-            onSave={(_vars) => {
-              // Aquí deberías guardar las variables en el backend o en el estado de la app
+            onSave={async (vars) => {
+              console.log('ApplicationsPanel: saving env for app', showEnvEditor.appId, vars);
+              const payload = { env: vars };
+              console.log('ApplicationsPanel: PUT payload for updateAppValues', payload);
+              try {
+                // Call backend to update app envvalues (send array inside object)
+                const res = await applicationsApi.updateAppValues(topologyId, showEnvEditor.appId, payload);
+                console.log('ApplicationsPanel: updateAppValues success', res);
+                // Invalidate applications list so UI reflects persisted changes
+                queryClient.invalidateQueries({ queryKey: ['applications', topologyId] });
+                // Also refresh runtime statuses after a short delay
+                setTimeout(reloadAllAppStatuses, 500);
+              } catch (e:any) {
+                console.error('ApplicationsPanel: updateAppValues failed', e);
+                alert('No se pudo guardar las variables en la aplicación: ' + (e?.message || e));
+              }
               setShowEnvEditor(null);
             }}
             onClose={() => setShowEnvEditor(null)}

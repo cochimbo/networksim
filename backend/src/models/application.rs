@@ -60,6 +60,7 @@ pub struct CreateApplication {
     pub chart_type: Option<String>, // 'predefined' or 'custom', defaults to 'predefined'
     pub version: Option<String>,
     // namespace is now fixed to the simulation namespace for network policies to work
+    #[serde(rename = "envvalues")]
     pub values: Option<serde_json::Value>,
 }
 
@@ -67,5 +68,6 @@ pub struct CreateApplication {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateApplication {
     pub status: Option<AppStatus>,
+    #[serde(rename = "envvalues")]
     pub values: Option<serde_json::Value>,
 }

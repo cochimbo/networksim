@@ -12,6 +12,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    strictPort: true,
     host: true,
     proxy: {
       '/api': {
@@ -23,5 +24,9 @@ export default defineConfig({
         ws: true,
       },
     },
+  },
+  build: {
+    // increase chunk size warning limit to avoid noisy warnings during CI/local builds
+    chunkSizeWarningLimit: 2000,
   },
 });

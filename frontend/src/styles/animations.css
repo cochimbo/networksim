@@ -1,0 +1,315 @@
+/* ============================================
+   Toast Animations
+   ============================================ */
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-right {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out forwards;
+}
+
+.animate-slide-out-right {
+  animation: slide-out-right 0.3s ease-in forwards;
+}
+
+/* ============================================
+   Pulse Animations for Status Indicators
+   ============================================ */
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ============================================
+   Network Packet Animations (for Cytoscape overlay)
+   ============================================ */
+
+@keyframes packet-flow {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes packet-flow-reverse {
+  0% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+}
+
+.packet {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.packet-normal {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+.packet-delayed {
+  background: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+  animation-duration: 3s !important; /* Slower for delay visualization */
+}
+
+.packet-lost {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+  animation: packet-flow 1s ease-in-out forwards, packet-fade-out 0.3s ease-out 0.5s forwards;
+}
+
+@keyframes packet-fade-out {
+  to {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+/* ============================================
+   Chaos Effect Animations
+   ============================================ */
+
+@keyframes chaos-pulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.3);
+  }
+}
+
+@keyframes chaos-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes partition-flash {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.chaos-active {
+  animation: chaos-pulse 2s ease-in-out infinite;
+}
+
+.chaos-partition-active {
+  animation: partition-flash 1s ease-in-out infinite;
+}
+
+/* ============================================
+   Loading Animations
+   ============================================ */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+
+.animate-bounce-slow {
+  animation: bounce 2s ease-in-out infinite;
+}
+
+/* ============================================
+   Metric Bar Animations
+   ============================================ */
+
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+.animate-bar-grow {
+  animation: bar-grow 0.5s ease-out forwards;
+}
+
+/* ============================================
+   Success/Error Flash
+   ============================================ */
+
+@keyframes flash-green {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(34, 197, 94, 0.2);
+  }
+}
+
+@keyframes flash-red {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(239, 68, 68, 0.2);
+  }
+}
+
+.flash-success {
+  animation: flash-green 0.5s ease-out;
+}
+
+.flash-error {
+  animation: flash-red 0.5s ease-out;
+}
+
+/* ============================================
+   Dark Mode Transition
+   ============================================ */
+
+.dark-mode-transition {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* ============================================
+   Tooltip Animations
+   ============================================ */
+
+@keyframes tooltip-appear {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tooltip-animated {
+  animation: tooltip-appear 0.2s ease-out forwards;
+}
+
+/* ============================================
+   Connection Line Animations
+   ============================================ */
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.animated-dash {
+  stroke-dasharray: 10, 5;
+  animation: dash-flow 1s linear infinite;
+}
+
+/* ============================================
+   Card Hover Effects
+   ============================================ */
+
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   Ripple Effect
+   ============================================ */
+
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  animation: ripple 0.6s linear;
+  background-color: rgba(255, 255, 255, 0.5);
+}

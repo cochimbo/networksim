@@ -9,24 +9,39 @@ import {
   Node,
   Link,
   ChaosConditionStatus,
+  Application,
 } from '../services/api';
 import './ChaosPanel.css';
+import { AffectedAppsModal } from './AffectedAppsModal';
 
 interface ChaosPanelProps {
   topologyId: string;
   nodes: Node[];
   links: Link[];
+  applications?: Application[];
   onClose?: () => void;
 }
 
-const CHAOS_TYPES: { value: ChaosType; label: string; description: string }[] = [
-  { value: 'delay', label: 'Delay', description: 'Add latency to network traffic' },
-  { value: 'loss', label: 'Packet Loss', description: 'Drop a percentage of packets' },
-  { value: 'bandwidth', label: 'Bandwidth', description: 'Limit network bandwidth' },
-  { value: 'corrupt', label: 'Corrupt', description: 'Corrupt packet data' },
-  { value: 'duplicate', label: 'Duplicate', description: 'Duplicate packets' },
-  { value: 'partition', label: 'Partition', description: 'Complete network partition' },
+const CHAOS_TYPES: { value: ChaosType; label: string; description: string; category: 'network' | 'stress' | 'pod' | 'io' | 'http' }[] = [
+  // Network chaos types
+  { value: 'delay', label: 'Delay', description: 'Add latency to network traffic', category: 'network' },
+  { value: 'loss', label: 'Packet Loss', description: 'Drop a percentage of packets', category: 'network' },
+  { value: 'bandwidth', label: 'Bandwidth', description: 'Limit network bandwidth', category: 'network' },
+  { value: 'corrupt', label: 'Corrupt', description: 'Corrupt packet data', category: 'network' },
+  { value: 'duplicate', label: 'Duplicate', description: 'Duplicate packets', category: 'network' },
+  { value: 'partition', label: 'Partition', description: 'Complete network partition', category: 'network' },
+  // New chaos types
+  { value: 'stress-cpu', label: 'CPU Stress', description: 'Stress CPU on target pods', category: 'stress' },
+  { value: 'pod-kill', label: 'Pod Kill', description: 'Kill target pods', category: 'pod' },
+  { value: 'io-delay', label: 'I/O Delay', description: 'Add latency to disk I/O', category: 'io' },
+  { value: 'http-abort', label: 'HTTP Abort', description: 'Abort HTTP requests with error code', category: 'http' },
 ];
+
+// Helper to check if chaos type requires target node
+const chaosTypeRequiresTarget = (type: ChaosType): boolean => {
+  const networkTypes: ChaosType[] = ['delay', 'loss', 'bandwidth', 'corrupt', 'duplicate', 'partition'];
+  return networkTypes.includes(type);
+};
 
 const DIRECTIONS: { value: ChaosDirection; label: string }[] = [
   { value: 'to', label: 'Outgoing' },
@@ -40,7 +55,7 @@ const STATUS_LABELS: Record<ChaosConditionStatus, { label: string; color: string
   paused: { label: 'Paused', color: '#ff9800' },
 };
 
-export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: ChaosPanelProps) {
+export function ChaosPanel({ topologyId, nodes, links, applications = [], onClose: _onClose }: ChaosPanelProps) {
   const [conditions, setConditions] = useState<ChaosCondition[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +66,10 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
   const [editDuration, setEditDuration] = useState<string>('');
   const [editParams, setEditParams] = useState<Record<string, any>>({});
 
+  // State for confirmation modal
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState<CreateChaosRequest | null>(null);
+
   const queryClient = useQueryClient();
 
   // Form state
@@ -60,13 +79,21 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
   const [direction, setDirection] = useState<ChaosDirection>('to');
   const [duration, setDuration] = useState<string>('');
 
-  // Type-specific params
+  // Type-specific params (NetworkChaos)
   const [latency, setLatency] = useState('100ms');
   const [jitter, setJitter] = useState('20ms');
   const [lossPercent, setLossPercent] = useState('10');
   const [bandwidthRate, setBandwidthRate] = useState('1mbps');
   const [corruptPercent, setCorruptPercent] = useState('10');
   const [duplicatePercent, setDuplicatePercent] = useState('10');
+
+  // New chaos type params
+  const [cpuLoad, setCpuLoad] = useState(80);
+  const [cpuWorkers, setCpuWorkers] = useState(2);
+  const [gracePeriod, setGracePeriod] = useState(0);
+  const [ioDelay, setIoDelay] = useState('100ms');
+  const [ioPercent, setIoPercent] = useState(100);
+  const [httpCode, setHttpCode] = useState(500);
 
   useEffect(() => {
     fetchConditions();
@@ -94,12 +121,7 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('ChaosPanel handleSubmit called');
-    console.log('topologyId:', topologyId);
-    console.log('sourceNode:', sourceNode);
-    console.log('targetNode:', targetNode);
-    
+
     const params = buildParams();
     const request: CreateChaosRequest = {
       topology_id: topologyId,
@@ -111,12 +133,20 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
       params,
     };
 
-    console.log('Request to send:', request);
+    // Show confirmation modal with affected apps
+    setPendingRequest(request);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmCreate = async () => {
+    if (!pendingRequest) return;
 
     try {
       setLoading(true);
-      await chaosApi.create(request);
+      await chaosApi.create(pendingRequest);
       setShowForm(false);
+      setShowConfirmModal(false);
+      setPendingRequest(null);
       await fetchConditions();
       // Invalidate chaos conditions query in TopologyEditor
       queryClient.invalidateQueries({ queryKey: ['chaos-conditions', topologyId] });
@@ -127,6 +157,11 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelConfirm = () => {
+    setShowConfirmModal(false);
+    setPendingRequest(null);
   };
 
   const buildParams = () => {
@@ -143,6 +178,15 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
         return { duplicate: duplicatePercent };
       case 'partition':
         return {};
+      // New chaos types
+      case 'stress-cpu':
+        return { load: cpuLoad, workers: cpuWorkers };
+      case 'pod-kill':
+        return { grace_period: gracePeriod };
+      case 'io-delay':
+        return { delay: ioDelay, percent: ioPercent };
+      case 'http-abort':
+        return { code: httpCode };
       default:
         return {};
     }
@@ -319,6 +363,15 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
         return `${params.duplicate}%`;
       case 'partition':
         return 'Complete';
+      // New chaos types
+      case 'stress-cpu':
+        return `${params.load || 80}% load, ${params.workers || 1} workers`;
+      case 'pod-kill':
+        return `grace: ${params.grace_period || 0}s`;
+      case 'io-delay':
+        return `${params.delay || '100ms'} (${params.percent || 100}%)`;
+      case 'http-abort':
+        return `HTTP ${params.code || 500}`;
       default:
         return '';
     }
@@ -405,6 +458,103 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
           <p className="info-text">
             Network partition will completely disconnect the selected nodes.
           </p>
+        );
+      // New chaos types
+      case 'stress-cpu':
+        return (
+          <>
+            <div className="form-group">
+              <label>CPU Load (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={cpuLoad}
+                onChange={(e) => setCpuLoad(parseInt(e.target.value) || 0)}
+              />
+            </div>
+            <div className="form-group">
+              <label>Workers</label>
+              <input
+                type="number"
+                min="1"
+                max="32"
+                value={cpuWorkers}
+                onChange={(e) => setCpuWorkers(parseInt(e.target.value) || 1)}
+              />
+            </div>
+            <p className="info-text">
+              Stress CPU on target pods. Higher load and more workers = more stress.
+            </p>
+          </>
+        );
+      case 'pod-kill':
+        return (
+          <>
+            <div className="form-group">
+              <label>Grace Period (seconds)</label>
+              <input
+                type="number"
+                min="0"
+                value={gracePeriod}
+                onChange={(e) => setGracePeriod(parseInt(e.target.value) || 0)}
+              />
+            </div>
+            <p className="info-text">
+              Kill target pods. Set grace period to 0 for immediate termination.
+            </p>
+          </>
+        );
+      case 'io-delay':
+        return (
+          <>
+            <div className="form-group">
+              <label>I/O Delay</label>
+              <input
+                type="text"
+                value={ioDelay}
+                onChange={(e) => setIoDelay(e.target.value)}
+                placeholder="100ms"
+              />
+            </div>
+            <div className="form-group">
+              <label>Percent of operations</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={ioPercent}
+                onChange={(e) => setIoPercent(parseInt(e.target.value) || 100)}
+              />
+            </div>
+            <p className="info-text">
+              Add latency to disk I/O operations on target pods.
+            </p>
+          </>
+        );
+      case 'http-abort':
+        return (
+          <>
+            <div className="form-group">
+              <label>HTTP Status Code</label>
+              <select
+                value={httpCode}
+                onChange={(e) => setHttpCode(parseInt(e.target.value))}
+              >
+                <option value={500}>500 - Internal Server Error</option>
+                <option value={502}>502 - Bad Gateway</option>
+                <option value={503}>503 - Service Unavailable</option>
+                <option value={504}>504 - Gateway Timeout</option>
+                <option value={429}>429 - Too Many Requests</option>
+                <option value={400}>400 - Bad Request</option>
+                <option value={403}>403 - Forbidden</option>
+                <option value={404}>404 - Not Found</option>
+              </select>
+            </div>
+            <p className="info-text">
+              Abort HTTP requests and return the selected error code.
+            </p>
+          </>
         );
       default:
         return null;
@@ -628,37 +778,41 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label>Target Node (optional)</label>
-                  <select
-                    value={targetNode}
-                    onChange={(e) => setTargetNode(e.target.value)}
-                  >
-                    <option value="">All traffic</option>
-                    {getConnectedNodes(sourceNode)
-                      .map((n) => (
-                        <option key={n.id} value={n.id}>
-                          {n.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
+                {chaosTypeRequiresTarget(chaosType) && (
+                  <div className="form-group">
+                    <label>Target Node (optional)</label>
+                    <select
+                      value={targetNode}
+                      onChange={(e) => setTargetNode(e.target.value)}
+                    >
+                      <option value="">All traffic</option>
+                      {getConnectedNodes(sourceNode)
+                        .map((n) => (
+                          <option key={n.id} value={n.id}>
+                            {n.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="form-row">
-                <div className="form-group">
-                  <label>Direction</label>
-                  <select
-                    value={direction}
-                    onChange={(e) => setDirection(e.target.value as ChaosDirection)}
-                  >
-                    {DIRECTIONS.map((d) => (
-                      <option key={d.value} value={d.value}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {chaosTypeRequiresTarget(chaosType) && (
+                  <div className="form-group">
+                    <label>Direction</label>
+                    <select
+                      value={direction}
+                      onChange={(e) => setDirection(e.target.value as ChaosDirection)}
+                    >
+                      {DIRECTIONS.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label>Duration (optional)</label>
@@ -814,13 +968,13 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
               )}
             </div>
             <div className="modal-footer">
-              <button 
+              <button
                 className="btn-secondary"
                 onClick={() => setEditingCondition(null)}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="btn-primary"
                 onClick={handleEditSubmit}
                 disabled={loading}
@@ -830,6 +984,24 @@ export function ChaosPanel({ topologyId, nodes, links, onClose: _onClose }: Chao
             </div>
           </div>
         </div>
+      )}
+
+      {/* Affected Apps Confirmation Modal */}
+      {pendingRequest && (
+        <AffectedAppsModal
+          isOpen={showConfirmModal}
+          onClose={handleCancelConfirm}
+          onConfirm={handleConfirmCreate}
+          chaosType={pendingRequest.chaos_type}
+          sourceNodeId={pendingRequest.source_node_id}
+          sourceNodeName={getNodeName(pendingRequest.source_node_id)}
+          targetNodeId={pendingRequest.target_node_id}
+          targetNodeName={pendingRequest.target_node_id ? getNodeName(pendingRequest.target_node_id) : undefined}
+          params={pendingRequest.params || {}}
+          applications={applications}
+          nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+          isLoading={loading}
+        />
       )}
     </div>
   );

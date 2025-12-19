@@ -3,6 +3,7 @@ import { Network, Settings, PlayCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { ConnectionStatus } from './ConnectionStatus';
 import { ClusterStatus } from './ClusterStatus';
+import { ThemeToggle } from '../contexts/ThemeContext';
 
 const navigation = [
   { name: 'Topologies', href: '/topologies', icon: Network },
@@ -14,9 +15,9 @@ export default function Layout() {
   const location = useLocation();
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 dark-mode-transition">
       {/* Sidebar */}
-      <div className="w-64 bg-gray-900 text-white">
+      <div className="w-64 bg-gray-900 dark:bg-gray-950 text-white">
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 py-4 border-b border-gray-700">
           <Network className="h-8 w-8 text-primary-400" />
@@ -49,18 +50,19 @@ export default function Layout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-900">
+        <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between dark-mode-transition">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             {navigation.find((item) => location.pathname.startsWith(item.href))?.name || 'NetworkSim'}
           </h1>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <ClusterStatus />
             <ConnectionStatus />
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-6 dark-mode-transition">
           <Outlet />
         </main>
       </div>

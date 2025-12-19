@@ -2,6 +2,8 @@
 //!
 //! Functions to create Pod, Service, and NetworkPolicy specs from topology data
 
+#![allow(clippy::items_after_test_module)]
+
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{
     Container, ContainerPort, EnvVar, Pod, PodSpec, ResourceRequirements, Service, ServicePort,
@@ -141,7 +143,7 @@ fn build_env_vars(config: &NodeConfig, node_name: &str, topology_id: &str) -> Ve
     if let Some(custom_env) = &config.env {
         for env in custom_env {
             env_vars.push(EnvVar {
-                // name: env.name.clone(), // Eliminado si no existe en el modelo
+                name: env.name.clone(),
                 value: Some(env.value.clone()),
                 ..Default::default()
             });
@@ -527,15 +529,88 @@ pub fn create_application_container(app: &Application) -> Container {
 
     // Add custom values as environment variables if they exist
     if let Some(values) = &app.values {
-        if let Some(obj) = values.as_object() {
-            for (key, value) in obj {
-                if let Some(str_val) = value.as_str() {
+        // Build a set of existing env var NAMES to avoid overwriting defaults
+        let mut existing_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for ev in &env_vars {
+            existing_names.insert(ev.name.clone());
+        }
+
+        // Helper to sanitize and validate an env var name
+        let sanitize_name = |s: &str| -> String {
+            let mut out = s
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c.to_ascii_uppercase() } else { '_' })
+                .collect::<String>();
+            // If first char is a digit, prefix with '_'
+            if out.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                out = format!("_{}", out);
+            }
+            out
+        };
+
+        // Support multiple shapes coming from the frontend:
+        // - { "env": [ {"name":"FOO","value":"bar"}, ... ] }
+        // - [ {"name":"FOO","value":"bar"}, ... ]
+        // - { "FOO": "bar", ... }
+        if let Some(env_array) = values.get("env").and_then(|v| v.as_array()) {
+            for item in env_array {
+                let raw_name = item.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                let raw_value = item.get("value").and_then(|v| v.as_str()).unwrap_or("");
+                let name = sanitize_name(raw_name);
+                if name.is_empty() {
+                    tracing::warn!("Skipping env var with empty name in app {}", app.id);
+                    continue;
+                }
+                if existing_names.contains(&name) {
+                    tracing::info!("Skipping env var '{}' for app {} to avoid overwriting existing variable", name, app.id);
+                    continue;
+                }
+                existing_names.insert(name.clone());
+                env_vars.push(EnvVar {
+                    name,
+                    value: Some(raw_value.to_string()),
+                    ..Default::default()
+                });
+            }
+        } else if let Some(arr) = values.as_array() {
+            for item in arr {
+                if let Some(raw_name) = item.get("name").and_then(|n| n.as_str()) {
+                    let raw_value = item.get("value").and_then(|v| v.as_str()).unwrap_or("");
+                    let name = sanitize_name(raw_name);
+                    if name.is_empty() {
+                        tracing::warn!("Skipping env var with empty name in app {}", app.id);
+                        continue;
+                    }
+                    if existing_names.contains(&name) {
+                        tracing::info!("Skipping env var '{}' for app {} to avoid overwriting existing variable", name, app.id);
+                        continue;
+                    }
+                    existing_names.insert(name.clone());
                     env_vars.push(EnvVar {
-                        name: format!("APP_{}", key.to_uppercase()),
-                        value: Some(str_val.to_string()),
+                        name,
+                        value: Some(raw_value.to_string()),
                         ..Default::default()
                     });
                 }
+            }
+        } else if let Some(obj) = values.as_object() {
+            for (key, value) in obj {
+                let sval = if let Some(s) = value.as_str() { s.to_string() } else { value.to_string() };
+                let name = sanitize_name(key);
+                if name.is_empty() {
+                    tracing::warn!("Skipping env var with empty name (key='{}') in app {}", key, app.id);
+                    continue;
+                }
+                if existing_names.contains(&name) {
+                    tracing::info!("Skipping env var '{}' (from key='{}') for app {} to avoid overwriting existing variable", name, key, app.id);
+                    continue;
+                }
+                existing_names.insert(name.clone());
+                env_vars.push(EnvVar {
+                    name,
+                    value: Some(sval),
+                    ..Default::default()
+                });
             }
         }
     }
@@ -594,12 +669,14 @@ pub fn create_application_container(app: &Application) -> Container {
 pub fn create_application_deployment(app: &Application, node_id: &str, topology_id: &str) -> Deployment {
     use k8s_openapi::api::apps::v1::{DeploymentSpec, DeploymentStrategy};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
-    
-    let deployment_name = format!("app-{}-{}", app.id.simple(), node_id);
+    // Build a kubernetes-safe deployment name (max 63 chars)
+    let deployment_name = make_deployment_name(&app.id.simple().to_string(), node_id);
     
     let mut labels = BTreeMap::new();
     labels.insert("app.kubernetes.io/name".to_string(), app.image_name.replace(":", "-"));
     labels.insert("app.kubernetes.io/managed-by".to_string(), "networksim".to_string());
+    // Ensure the instance label is set so lookups by app.kubernetes.io/instance work
+    labels.insert("app.kubernetes.io/instance".to_string(), deployment_name.clone());
     labels.insert("networksim.io/topology".to_string(), topology_id.to_string());
     labels.insert("networksim.io/node".to_string(), node_id.to_string());
     labels.insert("networksim.io/application".to_string(), app.id.to_string());
@@ -644,5 +721,16 @@ pub fn create_application_deployment(app: &Application, node_id: &str, topology_
         },
         spec: Some(deployment_spec),
         ..Default::default()
+    }
+}
+
+/// Create a deployment name safe for Kubernetes label/value and resource name limits.
+/// It will lowercase the input and truncate to 63 characters if necessary.
+pub fn make_deployment_name(app_id_simple: &str, node_id: &str) -> String {
+    let name = format!("app-{}-{}", app_id_simple, node_id).to_lowercase();
+    if name.len() > 63 {
+        name[..63].to_string()
+    } else {
+        name
     }
 }

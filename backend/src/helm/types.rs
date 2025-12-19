@@ -22,6 +22,7 @@ pub struct Application {
     pub topology_id: Uuid,
     pub chart: String,
     pub namespace: String,
+    #[serde(rename = "envvalues")]
     pub values: Option<serde_json::Value>,
     pub status: AppStatus,
     pub release_name: String,
