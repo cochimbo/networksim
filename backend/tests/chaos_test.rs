@@ -4,7 +4,7 @@
 
 use serde_json::json;
 
-use networksim_backend::chaos::types::*;
+use networksim_backend::chaos::*;
 
 #[test]
 fn test_chaos_type_display() {
