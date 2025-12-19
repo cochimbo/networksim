@@ -25,4 +25,8 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // increase chunk size warning limit to avoid noisy warnings during CI/local builds
+    chunkSizeWarningLimit: 2000,
+  },
 });

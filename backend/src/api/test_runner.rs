@@ -422,8 +422,8 @@ async fn run_test_async(state: &AppState, topology_id: &str, test_id: &str, test
 
 /// Run diagnostic test (network connectivity)
 async fn run_diagnostic_test(
-    state: &AppState,
-    topology_id: &str,
+    _state: &AppState,
+    _topology_id: &str,
 ) -> Result<crate::api::diagnostic::DiagnosticReport, String> {
     // This would call the diagnostic module
     // For now, return a mock result
@@ -523,7 +523,7 @@ async fn run_chaos_validation_test(
 ) -> Result<SmokeTestReport, String> {
     let mut tests = Vec::new();
     let mut passed = 0;
-    let mut failed = 0;
+    let failed = 0;
 
     // Get active chaos conditions
     let conditions = state

@@ -84,6 +84,7 @@ pub struct NodeMetric {
     pub measured_at: DateTime<Utc>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, FromRow)]
 struct NodeMetricRow {
     id: i64,

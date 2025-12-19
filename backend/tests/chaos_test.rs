@@ -2,8 +2,6 @@
 //!
 //! These tests verify the chaos condition creation, validation, and management.
 
-use serde_json::json;
-
 use networksim_backend::chaos::*;
 
 #[test]
