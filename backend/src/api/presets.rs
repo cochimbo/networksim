@@ -233,7 +233,7 @@ pub async fn create_preset(
     State(state): State<AppState>,
     Json(request): Json<CreatePresetRequest>,
 ) -> AppResult<Json<ChaosPreset>> {
-    let id = format!("preset-{}", Uuid::new_v4().to_string()[..8].to_string());
+    let id = format!("preset-{}", &Uuid::new_v4().to_string()[..8]);
     let now = Utc::now();
     let params_str = serde_json::to_string(&request.params).unwrap_or_else(|_| "{}".to_string());
 

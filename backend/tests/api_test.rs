@@ -350,7 +350,7 @@ async fn test_topology_wide_app_deployment() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/topologies/{}/apps", topology_id))
+                .uri(format!("/api/topologies/{}/apps", topology_id))
                 .body(Body::empty())
                 .unwrap(),
         )

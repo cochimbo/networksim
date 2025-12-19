@@ -101,7 +101,7 @@ pub async fn deploy(
     sqlx::query(
         "INSERT OR REPLACE INTO deployments (id, topology_id, status, deploy_command_state, created_at, updated_at) VALUES (?, ?, 'pending', 'deploying', datetime('now'), datetime('now'))"
     )
-    .bind(&format!("deploy-{}", id))
+    .bind(format!("deploy-{}", id))
     .bind(&id)
     .execute(state.db.pool())
     .await
@@ -192,7 +192,7 @@ pub async fn destroy(
     if let Err(e) = sqlx::query(
         "INSERT OR REPLACE INTO deployments (id, topology_id, status, deploy_command_state, created_at, updated_at) VALUES (?, ?, 'stopped', 'stopped', datetime('now'), datetime('now'))"
     )
-    .bind(&format!("deploy-{}", id))
+    .bind(format!("deploy-{}", id))
     .bind(&id)
     .execute(state.db.pool())
     .await {

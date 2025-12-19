@@ -2,6 +2,8 @@
 //!
 //! Functions to create Pod, Service, and NetworkPolicy specs from topology data
 
+#![allow(clippy::items_after_test_module)]
+
 use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{
     Container, ContainerPort, EnvVar, Pod, PodSpec, ResourceRequirements, Service, ServicePort,

@@ -806,7 +806,11 @@ pub async fn run_app_to_app_test(
             let port = request.port.ok_or_else(|| AppError::bad_request("Port required for TCP test"))?;
             run_tcp_test(client, &from_pod_name, &to_pod_ip, port, request.timeout_secs).await
         }
-        "ping" | _ => {
+        "ping" => {
+            run_ping_test(client, &from_pod_name, &to_pod_ip, request.timeout_secs).await
+        }
+        _ => {
+            // Default to ping for unknown types (preserve previous behavior)
             run_ping_test(client, &from_pod_name, &to_pod_ip, request.timeout_secs).await
         }
     };

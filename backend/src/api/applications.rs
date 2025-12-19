@@ -167,7 +167,7 @@ pub async fn uninstall_application_by_id(
     } else {
         // Update status back to deployed if uninstall partially failed
         state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&app.release_name)).await?;
-        Err(format!("Partial uninstall failure: {}", uninstall_errors.join(", ")).into())
+            Err(format!("Partial uninstall failure: {}", uninstall_errors.join(", ")).into())
     }
 }
 
@@ -224,7 +224,7 @@ pub async fn uninstall(
         })))
     } else {
         state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Deployed, Some(&app.release_name)).await?;
-        Err(AppError::internal(&format!("Partial uninstall failure: {}", uninstall_errors.join(", "))).into())
+        Err(AppError::internal(&format!("Partial uninstall failure: {}", uninstall_errors.join(", "))))
     }
 }
 
@@ -301,7 +301,7 @@ pub async fn logs(
     }
 
     if all_logs.is_empty() && !errors.is_empty() {
-        return Err(AppError::internal(&format!("Failed to get application logs: {}", errors.join(", "))).into());
+        return Err(AppError::internal(&format!("Failed to get application logs: {}", errors.join(", "))));
     }
 
     let combined_logs = all_logs.join("\n");
@@ -323,7 +323,7 @@ pub async fn deploy_topology(
 
     // Validate node_selector is not empty
     if request.node_selector.is_empty() {
-        return Err(AppError::BadRequest("node_selector cannot be empty".to_string()).into());
+        return Err(AppError::BadRequest("node_selector cannot be empty".to_string()));
     }
 
     // Check if topology is deployed by verifying pods exist for all selected nodes
@@ -347,7 +347,7 @@ pub async fn deploy_topology(
                 }
                 Err(e) => {
                     tracing::error!("❌ Pod {} not found for node {}: {}", pod_name, node_id, e);
-                    return Err(AppError::BadRequest(format!("Cannot deploy application: pod for node '{}' does not exist. Please ensure the topology is deployed and all nodes are running.", node_id)).into());
+                    return Err(AppError::BadRequest(format!("Cannot deploy application: pod for node '{}' does not exist. Please ensure the topology is deployed and all nodes are running.", node_id)));
                 }
             }
         }
@@ -363,7 +363,7 @@ pub async fn deploy_topology(
         
         for node_id in &request.node_selector {
             if !existing_node_ids.contains(node_id) {
-                return Err(AppError::BadRequest(format!("Node '{}' does not exist in topology", node_id)).into());
+                return Err(AppError::BadRequest(format!("Node '{}' does not exist in topology", node_id)));
             }
         }
         tracing::info!("✅ All selected nodes exist in topology definition, scheduling application for deployment");
@@ -447,7 +447,7 @@ pub async fn deploy_topology(
         } else {
             state.db.update_application_status(&app.id.to_string(), &crate::models::AppStatus::Failed, Some(&release_name)).await?;
             tracing::error!("❌ Application deployment failed with {} errors", deployment_errors.len());
-            Err(AppError::internal(&format!("Deployment failed: {}", deployment_errors.join(", "))).into())
+            Err(AppError::internal(&format!("Deployment failed: {}", deployment_errors.join(", "))))
         }
     } else {
         tracing::info!("📅 Application scheduled for deployment when topology is started");

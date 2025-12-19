@@ -348,7 +348,7 @@ pub async fn get_live_metrics(
 
     let packet_loss_events = network_metrics
         .iter()
-        .filter(|m| m.packet_loss_percent.map_or(false, |p| p > 0.0))
+        .filter(|m| m.packet_loss_percent.is_some_and(|p| p > 0.0))
         .count();
 
     let total_pairs = network_metrics.len();

@@ -325,6 +325,7 @@ pub async fn event_stats(
 }
 
 /// Helper function to create an event (for use by other modules)
+#[allow(clippy::too_many_arguments)]
 pub async fn emit_event(
     state: &AppState,
     topology_id: Option<&str>,
