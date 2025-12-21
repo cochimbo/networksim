@@ -1,165 +1,250 @@
 # NetworkSim - Chaos Engineering Platform
 
-A network topology simulator with chaos engineering capabilities for Kubernetes.
+Plataforma de ingeniería del caos con editor visual de topologías para Kubernetes.
 
-## Features
+## Servicios y Puertos
 
-### Chaos Engineering
-| Category | Type | CRD | Description |
-|----------|------|-----|-------------|
-| Network | delay | NetworkChaos | Add latency to traffic |
-| Network | loss | NetworkChaos | Simulate packet loss |
-| Network | bandwidth | NetworkChaos | Limit bandwidth |
-| Network | corrupt | NetworkChaos | Corrupt packets |
-| Network | duplicate | NetworkChaos | Duplicate packets |
-| Network | partition | NetworkChaos | Network partition |
-| Stress | stress-cpu | StressChaos | CPU stress on pods |
-| Pod | pod-kill | PodChaos | Kill and restart pods |
-| I/O | io-delay | IOChaos | Disk I/O latency |
-| HTTP | http-abort | HTTPChaos | Abort HTTP requests |
+| Servicio | Puerto | URL |
+|----------|--------|-----|
+| Frontend (React) | 3000 | http://localhost:3000 |
+| Backend API (Rust) | 8080 | http://localhost:8080 |
+| Swagger UI | 8080 | http://localhost:8080/swagger-ui/ |
+| Health Check | 8080 | http://localhost:8080/health |
 
-### Topology Editor
-- Visual drag & drop with Cytoscape.js
-- Undo/Redo (Ctrl+Z / Ctrl+Shift+Z)
-- Node grouping with colors
-- Connection labels
-- Copy node, Snap to grid
-- 6 topology templates (Microservices, 3-Tier, Star, Ring, Mesh, Pipeline)
+## Requisitos
 
-### Application Deployment
-- Deploy any Docker image
-- Replicas (1-10)
-- Volumes (emptyDir, hostPath, configMap, secret)
-- Health checks (HTTP, TCP)
-- Resource limits (CPU/Memory)
-- Private registry support
+- Docker
+- K3s o K3d (cluster Kubernetes)
+- Chaos Mesh instalado en el cluster
+- Calico CNI (para NetworkPolicy)
+- Rust 1.70+
+- Node.js 18+
 
-### Monitoring
-- Live metrics (latency, packet loss)
-- Chaos countdown timer
-- Impact dashboard
-- Event timeline
-- Export reports (JSON, HTML)
+## Instalación
 
-## Quick Start
+### 1. Clonar el repositorio
 
 ```bash
-# Install dependencies and cluster
-./scripts/setup.sh
-
-# Start services
-./start.sh
-
-# URLs
-# Frontend: http://localhost:3000
-# Backend:  http://localhost:8080
-# Swagger:  http://localhost:8080/swagger-ui/
+git clone https://github.com/cochimbo/networksim.git
+cd networksim
 ```
 
-## Project Structure
+### 2. Configurar el cluster (si no existe)
+
+```bash
+# Instalación automática (Docker, K3d, Calico, Chaos Mesh)
+./scripts/setup.sh
+
+# O solo cluster sin dependencias del sistema
+./scripts/setup.sh --skip-deps
+```
+
+### 3. Compilar el backend
+
+```bash
+cd backend
+cargo build --release
+```
+
+### 4. Instalar dependencias del frontend
+
+```bash
+cd frontend
+npm install
+```
+
+## Ejecutar
+
+### Opción 1: Script de inicio
+
+```bash
+./start.sh          # Iniciar todo
+./start.sh restart  # Reiniciar
+./start.sh stop     # Detener
+./start.sh status   # Ver estado
+```
+
+### Opción 2: Manual
+
+```bash
+# Terminal 1 - Backend
+cd backend
+KUBECONFIG=/etc/rancher/k3s/k3s.yaml ./target/release/networksim-backend
+
+# Terminal 2 - Frontend
+cd frontend
+npm run dev
+```
+
+## Características
+
+### Chaos Engineering
+
+| Categoría | Tipo | CRD | Descripción |
+|-----------|------|-----|-------------|
+| Network | delay | NetworkChaos | Latencia en el tráfico |
+| Network | loss | NetworkChaos | Pérdida de paquetes |
+| Network | bandwidth | NetworkChaos | Limitar ancho de banda |
+| Network | corrupt | NetworkChaos | Corrupción de paquetes |
+| Network | duplicate | NetworkChaos | Duplicar paquetes |
+| Network | partition | NetworkChaos | Partición de red |
+| Stress | stress-cpu | StressChaos | Estrés de CPU en pods |
+| Pod | pod-kill | PodChaos | Matar y reiniciar pods |
+| I/O | io-delay | IOChaos | Latencia en disco |
+| HTTP | http-abort | HTTPChaos | Abortar peticiones HTTP |
+
+### Editor de Topologías
+
+- Editor visual drag & drop (Cytoscape.js)
+- Undo/Redo (Ctrl+Z / Ctrl+Shift+Z)
+- Agrupación de nodos por colores
+- Etiquetas en conexiones
+- Copiar nodo, Snap to grid
+- 6 plantillas predefinidas (Microservices, 3-Tier, Star, Ring, Mesh, Pipeline)
+
+### Despliegue de Aplicaciones
+
+- Desplegar cualquier imagen Docker
+- Réplicas (1-10)
+- Volúmenes (emptyDir, hostPath, configMap, secret)
+- Health checks (HTTP, TCP)
+- Límites de recursos (CPU/Memory)
+- Variables de entorno personalizadas
+
+### Monitorización
+
+- Métricas en tiempo real (latencia, pérdida de paquetes)
+- Temporizador de cuenta atrás para chaos
+- Dashboard de impacto
+- Timeline de eventos
+- Exportar informes (JSON, HTML)
+
+## Estructura del Proyecto
 
 ```
 networksim/
-├── backend/           # Rust API (Axum, SQLx, kube-rs)
-│   ├── src/api/       # REST endpoints
-│   ├── src/chaos/     # Chaos Mesh integration
-│   ├── src/k8s/       # Kubernetes client
-│   └── migrations/    # SQLite migrations
-├── frontend/          # React + TypeScript + Vite
-│   ├── src/pages/     # Main views
-│   ├── src/components/# UI components
-│   └── src/services/  # API client
-└── scripts/           # Setup utilities
+├── backend/                 # API en Rust (Axum)
+│   ├── src/
+│   │   ├── api/             # Endpoints REST
+│   │   ├── chaos/           # Integración Chaos Mesh
+│   │   ├── k8s/             # Cliente Kubernetes
+│   │   ├── db/              # Capa de base de datos
+│   │   └── models/          # Modelos de datos
+│   ├── migrations/          # Migraciones SQLite
+│   └── Cargo.toml
+├── frontend/                # UI en React + TypeScript
+│   ├── src/
+│   │   ├── pages/           # Vistas principales
+│   │   ├── components/      # Componentes UI
+│   │   └── services/        # Cliente API
+│   ├── package.json
+│   └── vite.config.ts
+├── scripts/                 # Scripts de utilidad
+│   ├── setup.sh             # Instalación del cluster
+│   └── start.sh             # Iniciar servicios
+└── docs/                    # Documentación adicional
 ```
 
 ## API Reference
 
-### Topologies
+### Topologías
 ```
-GET    /api/topologies              List (paginated)
-POST   /api/topologies              Create
-GET    /api/topologies/:id          Get
-PUT    /api/topologies/:id          Update
-DELETE /api/topologies/:id          Delete
-POST   /api/topologies/:id/deploy   Deploy to K8s
-DELETE /api/topologies/:id/undeploy Remove from K8s
-GET    /api/topologies/:id/status   Deployment status
+GET    /api/topologies                    Lista paginada
+POST   /api/topologies                    Crear topología
+GET    /api/topologies/:id                Obtener topología
+PUT    /api/topologies/:id                Actualizar
+DELETE /api/topologies/:id                Eliminar
+POST   /api/topologies/:id/deploy         Desplegar en K8s
+DELETE /api/topologies/:id/undeploy       Eliminar de K8s
+GET    /api/topologies/:id/status         Estado del despliegue
 ```
 
 ### Chaos
 ```
-GET    /api/topologies/:id/chaos              List conditions
-POST   /api/topologies/:id/chaos              Create condition
-POST   /api/topologies/:id/chaos/:cid/start   Start (activate)
-POST   /api/topologies/:id/chaos/:cid/stop    Stop (pause)
-PUT    /api/topologies/:id/chaos/:cid         Update
-DELETE /api/topologies/:id/chaos/:cid         Delete
-DELETE /api/topologies/:id/chaos              Delete all
+GET    /api/topologies/:id/chaos              Listar condiciones
+POST   /api/topologies/:id/chaos              Crear condición
+POST   /api/topologies/:id/chaos/:cid/start   Activar
+POST   /api/topologies/:id/chaos/:cid/stop    Pausar
+PUT    /api/topologies/:id/chaos/:cid         Actualizar
+DELETE /api/topologies/:id/chaos/:cid         Eliminar
+DELETE /api/topologies/:id/chaos              Eliminar todas
 ```
 
-### Applications
+### Aplicaciones
 ```
-GET    /api/topologies/:id/apps           List apps
-POST   /api/topologies/:id/nodes/:nid/apps Deploy to node
-GET    /api/topologies/:id/apps/:aid      Get app
-PUT    /api/topologies/:id/apps/:aid      Update app
-DELETE /api/topologies/:id/apps/:aid      Uninstall
-GET    /api/topologies/:id/apps/:aid/logs Logs
-```
-
-### Metrics & Tests
-```
-GET    /api/topologies/:id/metrics/live        Live metrics
-POST   /api/topologies/:id/tests/app-to-app    Connectivity test
-GET    /api/topologies/:id/diagnostic          Network diagnostic
+GET    /api/topologies/:id/apps               Listar apps
+POST   /api/topologies/:id/nodes/:nid/apps    Desplegar en nodo
+GET    /api/topologies/:id/apps/:aid          Obtener app
+PUT    /api/topologies/:id/apps/:aid          Actualizar
+DELETE /api/topologies/:id/apps/:aid          Desinstalar
+GET    /api/topologies/:id/apps/:aid/logs     Ver logs
 ```
 
-### Other
+### Métricas y Tests
 ```
-GET    /api/templates              Topology templates
-GET    /api/presets                Chaos presets
-GET    /api/reports/:id/json       Export JSON report
-GET    /api/reports/:id/html       Export HTML report
-GET    /health                     Health check
-GET    /api/cluster/status         Cluster status
+GET    /api/topologies/:id/metrics/live       Métricas en vivo
+POST   /api/topologies/:id/tests/app-to-app   Test de conectividad
+GET    /api/topologies/:id/diagnostic         Diagnóstico de red
 ```
 
-## Requirements
+### Otros
+```
+GET    /api/templates                   Plantillas de topología
+GET    /api/presets                     Presets de chaos
+GET    /api/reports/:id/json            Exportar JSON
+GET    /api/reports/:id/html            Exportar HTML
+GET    /health                          Health check
+GET    /api/cluster/status              Estado del cluster
+```
 
-- Docker
-- K3s/K3d cluster
-- Chaos Mesh
-- Calico CNI
-- Rust 1.70+
-- Node.js 18+
-
-## Useful Commands
+## Comandos Útiles
 
 ```bash
-# View pods
+# Ver pods desplegados
 kubectl get pods -n networksim-sim
 
-# View chaos resources
-kubectl get networkchaos,stresschaos,podchaos -n networksim-sim
+# Ver recursos de chaos
+kubectl get networkchaos,stresschaos,podchaos,iochaos,httpchaos -n networksim-sim
 
-# View logs
+# Ver network policies
+kubectl get networkpolicies -n networksim-sim
+
+# Ver logs del backend
 tail -f /tmp/backend.log
 
-# Restart services
-./start.sh restart
+# Limpiar recursos
+kubectl delete namespace networksim-sim
 ```
 
-## Tech Stack
+## Stack Tecnológico
 
-| Layer | Technology |
-|-------|------------|
+| Capa | Tecnología |
+|------|------------|
 | Frontend | React 18, TypeScript, Vite, TailwindCSS, Cytoscape.js |
-| Backend | Rust, Axum, SQLx, kube-rs, utoipa |
-| Database | SQLite |
-| Runtime | K3s |
+| Backend | Rust, Axum, SQLx, kube-rs, utoipa (OpenAPI) |
+| Base de datos | SQLite |
+| Runtime | K3s / K3d |
 | Chaos | Chaos Mesh |
 | CNI | Calico |
 
-## License
+## Solución de Problemas
+
+```bash
+# Ver puertos ocupados
+ss -tlnp | grep -E "3000|8080"
+
+# Matar procesos
+pkill -f "networksim-backend"
+pkill -f "vite"
+
+# Reiniciar cluster
+./scripts/setup.sh --uninstall
+./scripts/setup.sh --skip-deps
+
+# Verificar Chaos Mesh
+kubectl get pods -n chaos-mesh
+```
+
+## Licencia
 
 MIT

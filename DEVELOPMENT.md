@@ -1,135 +1,135 @@
-# NetworkSim - Chaos Engineering Platform
+# Guía de Desarrollo
 
-Network topology simulator with multi-CRD chaos engineering for K3s/Kubernetes.
+## Arquitectura
 
-## Quick Start
-```bash
-# Backend (port 8080)
-cd /home/ubuntuser/chaosmesh/backend
-KUBECONFIG=/etc/rancher/k3s/k3s.yaml ./target/release/networksim-backend
+### Backend (Rust)
 
-# Frontend (port 3000)
-cd /home/ubuntuser/chaosmesh/frontend && npm run dev
-```
-
-## Architecture
-- **Frontend**: React 18, TypeScript, Vite, TailwindCSS, Cytoscape.js, TanStack Query
-- **Backend**: Rust, Axum, SQLx, kube-rs, utoipa (Swagger at `/swagger-ui/`)
-- **Infra**: K3s, Chaos Mesh, SQLite | Namespace: `networksim-sim`
-
-## Project Structure
 ```
 backend/src/
-├── api/           # REST endpoints
-│   ├── chaos.rs          # Chaos conditions CRUD
-│   ├── topologies.rs     # Topology management
-│   ├── templates.rs      # Topology templates
-│   ├── reports.rs        # JSON/HTML reports
-│   ├── applications.rs   # App deployment
-│   ├── presets.rs        # Chaos presets
-│   ├── registry.rs       # Container registries
-│   └── live_metrics.rs   # Real-time metrics
-├── chaos/         # Chaos Mesh integration
-│   ├── types.rs          # ChaosType enum, params
-│   ├── conditions.rs     # CRD manifest builders
-│   └── client.rs         # K8s API client
-├── k8s/           # Kubernetes client
-├── models/        # Data models
-└── lib.rs         # Router
+├── api/               # Endpoints REST (Axum handlers)
+│   ├── chaos.rs           # CRUD + start/stop chaos
+│   ├── topologies.rs      # CRUD topologías
+│   ├── applications.rs    # Despliegue de apps
+│   ├── deploy.rs          # Despliegue K8s
+│   ├── live_metrics.rs    # Métricas en tiempo real
+│   └── openapi.rs         # Esquemas Swagger
+├── chaos/             # Integración Chaos Mesh
+│   ├── types.rs           # ChaosType, ChaosCondition
+│   ├── conditions.rs      # Builders de CRDs
+│   └── client.rs          # Cliente K8s para chaos
+├── k8s/               # Operaciones Kubernetes
+│   ├── resources.rs       # Specs de Pod/Deployment
+│   ├── client.rs          # Cliente API K8s
+│   └── deployment.rs      # Despliegue de topologías
+├── db/                # Capa de base de datos
+│   └── mod.rs             # Queries SQLite
+└── models/            # Modelos de datos
+```
 
+### Frontend (React)
+
+```
 frontend/src/
-├── pages/         # TopologyEditor.tsx (main), Settings.tsx, Scenarios.tsx
+├── pages/
+│   ├── TopologyEditor.tsx    # Editor principal (Cytoscape)
+│   └── TopologyList.tsx      # Lista de topologías
 ├── components/
-│   ├── ChaosPanel.tsx        # Chaos condition editor
-│   ├── ChaosPresets.tsx      # Quick-apply presets
-│   ├── TemplateSelector.tsx  # Topology templates modal
-│   ├── ExportReport.tsx      # Report export modal
-│   ├── ApplicationsPanel.tsx # App deployment
-│   ├── LiveMetrics.tsx       # Real-time metrics
-│   └── NetworkMatrix.tsx     # Connectivity matrix
-└── services/      # api.ts
+│   ├── ChaosPanel.tsx        # Gestión de chaos
+│   ├── ApplicationsPanel.tsx # Despliegue de apps
+│   ├── LiveMetrics.tsx       # Visualización de métricas
+│   └── ...
+└── services/
+    └── api.ts                # Cliente API + tipos
 ```
 
-## Chaos Types
+## Tipos de Chaos
 
-### Network Chaos (NetworkChaos CRD)
-| Type | Description | Params |
-|------|-------------|--------|
-| delay | Add latency | latency (ms), jitter, correlation |
-| loss | Packet loss | percent |
-| bandwidth | Rate limit | rate, limit, buffer |
-| corrupt | Corruption | percent, correlation |
-| duplicate | Duplication | percent |
-| partition | Isolation | - |
+| Tipo | CRD | Requiere Target |
+|------|-----|-----------------|
+| delay, loss, bandwidth, corrupt, duplicate, partition | NetworkChaos | Sí |
+| stress-cpu | StressChaos | No |
+| pod-kill | PodChaos | No |
+| io-delay | IOChaos | No |
+| http-abort | HTTPChaos | No |
 
-### Extended Chaos Types
-| Type | CRD | Description | Params |
-|------|-----|-------------|--------|
-| stress-cpu | StressChaos | CPU stress | load (%), workers |
-| pod-kill | PodChaos | Kill pods | gracePeriod |
-| io-delay | IOChaos | Disk I/O latency | delay, path, percent |
-| http-abort | HTTPChaos | HTTP errors | code, method, path |
+## Base de Datos
 
-## Key Features
-- **Topologies**: Visual editor (Cytoscape.js), deploy to K8s, Network Policies
-- **Templates**: 6 pre-built patterns (Microservices, 3-Tier, Star, Ring, Mesh, Pipeline)
-- **Reports**: Export JSON data or standalone HTML reports
-- **Chaos**: 10 chaos types across 5 categories with presets
-- **Apps**: Deploy containers to nodes, env vars, private registries
-- **Metrics**: Real-time latency/loss, chaos timeline markers
-- **Tests**: App-to-app connectivity tests with visual results
+Tablas principales en SQLite:
 
-## Database Tables
-`topologies`, `chaos_conditions`, `chaos_presets`, `applications`, `network_metrics`, `events`, `registry_configs`
+- `topologies` - Definiciones de topología (datos JSON)
+- `chaos_conditions` - Configuraciones de chaos activas
+- `applications` - Apps desplegadas (con envvalues JSON)
+- `chaos_presets` - Escenarios predefinidos
+- `network_metrics` - Métricas recolectadas
+- `events` - Log de eventos
 
-## API Endpoints
+## Patrones de API
+
 ```
-# Topologies
-GET/POST /api/topologies              # CRUD + pagination
-POST     /api/topologies/:id/deploy   # Deploy to K8s
-DELETE   /api/topologies/:id/undeploy # Remove from K8s
-
-# Templates
-GET      /api/templates               # List templates
-POST     /api/templates/:id/generate  # Generate topology
-
-# Reports
-GET      /api/reports/:id/json        # JSON report
-GET      /api/reports/:id/html        # HTML download
-
-# Chaos
-POST     /api/chaos                   # Create condition
-POST     /api/chaos/:id/activate      # Apply to cluster
-POST     /api/chaos/:id/deactivate    # Remove from cluster
-GET      /api/presets                 # List presets
-
-# Metrics
-GET      /api/topologies/:id/metrics/live|history|aggregated
-
-# Apps
-GET/POST /api/applications            # CRUD
-GET      /api/registries              # Registry configs
-
-# Tests
-POST     /api/v1/topologies/:id/tests/app-to-app
+Topologías: /api/topologies/:id
+Chaos:      /api/topologies/:id/chaos/:cid
+Apps:       /api/topologies/:id/apps/:aid
+Nodos:      /api/topologies/:id/nodes/:nid/apps
 ```
 
-## Chaos Mesh Notes
-- NetworkChaos requires source and target nodes
-- StressChaos, PodChaos, IOChaos, HTTPChaos apply to source node only
-- Label required: `networksim.io/type=simulation`
-- HTTPChaos requires Chaos Mesh sidecar injection
+## Detalles de Implementación
 
-## Commands
+### Countdown Timer de Chaos
+- Campo `started_at` se establece cuando el estado cambia a "active"
+- Componente `ChaosCountdown` calcula el tiempo restante
+- Se limpia cuando se pausa/detiene
+
+### Volúmenes
+- Parseados desde `app.values.volumes`
+- Función `parse_volumes_from_app()` en resources.rs
+- Tipos: emptyDir, hostPath, configMap, secret
+
+### Variables de Entorno
+- Almacenadas en columna `envvalues` como JSON
+- Formatos aceptados: array, objeto, anidado
+- Sanitizadas a mayúsculas con underscores
+
+## Desarrollo Local
+
+### Compilar Backend
+
 ```bash
-# View all chaos resources
-k3s kubectl get networkchaos,stresschaos,podchaos,iochaos,httpchaos -n networksim-sim
+cd backend
+cargo build --release
+```
 
-# Build
-cargo build --release   # backend
-npm run build           # frontend
+### Ejecutar Frontend
 
-# Test
-cargo test              # backend
-npm test                # frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Ejecutar Tests
+
+```bash
+# Backend
+cd backend
+cargo test
+
+# Frontend
+cd frontend
+npm test
+```
+
+## Comandos de Depuración
+
+```bash
+# Ver pods
+kubectl get pods -n networksim-sim
+
+# Ver recursos chaos
+kubectl get networkchaos,stresschaos,podchaos -n networksim-sim
+
+# Logs del backend
+tail -f /tmp/backend.log
+
+# Ejecutar comando en pod
+kubectl exec -it <pod> -n networksim-sim -- sh
 ```
