@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   chaosApi,
@@ -22,6 +22,12 @@ function ChaosCountdown({ startedAt, duration, onExpired }: {
   onExpired?: () => void;
 }) {
   const [remaining, setRemaining] = useState<number | null>(null);
+  const expiredCalledRef = useRef(false);
+
+  useEffect(() => {
+    // Reset expired flag when startedAt or duration changes
+    expiredCalledRef.current = false;
+  }, [startedAt, duration]);
 
   useEffect(() => {
     if (!startedAt || !duration) {
@@ -49,19 +55,26 @@ function ChaosCountdown({ startedAt, duration, onExpired }: {
 
     const startTime = new Date(startedAt).getTime();
     const endTime = startTime + durationMs;
+    let interval: NodeJS.Timeout | null = null;
 
     const updateRemaining = () => {
       const now = Date.now();
       const left = Math.max(0, endTime - now);
       setRemaining(left);
-      if (left === 0 && onExpired) {
+
+      // Only call onExpired once
+      if (left === 0 && onExpired && !expiredCalledRef.current) {
+        expiredCalledRef.current = true;
+        if (interval) clearInterval(interval);
         onExpired();
       }
     };
 
     updateRemaining();
-    const interval = setInterval(updateRemaining, 1000);
-    return () => clearInterval(interval);
+    interval = setInterval(updateRemaining, 1000);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [startedAt, duration, onExpired]);
 
   if (remaining === null) return null;
