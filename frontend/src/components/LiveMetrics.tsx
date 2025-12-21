@@ -401,16 +401,16 @@ export function LiveMetrics({
               <StatCard
                 icon={<Gauge size={16} />}
                 label="Avg Latency"
-                value={snapshot.summary.avg_latency_ms?.toFixed(1) ?? '-'}
-                subValue="ms"
+                value={snapshot.summary.avg_latency_ms != null ? snapshot.summary.avg_latency_ms.toFixed(1) : 'N/A'}
+                subValue={snapshot.summary.avg_latency_ms != null ? 'ms' : ''}
                 trend={latencyTrend}
                 color="blue"
               />
               <StatCard
                 icon={<ArrowUpDown size={16} />}
                 label="Max Latency"
-                value={snapshot.summary.max_latency_ms?.toFixed(1) ?? '-'}
-                subValue="ms"
+                value={snapshot.summary.max_latency_ms != null ? snapshot.summary.max_latency_ms.toFixed(1) : 'N/A'}
+                subValue={snapshot.summary.max_latency_ms != null ? 'ms' : ''}
                 color="yellow"
               />
             </div>

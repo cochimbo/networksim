@@ -15,7 +15,8 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
-use tower_http::cors::{Any, CorsLayer};
+use axum::http::{header, Method};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -35,6 +36,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/topologies/:id", get(api::topologies::get))
         .route("/api/topologies/:id", put(api::topologies::update))
         .route("/api/topologies/:id", delete(api::topologies::delete))
+        .route("/api/topologies/:id/duplicate", post(api::topologies::duplicate))
         // Deployment
         .route("/api/topologies/:id/deploy", post(api::deploy::deploy))
         .route("/api/topologies/:id/deploy", delete(api::deploy::destroy))
@@ -186,12 +188,37 @@ pub fn create_router(state: AppState) -> Router {
         // OpenAPI / Swagger UI
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         // State and middleware
+        // Note: Rate limiting should be implemented at proxy/ingress level (nginx, traefik)
+        // for production deployments. See DEVELOPMENT.md for details.
         .with_state(state)
         .layer(TraceLayer::new_for_http())
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any),
-        )
+        .layer(cors_layer())
+}
+
+/// Create CORS layer with secure configuration
+fn cors_layer() -> CorsLayer {
+    // Allow origins from environment or default to localhost for development
+    let allowed_origins = std::env::var("CORS_ALLOWED_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:3000,http://127.0.0.1:3000".to_string());
+
+    let origins: Vec<_> = allowed_origins
+        .split(',')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
+
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list(origins))
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([
+            header::CONTENT_TYPE,
+            header::AUTHORIZATION,
+            header::ACCEPT,
+        ])
+        .allow_credentials(true)
 }

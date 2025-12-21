@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import EnvVarsEditor from './EnvVarsEditor';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Play, Trash2, Package } from 'lucide-react';
-import { applicationsApi, DeployAppRequest, AppRuntimeStatus } from '../services/api';
+import { Plus, Play, Trash2, Package, ChevronDown, ChevronUp, HardDrive, Cpu, Heart } from 'lucide-react';
+import { applicationsApi, DeployAppRequest, AppRuntimeStatus, VolumeMount, HealthCheck } from '../services/api';
 import envIcon from '../assets/icons/env-icon.png';
 import { SkeletonList } from './Skeleton';
 import './ApplicationsPanel.css';
@@ -66,12 +66,29 @@ const mapStatus = (backendStatus: string, isTopologyDeployed: boolean = false): 
 export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyDeployed = false }: ApplicationsPanelProps) {
   const queryClient = useQueryClient();
   const [showDeployForm, setShowDeployForm] = useState(false);
-  const [deployForm, setDeployForm] = useState<any>({
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [deployForm, setDeployForm] = useState<{
+    chart: string;
+    node_selector: string[];
+    envvalues: Record<string, any>;
+    replicas: number;
+    volumes: VolumeMount[];
+    cpu_request: string;
+    memory_request: string;
+    cpu_limit: string;
+    memory_limit: string;
+    healthCheck?: HealthCheck;
+  }>({
     chart: '',
     node_selector: selectedNode ? [selectedNode.id] : [],
     envvalues: {},
+    replicas: 1,
+    volumes: [],
+    cpu_request: '',
+    memory_request: '',
+    cpu_limit: '',
+    memory_limit: '',
   });
-  // Eliminado: const [logs, setLogs] = useState<string>('');
   const [chartValidationError, setChartValidationError] = useState<string>('');
   const [deleteError, setDeleteError] = useState<string>('');
   const [appStatuses, setAppStatuses] = useState<Record<string, AppRuntimeStatus>>({});
@@ -133,10 +150,17 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
       
       queryClient.invalidateQueries({ queryKey: ['applications', topologyId] });
       setShowDeployForm(false);
+      setShowAdvanced(false);
       setDeployForm({
         chart: '',
         node_selector: [],
         envvalues: {},
+        replicas: 1,
+        volumes: [],
+        cpu_request: '',
+        memory_request: '',
+        cpu_limit: '',
+        memory_limit: '',
       });
       // Recargar estados de runtime después de un pequeño delay para que la DB se actualice
       setTimeout(reloadAllAppStatuses, 1000);
@@ -169,11 +193,18 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
       return;
     }
     setChartValidationError('');
-    // Log del objeto que se enviará
-    const deployPayload = {
+    // Build deploy payload with all fields
+    const deployPayload: DeployAppRequest = {
       chart: deployForm.chart,
       node_selector: deployForm.node_selector,
-      envvalues: deployForm.envvalues && Object.keys(deployForm.envvalues).length > 0 ? deployForm.envvalues : undefined
+      envvalues: deployForm.envvalues && Object.keys(deployForm.envvalues).length > 0 ? deployForm.envvalues : undefined,
+      replicas: deployForm.replicas > 1 ? deployForm.replicas : undefined,
+      volumes: deployForm.volumes.length > 0 ? deployForm.volumes : undefined,
+      healthCheck: deployForm.healthCheck,
+      cpu_request: deployForm.cpu_request || undefined,
+      memory_request: deployForm.memory_request || undefined,
+      cpu_limit: deployForm.cpu_limit || undefined,
+      memory_limit: deployForm.memory_limit || undefined,
     };
     // eslint-disable-next-line no-console
     console.log('Deploy payload:', deployPayload);
@@ -207,15 +238,218 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
         </div>
         {showDeployForm && selectedNode && (
           <div className="mb-4 p-4 border rounded bg-gray-50">
-            <h4 className="font-medium mb-2">Deploy New Application to <span className='font-bold'>{selectedNode.name}</span></h4>
-            <input
-              type="text"
-              placeholder="Image name (e.g. nginx:latest)"
-              value={deployForm.chart}
-              onChange={e => setDeployForm((prev: any) => ({ ...prev, chart: e.target.value }))}
-              className="mb-2 p-2 border rounded w-full"
-            />
-            {chartValidationError && <div className="text-red-600 text-sm mb-2">{chartValidationError}</div>}
+            <h4 className="font-medium mb-3">Deploy New Application to <span className='font-bold'>{selectedNode.name}</span></h4>
+
+            {/* Basic fields */}
+            <div className="space-y-2 mb-3">
+              <input
+                type="text"
+                placeholder="Image name (e.g. nginx:latest)"
+                value={deployForm.chart}
+                onChange={e => setDeployForm(prev => ({ ...prev, chart: e.target.value }))}
+                className="p-2 border rounded w-full text-sm"
+              />
+              {chartValidationError && <div className="text-red-600 text-sm">{chartValidationError}</div>}
+
+              {/* Replicas */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 w-20">Replicas:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={deployForm.replicas}
+                  onChange={e => setDeployForm(prev => ({ ...prev, replicas: parseInt(e.target.value) || 1 }))}
+                  className="p-2 border rounded w-20 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Advanced options toggle */}
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-2"
+            >
+              {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              Advanced Options
+            </button>
+
+            {showAdvanced && (
+              <div className="space-y-3 p-3 bg-white border rounded mb-3">
+                {/* Resource Limits */}
+                <div>
+                  <div className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    <Cpu className="h-4 w-4" /> Resources
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="CPU Request (e.g. 100m)"
+                      value={deployForm.cpu_request}
+                      onChange={e => setDeployForm(prev => ({ ...prev, cpu_request: e.target.value }))}
+                      className="p-2 border rounded text-xs"
+                    />
+                    <input
+                      type="text"
+                      placeholder="CPU Limit (e.g. 500m)"
+                      value={deployForm.cpu_limit}
+                      onChange={e => setDeployForm(prev => ({ ...prev, cpu_limit: e.target.value }))}
+                      className="p-2 border rounded text-xs"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Memory Request (e.g. 64Mi)"
+                      value={deployForm.memory_request}
+                      onChange={e => setDeployForm(prev => ({ ...prev, memory_request: e.target.value }))}
+                      className="p-2 border rounded text-xs"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Memory Limit (e.g. 256Mi)"
+                      value={deployForm.memory_limit}
+                      onChange={e => setDeployForm(prev => ({ ...prev, memory_limit: e.target.value }))}
+                      className="p-2 border rounded text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Volumes */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                      <HardDrive className="h-4 w-4" /> Volumes
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDeployForm(prev => ({
+                        ...prev,
+                        volumes: [...prev.volumes, { name: `vol-${prev.volumes.length + 1}`, mountPath: '/data', type: 'emptyDir' }]
+                      }))}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      + Add Volume
+                    </button>
+                  </div>
+                  {deployForm.volumes.map((vol, idx) => (
+                    <div key={idx} className="flex items-center gap-2 mb-2">
+                      <select
+                        value={vol.type}
+                        onChange={e => {
+                          const newVols = [...deployForm.volumes];
+                          newVols[idx] = { ...vol, type: e.target.value as VolumeMount['type'] };
+                          setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                        }}
+                        className="p-1 border rounded text-xs w-24"
+                      >
+                        <option value="emptyDir">emptyDir</option>
+                        <option value="hostPath">hostPath</option>
+                        <option value="configMap">configMap</option>
+                        <option value="secret">secret</option>
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Mount path"
+                        value={vol.mountPath}
+                        onChange={e => {
+                          const newVols = [...deployForm.volumes];
+                          newVols[idx] = { ...vol, mountPath: e.target.value };
+                          setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                        }}
+                        className="p-1 border rounded text-xs flex-1"
+                      />
+                      {vol.type !== 'emptyDir' && (
+                        <input
+                          type="text"
+                          placeholder={vol.type === 'hostPath' ? '/host/path' : 'name'}
+                          value={vol.source || ''}
+                          onChange={e => {
+                            const newVols = [...deployForm.volumes];
+                            newVols[idx] = { ...vol, source: e.target.value };
+                            setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                          }}
+                          className="p-1 border rounded text-xs w-28"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDeployForm(prev => ({
+                          ...prev,
+                          volumes: prev.volumes.filter((_, i) => i !== idx)
+                        }))}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Health Check */}
+                <div>
+                  <div className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    <Heart className="h-4 w-4" /> Health Check
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={deployForm.healthCheck?.type || ''}
+                      onChange={e => {
+                        if (!e.target.value) {
+                          setDeployForm(prev => ({ ...prev, healthCheck: undefined }));
+                        } else {
+                          setDeployForm(prev => ({
+                            ...prev,
+                            healthCheck: { type: e.target.value as HealthCheck['type'], port: 80, path: '/health' }
+                          }));
+                        }
+                      }}
+                      className="p-1 border rounded text-xs"
+                    >
+                      <option value="">None</option>
+                      <option value="http">HTTP</option>
+                      <option value="tcp">TCP</option>
+                    </select>
+                    {deployForm.healthCheck?.type === 'http' && (
+                      <>
+                        <input
+                          type="text"
+                          placeholder="/health"
+                          value={deployForm.healthCheck.path || ''}
+                          onChange={e => setDeployForm(prev => ({
+                            ...prev,
+                            healthCheck: { ...prev.healthCheck!, path: e.target.value }
+                          }))}
+                          className="p-1 border rounded text-xs w-20"
+                        />
+                        <input
+                          type="number"
+                          placeholder="80"
+                          value={deployForm.healthCheck.port || ''}
+                          onChange={e => setDeployForm(prev => ({
+                            ...prev,
+                            healthCheck: { ...prev.healthCheck!, port: parseInt(e.target.value) || 80 }
+                          }))}
+                          className="p-1 border rounded text-xs w-16"
+                        />
+                      </>
+                    )}
+                    {deployForm.healthCheck?.type === 'tcp' && (
+                      <input
+                        type="number"
+                        placeholder="Port"
+                        value={deployForm.healthCheck.port || ''}
+                        onChange={e => setDeployForm(prev => ({
+                          ...prev,
+                          healthCheck: { ...prev.healthCheck!, port: parseInt(e.target.value) || 80 }
+                        }))}
+                        className="p-1 border rounded text-xs w-16"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <button
                 onClick={handleDeploy}
@@ -226,7 +460,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                 Schedule
               </button>
               <button
-                onClick={() => setShowDeployForm(false)}
+                onClick={() => { setShowDeployForm(false); setShowAdvanced(false); }}
                 className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Cancel
@@ -267,6 +501,32 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                           ({runningNodes}/{totalNodes} running)
                         </span>
                       )}
+                      {/* Show replicas and resources */}
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {(app.replicas && app.replicas > 1) && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">
+                            {app.replicas}x replicas
+                          </span>
+                        )}
+                        {(app.cpu_limit || app.memory_limit) && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded flex items-center gap-1">
+                            <Cpu className="h-3 w-3" />
+                            {app.cpu_limit || app.cpu_request || '-'} / {app.memory_limit || app.memory_request || '-'}
+                          </span>
+                        )}
+                        {(app.volumes && app.volumes.length > 0) && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded flex items-center gap-1">
+                            <HardDrive className="h-3 w-3" />
+                            {app.volumes.length} vol
+                          </span>
+                        )}
+                        {app.healthCheck && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded flex items-center gap-1">
+                            <Heart className="h-3 w-3" />
+                            {app.healthCheck.type}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-1">
                       <button

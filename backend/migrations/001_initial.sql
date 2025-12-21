@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS chaos_conditions (
     params TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     k8s_name TEXT,
+    started_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (topology_id) REFERENCES topologies(id) ON DELETE CASCADE

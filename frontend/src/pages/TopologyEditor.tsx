@@ -6,11 +6,12 @@ import cytoscape, { Core } from 'cytoscape';
 import {
   Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize,
   Play, Square, Loader2, Zap, Bookmark, Activity, TestTube, Grid3X3,
-  ChevronUp, ChevronDown, Clock, Film, BarChart3, FileDown, LayoutTemplate
+  ChevronUp, ChevronDown, Clock, Film, BarChart3, FileDown, LayoutTemplate,
+  Undo2, Redo2, Copy, Grid
 } from 'lucide-react';
 import { topologyApi, clusterApi, deploymentApi, chaosApi, diagnosticApi, Topology, Node, Link, ContainerInfo } from '../services/api';
 import { ChaosPanel } from '../components/ChaosPanel';
-import { NodePropertiesModal } from '../components/NodePropertiesModal';
+import { NodePropertiesModal, GROUP_COLORS } from '../components/NodePropertiesModal';
 import { DeploymentModal, DeploymentAction, DeploymentPhase } from '../components/DeploymentModal';
 import { ApplicationsPanel } from '../components/ApplicationsPanel';
 import { useWebSocketEvents, WebSocketEvent } from '../contexts/WebSocketContext';
@@ -42,6 +43,17 @@ const STATUS_COLORS: Record<NodeStatus, string> = {
   unknown: '#6b7280',    // gray
 };
 
+// Type-safe error message extraction
+function getErrorMessage(error: unknown, fallback = 'An error occurred'): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    const e = error as { message?: string; response?: { data?: { message?: string } } };
+    return e.response?.data?.message || e.message || fallback;
+  }
+  if (typeof error === 'string') return error;
+  return fallback;
+}
+
 export default function TopologyEditor() {
   // Estado para el modal de propiedades de nodo
   // Panel widths for resizable panels
@@ -61,6 +73,7 @@ export default function TopologyEditor() {
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [tool, setTool] = useState<'select' | 'node' | 'link'>('select');
   const [linkSource, setLinkSource] = useState<string | null>(null);
+  const [snapToGrid, setSnapToGrid] = useState(false);
   const [_nodeStatuses, setNodeStatuses] = useState<Record<string, NodeStatus>>({});
   const [cyReady, setCyReady] = useState(false);
   const [deployModal, setDeployModal] = useState<{
@@ -72,6 +85,10 @@ export default function TopologyEditor() {
 
   // Toast notifications
   const toast = useToast();
+
+  // Track unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedState, setLastSavedState] = useState<string>('');
 
   // Template selector and export report modals
   const [showTemplateSelector, setShowTemplateSelector] = useState(!id); // Show on new topology
@@ -100,24 +117,118 @@ export default function TopologyEditor() {
     visible: boolean;
     x: number;
     y: number;
+    edgeId: string;
     sourceId: string;
     targetId: string;
     sourceName: string;
     targetName: string;
+    currentLabel?: string;
     activeChaos: { id: string; type: string; status: string }[];
   } | null>(null);
+
+  // Edge label editing
+  const [editingEdgeLabel, setEditingEdgeLabel] = useState<{ edgeId: string; label: string } | null>(null);
+
+  // Undo/Redo history
+  type HistoryState = { nodes: Node[]; links: Link[] };
+  const [history, setHistory] = useState<HistoryState[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const isUndoRedoAction = useRef(false);
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  // Push current state to history (call before making changes)
+  const pushToHistory = useCallback(() => {
+    if (isUndoRedoAction.current) return;
+
+    setHistory(prev => {
+      // Remove any future states if we're not at the end
+      const newHistory = prev.slice(0, historyIndex + 1);
+      // Add current state
+      newHistory.push({ nodes: [...nodes], links: [...links] });
+      // Limit history to 50 states
+      if (newHistory.length > 50) newHistory.shift();
+      return newHistory;
+    });
+    setHistoryIndex(prev => Math.min(prev + 1, 49));
+  }, [nodes, links, historyIndex]);
+
+  const undo = useCallback(() => {
+    if (!canUndo) return;
+    isUndoRedoAction.current = true;
+    const prevState = history[historyIndex - 1];
+    setNodes(prevState.nodes);
+    setLinks(prevState.links);
+    setHistoryIndex(prev => prev - 1);
+    // Sync with Cytoscape
+    setTimeout(() => {
+      if (cyInstance.current) {
+        cyInstance.current.elements().remove();
+        prevState.nodes.forEach(n => {
+          const groupColor = n.group ? GROUP_COLORS[n.group] || '#9ca3af' : '#6366f1';
+          cyInstance.current?.add({
+            group: 'nodes',
+            data: { id: n.id, name: n.name, group: n.group },
+            position: { x: n.position.x, y: n.position.y },
+            style: { 'background-color': groupColor },
+          });
+        });
+        prevState.links.forEach(l => {
+          cyInstance.current?.add({ group: 'edges', data: { id: l.id, source: l.source, target: l.target, label: l.label || '' } });
+        });
+      }
+      isUndoRedoAction.current = false;
+    }, 0);
+    toast.info('Undo');
+  }, [canUndo, history, historyIndex, toast]);
+
+  const redo = useCallback(() => {
+    if (!canRedo) return;
+    isUndoRedoAction.current = true;
+    const nextState = history[historyIndex + 1];
+    setNodes(nextState.nodes);
+    setLinks(nextState.links);
+    setHistoryIndex(prev => prev + 1);
+    // Sync with Cytoscape
+    setTimeout(() => {
+      if (cyInstance.current) {
+        cyInstance.current.elements().remove();
+        nextState.nodes.forEach(n => {
+          const groupColor = n.group ? GROUP_COLORS[n.group] || '#9ca3af' : '#6366f1';
+          cyInstance.current?.add({
+            group: 'nodes',
+            data: { id: n.id, name: n.name, group: n.group },
+            position: { x: n.position.x, y: n.position.y },
+            style: { 'background-color': groupColor },
+          });
+        });
+        nextState.links.forEach(l => {
+          cyInstance.current?.add({ group: 'edges', data: { id: l.id, source: l.source, target: l.target, label: l.label || '' } });
+        });
+      }
+      isUndoRedoAction.current = false;
+    }, 0);
+    toast.info('Redo');
+  }, [canRedo, history, historyIndex, toast]);
 
   // Refs to access current values in event handlers
   const toolRef = useRef(tool);
   const nodesRef = useRef(nodes);
+  const linksRef = useRef(links);
   const linkSourceRef = useRef(linkSource);
+  const snapToGridRef = useRef(snapToGrid);
   const applicationsRef = useRef<any[]>([]);
   const chaosConditionsRef = useRef<any[]>([]);
+  const pushToHistoryRef = useRef(pushToHistory);
 
   // Keep refs in sync
   useEffect(() => { toolRef.current = tool; }, [tool]);
   useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  useEffect(() => { linksRef.current = links; }, [links]);
   useEffect(() => { linkSourceRef.current = linkSource; }, [linkSource]);
+  useEffect(() => { snapToGridRef.current = snapToGrid; }, [snapToGrid]);
+  useEffect(() => { pushToHistoryRef.current = pushToHistory; }, [pushToHistory]);
 
   // Handle real-time WebSocket events
   const handleWsEvent = useCallback((event: WebSocketEvent) => {
@@ -175,12 +286,15 @@ export default function TopologyEditor() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['topologies'] });
       toast.success('Topology saved successfully');
+      // Update saved state to clear unsaved changes flag
+      setLastSavedState(JSON.stringify({ name, description, nodes, links }));
+      setHasUnsavedChanges(false);
       if (isNewTopology) {
         navigate(`/topologies/${data.id}`);
       }
     },
-    onError: (error: any) => {
-      toast.error(error?.message || 'Failed to save topology');
+    onError: (error: unknown) => {
+      toast.error(getErrorMessage(error, 'Failed to save topology'));
     },
   });
 
@@ -257,14 +371,17 @@ export default function TopologyEditor() {
       queryClient.invalidateQueries({ queryKey: ['deployment-status', id] });
       queryClient.invalidateQueries({ queryKey: ['applications', id] });
       queryClient.invalidateQueries({ queryKey: ['active-deployment'] });
+      // Zoom to fit after deploy
+      setTimeout(() => cyInstance.current?.fit(undefined, 50), 500);
     },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || error.message || 'Deploy failed');
+    onError: (error: unknown) => {
+      const message = getErrorMessage(error, 'Deploy failed');
+      toast.error(message);
       setDeployModal({
         show: true,
         action: 'deploy',
         phase: 'error',
-        message: error?.response?.data?.message || error.message || 'Deploy failed'
+        message
       });
     },
   });
@@ -284,16 +401,125 @@ export default function TopologyEditor() {
       queryClient.invalidateQueries({ queryKey: ['active-deployment'] });
       setNodeStatuses({});
     },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || error.message || 'Stop failed');
+    onError: (error: unknown) => {
+      const message = getErrorMessage(error, 'Stop failed');
+      toast.error(message);
       setDeployModal({
         show: true,
         action: 'destroy',
         phase: 'error',
-        message: error?.response?.data?.message || error.message || 'Stop failed'
+        message
       });
     },
   });
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      // Ctrl+S or Cmd+S - Save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (!saveMutation.isPending) {
+          saveMutation.mutate({
+            name,
+            description: description || undefined,
+            nodes,
+            links,
+          });
+        }
+      }
+
+      // Ctrl+Z - Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+
+      // Ctrl+Shift+Z or Ctrl+Y - Redo
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || e.key === 'y')) {
+        e.preventDefault();
+        redo();
+      }
+
+      // Escape - Cancel current operation
+      if (e.key === 'Escape') {
+        setTool('select');
+        setLinkSource(null);
+        setSelectedElement(null);
+        setNodeModal(null);
+        setEdgeContextMenu(null);
+        cyInstance.current?.$('.link-source').removeClass('link-source');
+      }
+
+      // Delete or Backspace - Delete selected element
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElement && !isDeployed) {
+        pushToHistory();
+        if (selectedElement.isNode && selectedElement.isNode()) {
+          const nodeId = selectedElement.id();
+          setNodes(prev => prev.filter(n => n.id !== nodeId));
+          setLinks(prev => prev.filter(l => l.source !== nodeId && l.target !== nodeId));
+          cyInstance.current?.remove(selectedElement);
+          setSelectedElement(null);
+        } else if (selectedElement.isEdge && selectedElement.isEdge()) {
+          const linkId = selectedElement.id();
+          setLinks(prev => prev.filter(l => l.id !== linkId));
+          cyInstance.current?.remove(selectedElement);
+          setSelectedElement(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedElement, isDeployed, saveMutation, name, description, nodes, links, undo, redo, pushToHistory]);
+
+  // Detect unsaved changes
+  useEffect(() => {
+    const currentState = JSON.stringify({ name, description, nodes, links });
+    if (lastSavedState && currentState !== lastSavedState) {
+      setHasUnsavedChanges(true);
+    } else if (currentState === lastSavedState) {
+      setHasUnsavedChanges(false);
+    }
+  }, [name, description, nodes, links, lastSavedState]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Auto-save every 30 seconds if there are unsaved changes
+  useEffect(() => {
+    if (!hasUnsavedChanges || !id || isNewTopology) return;
+
+    const autoSaveTimer = setTimeout(() => {
+      if (hasUnsavedChanges && !saveMutation.isPending) {
+        saveMutation.mutate({
+          name,
+          description: description || undefined,
+          nodes,
+          links,
+        });
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearTimeout(autoSaveTimer);
+  }, [hasUnsavedChanges, id, isNewTopology, saveMutation, name, description, nodes, links]);
 
   // Callback ref to initialize Cytoscape when container is available
   const cyRef = useCallback((container: HTMLDivElement | null) => {
@@ -346,6 +572,13 @@ export default function TopologyEditor() {
             'line-color': '#9ca3af',
             'target-arrow-color': '#9ca3af',
             'curve-style': 'bezier',
+            'label': 'data(label)',
+            'text-rotation': 'autorotate',
+            'font-size': '10px',
+            'text-background-color': '#ffffff',
+            'text-background-opacity': 0.8,
+            'text-background-padding': '2px',
+            'color': '#4b5563',
           },
         },
         {
@@ -574,6 +807,7 @@ export default function TopologyEditor() {
     // Click on canvas to add node
     cy.on('tap', (event) => {
       if (event.target === cy && toolRef.current === 'node') {
+        pushToHistoryRef.current();
         const pos = event.position;
         const newNode: Node = {
           id: `node-${Date.now()}`,
@@ -604,6 +838,7 @@ export default function TopologyEditor() {
           node.addClass('link-source');
           setLinkSource(node.id());
         } else if (prevSource !== node.id()) {
+          pushToHistoryRef.current();
           const linkId = `link-${Date.now()}`;
           const newLink: Link = {
             id: linkId,
@@ -641,10 +876,22 @@ export default function TopologyEditor() {
       });
     });
 
-    // Move node
+    // Move node (with snap to grid support)
     cy.on('dragfree', 'node', (event) => {
+      pushToHistoryRef.current();
       const node = event.target;
-      const pos = node.position();
+      let pos = node.position();
+
+      // Snap to grid if enabled
+      if (snapToGridRef.current) {
+        const gridSize = 50;
+        pos = {
+          x: Math.round(pos.x / gridSize) * gridSize,
+          y: Math.round(pos.y / gridSize) * gridSize,
+        };
+        node.position(pos);
+      }
+
       setNodes((prev) =>
         prev.map((n) =>
           n.id === node.id() ? { ...n, position: { x: pos.x, y: pos.y } } : n
@@ -727,10 +974,12 @@ export default function TopologyEditor() {
         visible: true,
         x: containerRect.left + renderedPos.x,
         y: containerRect.top + renderedPos.y,
+        edgeId: edge.id(),
         sourceId,
         targetId,
         sourceName,
         targetName,
+        currentLabel: edge.data('label') || '',
         activeChaos: edgeChaos,
       });
     });
@@ -840,22 +1089,34 @@ export default function TopologyEditor() {
       setDescription(topology.description || '');
       setNodes(topology.nodes);
       setLinks(topology.links);
+      // Initialize history with loaded state
+      setHistory([{ nodes: topology.nodes, links: topology.links }]);
+      setHistoryIndex(0);
+      // Initialize saved state for unsaved changes detection
+      setLastSavedState(JSON.stringify({
+        name: topology.name,
+        description: topology.description || '',
+        nodes: topology.nodes,
+        links: topology.links
+      }));
 
       const cy = cyInstance.current;
       cy.elements().remove();
 
       topology.nodes.forEach((node) => {
+        const groupColor = node.group ? GROUP_COLORS[node.group] || '#9ca3af' : '#6366f1';
         cy.add({
           group: 'nodes',
-          data: { id: node.id, name: node.name },
+          data: { id: node.id, name: node.name, group: node.group },
           position: { x: node.position.x, y: node.position.y },
+          style: { 'background-color': groupColor },
         });
       });
 
       topology.links.forEach((link) => {
         cy.add({
           group: 'edges',
-          data: { id: link.id, source: link.source, target: link.target },
+          data: { id: link.id, source: link.source, target: link.target, label: link.label || '' },
         });
       });
 
@@ -915,6 +1176,7 @@ export default function TopologyEditor() {
   const handleDeleteSelected = () => {
     if (!selectedElement || !cyInstance.current) return;
 
+    pushToHistory();
     const cy = cyInstance.current;
 
     if (selectedElement.type === 'node') {
@@ -929,6 +1191,37 @@ export default function TopologyEditor() {
     }
 
     setSelectedElement(null);
+  };
+
+  // Copy selected node
+  const handleCopyNode = () => {
+    if (!selectedElement || selectedElement.type !== 'node' || !cyInstance.current) return;
+
+    pushToHistory();
+    const sourceNode = nodes.find(n => n.id === selectedElement.data.id);
+    if (!sourceNode) return;
+
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      name: `${sourceNode.name} (copy)`,
+      position: {
+        x: sourceNode.position.x + 50,
+        y: sourceNode.position.y + 50,
+      },
+      config: { ...sourceNode.config },
+      group: sourceNode.group,
+    };
+
+    const groupColor = newNode.group ? GROUP_COLORS[newNode.group] || '#9ca3af' : '#6366f1';
+    cyInstance.current.add({
+      group: 'nodes',
+      data: { id: newNode.id, name: newNode.name, group: newNode.group },
+      position: { x: newNode.position.x, y: newNode.position.y },
+      style: { 'background-color': groupColor },
+    });
+
+    setNodes(prev => [...prev, newNode]);
+    toast.success('Node copied');
   };
 
   // Handle preset application - refresh chaos conditions
@@ -1131,33 +1424,60 @@ export default function TopologyEditor() {
           placeholder="Topology name"
         />
 
+        {/* Mini stats */}
+        <div className="hidden sm:flex items-center gap-3 text-xs text-gray-500">
+          <span className="flex items-center gap-1">
+            <Circle className="h-3 w-3" />
+            {nodes.length} nodes
+          </span>
+          <span className="flex items-center gap-1">
+            <LinkIcon className="h-3 w-3" />
+            {links.length} links
+          </span>
+          {chaosConditions && chaosConditions.filter((c: { status: string }) => c.status === 'active').length > 0 && (
+            <span className="flex items-center gap-1 text-red-500">
+              <Zap className="h-3 w-3" />
+              {chaosConditions.filter((c: { status: string }) => c.status === 'active').length} chaos
+            </span>
+          )}
+          {hasUnsavedChanges && (
+            <span className="text-amber-500 font-medium">• Unsaved</span>
+          )}
+        </div>
+
         <div className="h-6 w-px bg-gray-200" />
 
         {/* Tools */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" role="toolbar" aria-label="Topology editing tools">
           <button
             onClick={() => { setTool('select'); setLinkSource(null); }}
             disabled={isDeployed}
             className={`p-2 rounded ${tool === 'select' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'} disabled:opacity-50 disabled:cursor-not-allowed`}
             title="Select"
+            aria-label="Select tool"
+            aria-pressed={tool === 'select'}
           >
-            <ArrowRight className="h-5 w-5" />
+            <ArrowRight className="h-5 w-5" aria-hidden="true" />
           </button>
           <button
             onClick={() => { setTool('node'); setLinkSource(null); }}
             disabled={isDeployed}
             className={`p-2 rounded ${tool === 'node' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'} disabled:opacity-50 disabled:cursor-not-allowed`}
             title={isDeployed ? "Cannot add nodes while deployed" : "Add Node"}
+            aria-label="Add node tool"
+            aria-pressed={tool === 'node'}
           >
-            <Circle className="h-5 w-5" />
+            <Circle className="h-5 w-5" aria-hidden="true" />
           </button>
           <button
             onClick={() => { setTool('link'); setLinkSource(null); }}
             disabled={isDeployed}
             className={`p-2 rounded ${tool === 'link' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'} disabled:opacity-50 disabled:cursor-not-allowed`}
             title={isDeployed ? "Cannot add links while deployed" : "Add Link (click two nodes)"}
+            aria-label="Add link tool"
+            aria-pressed={tool === 'link'}
           >
-            <LinkIcon className="h-5 w-5" />
+            <LinkIcon className="h-5 w-5" aria-hidden="true" />
           </button>
           {tool === 'link' && (
             <span className="text-xs text-gray-500 ml-1">
@@ -1168,28 +1488,68 @@ export default function TopologyEditor() {
 
         <div className="h-6 w-px bg-gray-200" />
 
+        {/* Undo/Redo */}
+        <div className="flex items-center gap-1" role="group" aria-label="History controls">
+          <button
+            onClick={undo}
+            disabled={!canUndo || isDeployed}
+            className="p-2 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
+          >
+            <Undo2 className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <button
+            onClick={redo}
+            disabled={!canRedo || isDeployed}
+            className="p-2 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Redo (Ctrl+Shift+Z)"
+            aria-label="Redo"
+          >
+            <Redo2 className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="h-6 w-px bg-gray-200" />
+
+        {/* Snap to Grid */}
+        <button
+          onClick={() => setSnapToGrid(!snapToGrid)}
+          className={`p-2 rounded ${snapToGrid ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'}`}
+          title={`Snap to Grid: ${snapToGrid ? 'ON' : 'OFF'}`}
+          aria-label="Toggle snap to grid"
+          aria-pressed={snapToGrid}
+        >
+          <Grid className="h-5 w-5" aria-hidden="true" />
+        </button>
+
+        <div className="h-6 w-px bg-gray-200" />
+
         {/* Zoom controls */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1" role="group" aria-label="Zoom controls">
           <button
             onClick={() => cyInstance.current?.zoom(cyInstance.current.zoom() * 1.2)}
             className="p-2 rounded hover:bg-gray-100"
             title="Zoom In"
+            aria-label="Zoom in"
           >
-            <ZoomIn className="h-5 w-5" />
+            <ZoomIn className="h-5 w-5" aria-hidden="true" />
           </button>
           <button
             onClick={() => cyInstance.current?.zoom(cyInstance.current.zoom() / 1.2)}
             className="p-2 rounded hover:bg-gray-100"
             title="Zoom Out"
+            aria-label="Zoom out"
           >
-            <ZoomOut className="h-5 w-5" />
+            <ZoomOut className="h-5 w-5" aria-hidden="true" />
           </button>
           <button
             onClick={() => cyInstance.current?.fit()}
             className="p-2 rounded hover:bg-gray-100"
             title="Fit to View"
+            aria-label="Fit to view"
           >
-            <Maximize className="h-5 w-5" />
+            <Maximize className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -1274,10 +1634,20 @@ export default function TopologyEditor() {
 
         {/* Actions */}
         <button
+          onClick={handleCopyNode}
+          disabled={!selectedElement || selectedElement.type !== 'node' || isDeployed}
+          className="p-2 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          title={isDeployed ? "Cannot copy while deployed" : "Copy Node"}
+          aria-label="Copy node"
+        >
+          <Copy className="h-5 w-5" />
+        </button>
+        <button
           onClick={handleDeleteSelected}
           disabled={!selectedElement || isDeployed}
           className="p-2 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
           title={isDeployed ? "Cannot delete while deployed" : "Delete Selected"}
+          aria-label="Delete selected"
         >
           <Trash2 className="h-5 w-5" />
         </button>
@@ -1569,6 +1939,23 @@ export default function TopologyEditor() {
             <span className="text-emerald-500 text-lg">🌐</span>
             <span className="text-gray-700 dark:text-gray-300">HTTP Abort</span>
           </div>
+
+          {/* Divider and Node Groups */}
+          {nodes.some(n => n.group) && (
+            <>
+              <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-2" />
+              <span className="text-xs text-gray-500 font-medium">Groups:</span>
+              {[...new Set(nodes.map(n => n.group).filter(Boolean) as string[])].map(group => (
+                <div key={group} className="flex items-center gap-1 text-sm">
+                  <span
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: GROUP_COLORS[group] || '#9ca3af' }}
+                  />
+                  <span className="text-gray-700 dark:text-gray-300 capitalize">{group}</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
 
@@ -1576,12 +1963,22 @@ export default function TopologyEditor() {
       <NodePropertiesModal
         open={!!nodeModal?.open}
         node={nodeModal?.node}
+        existingGroups={[...new Set(nodes.map(n => n.group).filter(Boolean) as string[])]}
         onClose={() => setNodeModal(null)}
         onChange={newNode => {
           if (cyInstance.current && newNode?.data?.id) {
-            cyInstance.current.$(`#${newNode.data.id}`).data('name', newNode.data.name);
+            const cyNode = cyInstance.current.$(`#${newNode.data.id}`);
+            cyNode.data('name', newNode.data.name);
+            cyNode.data('group', newNode.data.group);
+            // Update node background color based on group
+            const groupColor = newNode.data.group ? GROUP_COLORS[newNode.data.group] || '#9ca3af' : '#6366f1';
+            cyNode.style('background-color', groupColor);
           }
-          setNodes(prev => prev.map(n => n.id === newNode.data.id ? { ...n, name: newNode.data.name } : n));
+          pushToHistory();
+          setNodes(prev => prev.map(n => n.id === newNode.data.id
+            ? { ...n, name: newNode.data.name, group: newNode.data.group }
+            : n
+          ));
           setNodeModal(modal => modal ? { ...modal, node: newNode } : null);
         }}
       />
@@ -1672,6 +2069,61 @@ export default function TopologyEditor() {
             <div className="font-medium text-gray-900 dark:text-white text-sm">
               {edgeContextMenu.sourceName} → {edgeContextMenu.targetName}
             </div>
+          </div>
+
+          {/* Edit Label */}
+          <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="text-xs text-gray-500 mb-1">Label</div>
+            {editingEdgeLabel?.edgeId === edgeContextMenu.edgeId ? (
+              <div className="flex gap-1">
+                <input
+                  type="text"
+                  value={editingEdgeLabel.label}
+                  onChange={(e) => setEditingEdgeLabel({ ...editingEdgeLabel, label: e.target.value })}
+                  className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded"
+                  placeholder="Enter label..."
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      pushToHistory();
+                      setLinks(prev => prev.map(l => l.id === edgeContextMenu.edgeId
+                        ? { ...l, label: editingEdgeLabel.label || undefined }
+                        : l
+                      ));
+                      if (cyInstance.current) {
+                        cyInstance.current.$(`#${edgeContextMenu.edgeId}`).data('label', editingEdgeLabel.label || '');
+                      }
+                      setEditingEdgeLabel(null);
+                    } else if (e.key === 'Escape') {
+                      setEditingEdgeLabel(null);
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    pushToHistory();
+                    setLinks(prev => prev.map(l => l.id === edgeContextMenu.edgeId
+                      ? { ...l, label: editingEdgeLabel.label || undefined }
+                      : l
+                    ));
+                    if (cyInstance.current) {
+                      cyInstance.current.$(`#${edgeContextMenu.edgeId}`).data('label', editingEdgeLabel.label || '');
+                    }
+                    setEditingEdgeLabel(null);
+                  }}
+                  className="px-2 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
+                >
+                  ✓
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditingEdgeLabel({ edgeId: edgeContextMenu.edgeId, label: edgeContextMenu.currentLabel || '' })}
+                className="w-full text-left px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded hover:bg-gray-100 dark:hover:bg-gray-600"
+              >
+                {edgeContextMenu.currentLabel || <span className="text-gray-400 italic">No label</span>}
+              </button>
+            )}
           </div>
 
           {/* Active Chaos */}

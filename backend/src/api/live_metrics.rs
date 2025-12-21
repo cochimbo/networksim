@@ -19,6 +19,8 @@ use std::collections::HashMap;
 use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
 
+use crate::models::Application;
+
 use crate::api::AppState;
 use crate::error::{AppError, AppResult};
 
@@ -215,6 +217,21 @@ pub async fn get_live_metrics(
     let mut network_metrics = Vec::new();
     let mut node_metrics = Vec::new();
 
+    // Pre-load all apps and chaos conditions to avoid N+1 queries
+    let all_apps = state.db.list_applications(&topology_id).await.unwrap_or_default();
+    let all_chaos = state.db.list_chaos_conditions(&topology_id).await.unwrap_or_default();
+
+    // Build apps lookup by node_selector for quick filtering
+    let apps_by_node: HashMap<String, Vec<&Application>> = {
+        let mut map: HashMap<String, Vec<&Application>> = HashMap::new();
+        for app in &all_apps {
+            for node_id in &app.node_selector {
+                map.entry(node_id.clone()).or_default().push(app);
+            }
+        }
+        map
+    };
+
     // Collect network metrics between all pairs
     let node_ids: Vec<String> = pod_info.keys().cloned().collect();
 
@@ -238,12 +255,12 @@ pub async fn get_live_metrics(
             let (is_connected, latency_ms, packet_loss) =
                 measure_connectivity(client, from_pod, to_ip).await;
 
-            // Get apps on source and target nodes
-            let source_apps = state.db.list_applications_by_node(from_node).await.unwrap_or_default();
-            let target_apps = state.db.list_applications_by_node(to_node).await.unwrap_or_default();
+            // Get apps on source and target nodes (from pre-loaded data)
+            let source_apps: Vec<&Application> = apps_by_node.get(from_node).cloned().unwrap_or_default();
+            let target_apps: Vec<&Application> = apps_by_node.get(to_node).cloned().unwrap_or_default();
 
-            // Get chaos conditions affecting this pair
-            let chaos_conditions = state.db.list_chaos_conditions(&topology_id).await.unwrap_or_default();
+            // Get chaos conditions affecting this pair (from pre-loaded data)
+            let chaos_conditions = &all_chaos;
             let affecting_chaos: Vec<String> = chaos_conditions
                 .iter()
                 .filter(|c| {
@@ -279,7 +296,10 @@ pub async fn get_live_metrics(
         }
 
         // Collect node metrics
-        let (pod_name, _) = pod_info.get(from_node).unwrap();
+        let (pod_name, _) = match pod_info.get(from_node) {
+            Some(info) => info,
+            None => continue, // Skip if pod info not found
+        };
         let pod_status = get_pod_status(&pod_list, pod_name);
 
         let node_metric = NodeMetric {

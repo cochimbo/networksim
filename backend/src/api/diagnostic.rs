@@ -259,8 +259,8 @@ pub async fn run_diagnostic(
 
             // Update matrix
             connectivity_matrix
-                .get_mut(from_node)
-                .unwrap()
+                .entry(from_node.clone())
+                .or_default()
                 .insert(to_node.clone(), actual == ConnectivityStatus::Connected);
 
             connectivity_tests.push(ConnectivityResult {

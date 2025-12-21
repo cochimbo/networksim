@@ -8,6 +8,18 @@ use std::collections::BTreeMap;
 
 use super::types::*;
 
+/// Error when converting non-NetworkChaos types to ChaosAction
+#[derive(Debug, Clone)]
+pub struct InvalidChaosActionError(pub ChaosType);
+
+impl std::fmt::Display for InvalidChaosActionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ChaosAction only applies to NetworkChaos types, got {:?}", self.0)
+    }
+}
+
+impl std::error::Error for InvalidChaosActionError {}
+
 /// The Chaos Mesh NetworkChaos action
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -20,19 +32,19 @@ pub enum ChaosAction {
     Partition,
 }
 
-impl From<&ChaosType> for ChaosAction {
-    fn from(t: &ChaosType) -> Self {
+impl TryFrom<&ChaosType> for ChaosAction {
+    type Error = InvalidChaosActionError;
+
+    fn try_from(t: &ChaosType) -> Result<Self, Self::Error> {
         match t {
-            ChaosType::Delay => ChaosAction::Delay,
-            ChaosType::Loss => ChaosAction::Loss,
-            ChaosType::Bandwidth => ChaosAction::Bandwidth,
-            ChaosType::Corrupt => ChaosAction::Corrupt,
-            ChaosType::Duplicate => ChaosAction::Duplicate,
-            ChaosType::Partition => ChaosAction::Partition,
-            // Non-NetworkChaos types don't have a ChaosAction - should use create_chaos_manifest instead
-            ChaosType::StressCpu | ChaosType::PodKill | ChaosType::IoDelay | ChaosType::HttpAbort => {
-                panic!("ChaosAction only applies to NetworkChaos types")
-            }
+            ChaosType::Delay => Ok(ChaosAction::Delay),
+            ChaosType::Loss => Ok(ChaosAction::Loss),
+            ChaosType::Bandwidth => Ok(ChaosAction::Bandwidth),
+            ChaosType::Corrupt => Ok(ChaosAction::Corrupt),
+            ChaosType::Duplicate => Ok(ChaosAction::Duplicate),
+            ChaosType::Partition => Ok(ChaosAction::Partition),
+            // Non-NetworkChaos types don't have a ChaosAction
+            other => Err(InvalidChaosActionError(other.clone())),
         }
     }
 }
@@ -169,6 +181,7 @@ pub fn create_network_chaos(
     duration: Option<&str>,
     params: &serde_json::Value,
 ) -> serde_json::Value {
+    // Safety: create_chaos_manifest dispatcher ensures only NetworkChaos types reach here
     let action = match chaos_type {
         ChaosType::Delay => "delay",
         ChaosType::Loss => "loss",
@@ -176,8 +189,13 @@ pub fn create_network_chaos(
         ChaosType::Corrupt => "corrupt",
         ChaosType::Duplicate => "duplicate",
         ChaosType::Partition => "partition",
-        // Non-network types should use create_chaos_manifest dispatcher
-        _ => panic!("Invalid chaos type for NetworkChaos: {:?}", chaos_type),
+        // Non-network types are handled by their own builders via create_chaos_manifest
+        ChaosType::StressCpu | ChaosType::PodKill | ChaosType::IoDelay | ChaosType::HttpAbort => {
+            tracing::error!("Invalid chaos type for NetworkChaos: {:?}. This is a bug - the dispatcher should prevent this.", chaos_type);
+            return json!({
+                "error": format!("Invalid chaos type for NetworkChaos: {:?}", chaos_type)
+            });
+        }
     };
 
     // Source selector
@@ -306,10 +324,9 @@ pub fn create_network_chaos(
                 "loss": "100"
             });
         }
-        // Non-NetworkChaos types are handled by their own builders
-        ChaosType::StressCpu | ChaosType::PodKill | ChaosType::IoDelay | ChaosType::HttpAbort => {
-            unreachable!("Non-NetworkChaos types should use create_chaos_manifest")
-        }
+        // Non-NetworkChaos types are handled by their own builders - this branch
+        // should never execute due to the early return above
+        ChaosType::StressCpu | ChaosType::PodKill | ChaosType::IoDelay | ChaosType::HttpAbort => {}
     }
 
     // Build the full NetworkChaos resource

@@ -115,6 +115,7 @@ pub async fn create(
         params: req.params,
         k8s_name: None,
         status: ChaosConditionStatus::Pending,
+        started_at: None,
         created_at: now,
         updated_at: now,
     };

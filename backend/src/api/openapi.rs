@@ -278,7 +278,7 @@ pub struct ChaosConditionSchema {
     /// Source node ID
     #[schema(example = "server-1")]
     pub source_node_id: String,
-    /// Target node ID (optional)
+    /// Target node ID (optional for node-based chaos like stress-cpu, pod-kill)
     pub target_node_id: Option<String>,
     /// Type of chaos
     pub chaos_type: ChaosTypeSchema,
@@ -290,11 +290,15 @@ pub struct ChaosConditionSchema {
     pub params: ChaosParamsSchema,
     /// Kubernetes resource name
     pub k8s_name: Option<String>,
-    /// Status: pending, active, paused, completed, error
+    /// Status: pending, active, paused
     #[schema(example = "active")]
     pub status: String,
+    /// When chaos was activated (for countdown timer)
+    pub started_at: Option<String>,
     /// Creation timestamp
     pub created_at: String,
+    /// Last update timestamp
+    pub updated_at: String,
 }
 
 /// Request to create a chaos condition
@@ -321,8 +325,9 @@ pub struct CreateChaosRequest {
 
 /// Type of chaos to apply
 #[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum ChaosTypeSchema {
+    // NetworkChaos types
     /// Add network latency
     Delay,
     /// Cause packet loss
@@ -335,6 +340,22 @@ pub enum ChaosTypeSchema {
     Duplicate,
     /// Network partition (block all traffic)
     Partition,
+    // StressChaos
+    /// CPU stress on target pods
+    #[serde(rename = "stress-cpu")]
+    StressCpu,
+    // PodChaos
+    /// Kill target pods
+    #[serde(rename = "pod-kill")]
+    PodKill,
+    // IOChaos
+    /// Add latency to disk I/O
+    #[serde(rename = "io-delay")]
+    IoDelay,
+    // HTTPChaos
+    /// Abort HTTP requests with error codes
+    #[serde(rename = "http-abort")]
+    HttpAbort,
 }
 
 /// Traffic direction for chaos
@@ -352,6 +373,7 @@ pub enum ChaosDirectionSchema {
 /// Parameters for chaos conditions
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct ChaosParamsSchema {
+    // NetworkChaos params
     /// Latency to add (for delay type)
     #[schema(example = "100ms")]
     pub latency: Option<String>,
@@ -367,6 +389,37 @@ pub struct ChaosParamsSchema {
     /// Corruption percentage (for corrupt type)
     #[schema(example = "5")]
     pub corrupt: Option<String>,
+    // StressChaos params
+    /// Number of CPU workers (for stress-cpu)
+    #[schema(example = 2)]
+    pub workers: Option<u32>,
+    /// CPU load percentage (for stress-cpu)
+    #[schema(example = 80)]
+    pub load: Option<u32>,
+    // PodChaos params
+    /// Grace period before killing pod (for pod-kill)
+    #[schema(example = 0)]
+    pub grace_period: Option<i64>,
+    // IOChaos params
+    /// I/O delay (for io-delay)
+    #[schema(example = "100ms")]
+    pub delay: Option<String>,
+    /// Path to affect (for io-delay)
+    #[schema(example = "/data")]
+    pub path: Option<String>,
+    /// Percentage of operations to affect
+    #[schema(example = 100)]
+    pub percent: Option<u32>,
+    // HTTPChaos params
+    /// HTTP status code to return (for http-abort)
+    #[schema(example = 500)]
+    pub code: Option<u16>,
+    /// HTTP method to match
+    #[schema(example = "GET")]
+    pub method: Option<String>,
+    /// HTTP port to intercept
+    #[schema(example = 8080)]
+    pub port: Option<u16>,
 }
 
 // --- Preset Schemas ---

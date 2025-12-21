@@ -303,3 +303,78 @@ pub async fn delete(
 
     Ok(Json(serde_json::json!({ "deleted": id })))
 }
+
+/// Duplicate a topology
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{id}/duplicate",
+    tag = "topologies",
+    params(
+        ("id" = String, Path, description = "Topology ID to duplicate")
+    ),
+    responses(
+        (status = 200, description = "Topology duplicated successfully", body = super::openapi::TopologySchema),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn duplicate(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> AppResult<Json<Topology>> {
+    // Get original topology
+    let row: TopologyRow = sqlx::query_as(
+        "SELECT id, name, description, data, created_at, updated_at FROM topologies WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_optional(state.db.pool())
+    .await?
+    .ok_or_else(|| AppError::NotFound(format!("Topology not found: {}", id)))?;
+
+    // Parse original data
+    let data: serde_json::Value = serde_json::from_str(&row.data)
+        .map_err(|e| AppError::internal(&format!("Failed to parse topology data: {}", e)))?;
+
+    let nodes: Vec<crate::models::Node> = serde_json::from_value(data["nodes"].clone()).unwrap_or_default();
+    let links: Vec<crate::models::Link> = serde_json::from_value(data["links"].clone()).unwrap_or_default();
+
+    // Create new topology with new ID and "Copy of" name
+    let now = Utc::now();
+    let new_id = Uuid::new_v4().to_string();
+    let new_name = format!("Copy of {}", row.name);
+
+    let new_topology = Topology {
+        id: new_id.clone(),
+        name: new_name,
+        description: row.description,
+        nodes,
+        links,
+        created_at: now,
+        updated_at: now,
+    };
+
+    // Save to database
+    let new_data = serde_json::json!({
+        "nodes": new_topology.nodes,
+        "links": new_topology.links,
+    });
+    let data_str = new_data.to_string();
+    let now_str = now.to_rfc3339();
+
+    sqlx::query(
+        "INSERT INTO topologies (id, name, description, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+    )
+    .bind(&new_topology.id)
+    .bind(&new_topology.name)
+    .bind(&new_topology.description)
+    .bind(&data_str)
+    .bind(&now_str)
+    .bind(&now_str)
+    .execute(state.db.pool())
+    .await?;
+
+    // Broadcast event
+    let _ = state.event_tx.send(Event::TopologyCreated { id: new_id });
+
+    Ok(Json(new_topology))
+}
