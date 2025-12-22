@@ -1,0 +1,5 @@
+target
+.git
+.idea
+node_modules
+**/*.rs.bk

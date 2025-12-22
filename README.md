@@ -248,3 +248,55 @@ kubectl get pods -n chaos-mesh
 ## Licencia
 
 MIT
+
+## Pruebas con el binario `testdistributed_app`
+
+Este repositorio incluye una pequeña aplicación de prueba basada en libp2p llamada `testdistributed_app` (ubicada en `testdistributed_app/`). Está pensada para validar comportamiento de descubrimiento/gossip y hacer pruebas de convergencia en entornos aislados (docker-compose, simuladores de red, etc.).
+
+Resumen rápido:
+- Binario: `testdistributed_app/target/release/testdistributed_app` (o `cargo build` para modo debug).
+- Imagen Docker de ejemplo: `testdistributed_app:local` (ver `testdistributed_app/Dockerfile.runtime`).
+- Script de ayudas:
+	- `testdistributed_app/scripts/integration_docker.sh` — construye la imagen y lanza N contenedores (puerto host por contenedor).
+	- `testdistributed_app/scripts/integration_compose.sh` — escala el servicio `node` en `testdistributed_app/docker-compose.yml`.
+	- `testdistributed_app/scripts/integration_compose_logs.sh` — similar a `integration_compose.sh` pero captura logs por contenedor en `testdistributed_app/logs/`.
+	- `testdistributed_app/build_and_push.sh` — construye y (opcionalmente) empuja la imagen a un registry local (`localhost:5000`).
+
+Cómo ejecutar una prueba rápida con 3 nodos (docker-compose):
+
+```bash
+# construir imagen local si hace falta
+cd testdistributed_app
+./scripts/integration_docker.sh 3 9000 60
+
+# o usar docker-compose directo (imagen ya presente)
+./scripts/integration_compose_logs.sh 3 60
+
+# Los logs por contenedor se guardarán en testdistributed_app/logs/<timestamp>/
+```
+
+Cómo ejecutar en modo local sin Docker (útil para depuración):
+
+```bash
+# en una terminal (nodo A)
+cd testdistributed_app
+HTTP_PORT=9091 INTERVAL_SECONDS=2 ANTI_ENTROPY_SECONDS=6 RUST_LOG=info ./target/debug/testdistributed_app
+
+# en otra terminal (nodo B)
+HTTP_PORT=9092 INTERVAL_SECONDS=2 ANTI_ENTROPY_SECONDS=6 RUST_LOG=info ./target/debug/testdistributed_app
+
+# etc. Ajusta puertos y variables de entorno al lanzar múltiples instancias.
+```
+
+Variables útiles:
+- `HTTP_PORT`: puerto interno del servidor HTTP de inspección (por defecto 9090 en contenedor).
+- `INTERVAL_SECONDS`: frecuencia de publicación de heartbeat.
+- `ANTI_ENTROPY_SECONDS`: frecuencia de sincronización DHT/anti-entropy.
+- `PEER_TTL_SECONDS`: tiempo para considerar un peer como "lost" si no se le ve.
+- `RUST_LOG`: nivel de logging (ej. `info`, `debug`).
+
+Consejos:
+- Para pruebas en simuladores de red, utiliza `integration_compose_logs.sh` y luego reproduce condiciones (latencia/pérdida) sobre la red Docker para validar descubrimiento/pérdida de peers.
+- Usa `RUST_LOG=debug` para trazas más detalladas (Kademlia, gossipsub, mdns).
+- Los endpoints HTTP `/peers` permiten consultar el mapa de peers desde cada nodo para medir convergencia.
+

@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  node:
+    image: testdistributed_app:local
+    environment:
+      - HTTP_PORT=9090
+      - INTERVAL_SECONDS=1
+      - ANTI_ENTROPY_SECONDS=5
+      - TOPIC=testdistributed/peers
+      - RUST_LOG=info
+    expose:
+      - "9090"
+    restart: 'no'

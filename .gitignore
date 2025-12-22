@@ -62,6 +62,10 @@ coverage/
 *.so
 *.dylib
 
+# Cargo build targets
+target/
+**/target/
+
 # ====================
 # Kubernetes / K3s
 # ====================
