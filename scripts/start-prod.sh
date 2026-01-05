@@ -18,6 +18,12 @@ if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/
     exit 1
 fi
 
+# Generate SSL certificates if needed
+if [ ! -f "../certs/nginx.crt" ] || [ ! -f "../certs/nginx.key" ]; then
+    echo "Generating SSL certificates..."
+    ./generate-certs.sh
+fi
+
 # Build and start containers
 echo "Building and starting containers..."
 if docker compose version &> /dev/null; then
@@ -28,7 +34,7 @@ fi
 
 echo ""
 echo -e "${GREEN}NetworkSim is running!${NC}"
-echo -e "Frontend: ${GREEN}http://localhost:3000${NC}"
+echo -e "Frontend: ${GREEN}https://localhost${NC} (HTTP redirects to HTTPS)"
 echo -e "Backend:  ${GREEN}http://localhost:8080${NC}"
 echo ""
 echo "To stop:"

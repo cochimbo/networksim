@@ -6,7 +6,7 @@ Plataforma de ingeniería del caos con editor visual de topologías para Kuberne
 
 | Servicio | Puerto | URL |
 |----------|--------|-----|
-| Frontend (React) | 3000 | http://localhost:3000 |
+| Frontend (React) | 80/443 | https://localhost |
 | Backend API (Rust) | 8080 | http://localhost:8080 |
 | Swagger UI | 8080 | http://localhost:8080/swagger-ui/ |
 | Health Check | 8080 | http://localhost:8080/health |
