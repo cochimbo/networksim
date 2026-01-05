@@ -20,7 +20,9 @@ check_cluster() {
         echo -e "${YELLOW}Cluster 'networksim' not found. Creating it...${NC}"
         "$SCRIPT_DIR/setup.sh" --skip-deps
     else
-        echo -e "${GREEN}Cluster 'networksim' is running.${NC}"
+        echo -e "${YELLOW}Ensuring cluster 'networksim' is started...${NC}"
+        k3d cluster start networksim 2>/dev/null || true
+        echo -e "${GREEN}Cluster 'networksim' is ready.${NC}"
     fi
 }
 
@@ -59,10 +61,36 @@ fi
 # 3. Generate SSL certificates if needed
 if [ ! -f "$PROJECT_ROOT/certs/nginx.crt" ] || [ ! -f "$PROJECT_ROOT/certs/nginx.key" ]; then
     echo "Generating SSL certificates..."
+
+    # Fix: If certs dir exists but is not writable (e.g. created by Docker as root), remove it
+    if [ -d "$PROJECT_ROOT/certs" ] && [ ! -w "$PROJECT_ROOT/certs" ]; then
+        echo "Removing non-writable certs directory to avoid permission errors..."
+        sudo rm -rf "$PROJECT_ROOT/certs"
+    fi
+
     "$SCRIPT_DIR/generate-certs.sh"
 fi
 
-# 4. Build and start containers
+# 4. Generate Kubeconfig for Backend
+echo "Generating kubeconfig for backend container..."
+k3d kubeconfig get networksim > "$PROJECT_ROOT/kubeconfig.yaml"
+# Replace localhost/0.0.0.0 with the k3d load balancer container name
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' 's/0.0.0.0/k3d-networksim-serverlb/g' "$PROJECT_ROOT/kubeconfig.yaml"
+    sed -i '' 's/127.0.0.1/k3d-networksim-serverlb/g' "$PROJECT_ROOT/kubeconfig.yaml"
+else
+    sed -i 's/0.0.0.0/k3d-networksim-serverlb/g' "$PROJECT_ROOT/kubeconfig.yaml"
+    sed -i 's/127.0.0.1/k3d-networksim-serverlb/g' "$PROJECT_ROOT/kubeconfig.yaml"
+fi
+# Replace the host mapped port with the internal k3d port (6443)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' -E 's/k3d-networksim-serverlb:[0-9]+/k3d-networksim-serverlb:6443/g' "$PROJECT_ROOT/kubeconfig.yaml"
+else
+    sed -i -E 's/k3d-networksim-serverlb:[0-9]+/k3d-networksim-serverlb:6443/g' "$PROJECT_ROOT/kubeconfig.yaml"
+fi
+chmod 644 "$PROJECT_ROOT/kubeconfig.yaml"
+
+# 5. Build and start containers
 echo "Building and starting containers..."
 cd "$PROJECT_ROOT"
 if docker compose version &> /dev/null; then

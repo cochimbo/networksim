@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.74-bookworm as builder
+FROM rust:1-bookworm as builder
 
 WORKDIR /app
 
@@ -16,6 +16,9 @@ WORKDIR /app/networksim-backend
 # Copy manifests
 COPY ./Cargo.toml ./Cargo.lock ./
 
+# Create dummy bench file to satisfy Cargo.toml
+RUN mkdir benches && echo "fn main() {}" > benches/benchmarks.rs
+
 # Build only the dependencies to cache them
 RUN cargo build --release
 RUN rm src/*.rs
@@ -23,11 +26,8 @@ RUN rm src/*.rs
 # Copy the source code
 COPY ./src ./src
 COPY ./migrations ./migrations
-COPY ./sqlx-data.json ./sqlx-data.json* 
 
 # Build for release
-# SQLX_OFFLINE=true is often needed if we don't have a live DB during build
-ENV SQLX_OFFLINE=true
 RUN touch src/main.rs
 RUN cargo build --release
 

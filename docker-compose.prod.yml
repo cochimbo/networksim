@@ -12,12 +12,13 @@ services:
       - RUST_LOG=info
     volumes:
       - backend_data:/app/data
-      # Mount kubeconfig if you want to connect to a local cluster (optional)
-      # - ~/.kube/config:/root/.kube/config:ro
+      # Mount kubeconfig for k3d access
+      - ./kubeconfig.yaml:/app/.kube/config:ro
     ports:
       - "8080:8080"
     networks:
       - networksim-net
+      - k3d-networksim
 
   frontend:
     build:
@@ -41,3 +42,5 @@ volumes:
 networks:
   networksim-net:
     driver: bridge
+  k3d-networksim:
+    external: true

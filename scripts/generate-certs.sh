@@ -5,7 +5,9 @@
 
 set -e
 
-CERT_DIR="../certs"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+CERT_DIR="$PROJECT_ROOT/certs"
 KEY_FILE="$CERT_DIR/nginx.key"
 CERT_FILE="$CERT_DIR/nginx.crt"
 

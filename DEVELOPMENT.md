@@ -153,5 +153,5 @@ El proyecto utiliza GitHub Actions para automatizar la construcción y publicaci
     - Etiquetas generadas: `latest` y `v1.0.0`.
 
 3.  **Despliegue:**
-    Las imágenes pueden ser utilizadas directamente desde `ghcr.io/cochimbo/networksim/backend` y `frontend`.
+    Las imágenes pueden ser utilizadas directamente desde `ghcr.io/tu-usuario/networksim/backend` y `frontend`.
 

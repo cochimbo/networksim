@@ -25,7 +25,7 @@ Plataforma de ingeniería del caos con editor visual de topologías para Kuberne
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/cochimbo/networksim.git
+git clone https://github.com/tu-usuario/networksim.git
 cd networksim
 ```
 

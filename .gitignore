@@ -79,3 +79,7 @@ k3s.yaml
 *.bak
 *.tmp
 *.temp
+
+# Generated Secrets
+certs/
+kubeconfig.yaml
