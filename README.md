@@ -6,7 +6,7 @@ Plataforma de ingeniería del caos con editor visual de topologías para Kuberne
 
 | Servicio | Puerto | URL |
 |----------|--------|-----|
-| Frontend (React) | 3000 | http://localhost:3000 |
+| Frontend (React) | 80/443 | https://localhost |
 | Backend API (Rust) | 8080 | http://localhost:8080 |
 | Swagger UI | 8080 | http://localhost:8080/swagger-ui/ |
 | Health Check | 8080 | http://localhost:8080/health |
@@ -25,7 +25,7 @@ Plataforma de ingeniería del caos con editor visual de topologías para Kuberne
 ### 1. Clonar el repositorio
 
 ```bash
-git clone https://github.com/cochimbo/networksim.git
+git clone https://github.com/tu-usuario/networksim.git
 cd networksim
 ```
 
@@ -75,6 +75,19 @@ KUBECONFIG=/etc/rancher/k3s/k3s.yaml ./target/release/networksim-backend
 cd frontend
 npm run dev
 ```
+
+### Opción 3: Producción (Docker Compose)
+
+Para ejecutar la versión optimizada para producción (contenedores Docker):
+
+```bash
+./scripts/start-prod.sh
+```
+
+Esto levantará:
+- Backend (Rust) en contenedor optimizado
+- Frontend (React) servido por Nginx
+- Nginx como Reverse Proxy en puerto 3000
 
 ## Características
 

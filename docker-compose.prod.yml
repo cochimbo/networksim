@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: networksim-backend:latest
+    restart: always
+    environment:
+      - DATABASE_URL=sqlite:///app/data/networksim.db
+      - RUST_LOG=info
+    volumes:
+      - backend_data:/app/data
+      # Mount kubeconfig for k3d access
+      - ./kubeconfig.yaml:/app/.kube/config:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - networksim-net
+      - k3d-networksim
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: networksim-frontend:latest
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+    networks:
+      - networksim-net
+
+volumes:
+  backend_data:
+
+networks:
+  networksim-net:
+    driver: bridge
+  k3d-networksim:
+    external: true
