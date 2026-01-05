@@ -207,3 +207,17 @@ INSERT OR IGNORE INTO chaos_presets (id, name, description, category, icon, chao
 ('preset-http-503', 'Service Unavailable', 'Return HTTP 503 Service Unavailable', 'http', '🔌', 'http-abort', 'to', '60s', '{"code": 503}', 1),
 ('preset-http-timeout', 'Gateway Timeout', 'Return HTTP 504 Gateway Timeout', 'http', '⏰', 'http-abort', 'to', '60s', '{"code": 504}', 1);
 
+-- Registry configurations
+CREATE TABLE IF NOT EXISTS registry_configs (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    username TEXT,
+    password TEXT,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    is_insecure INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+

@@ -9,7 +9,7 @@ import {
   ChevronUp, ChevronDown, Clock, Film, BarChart3, FileDown, LayoutTemplate,
   Undo2, Redo2, Copy, Grid
 } from 'lucide-react';
-import { topologyApi, clusterApi, deploymentApi, chaosApi, diagnosticApi, Topology, Node, Link, ContainerInfo } from '../services/api';
+import { topologyApi, clusterApi, deploymentApi, chaosApi, diagnosticApi, Topology, Node, Link } from '../services/api';
 import { ChaosPanel } from '../components/ChaosPanel';
 import { NodePropertiesModal, GROUP_COLORS } from '../components/NodePropertiesModal';
 import { DeploymentModal, DeploymentAction, DeploymentPhase } from '../components/DeploymentModal';
@@ -74,7 +74,7 @@ export default function TopologyEditor() {
   const [tool, setTool] = useState<'select' | 'node' | 'link'>('select');
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const [snapToGrid, setSnapToGrid] = useState(false);
-  const [_nodeStatuses, setNodeStatuses] = useState<Record<string, NodeStatus>>({});
+  const [, setNodeStatuses] = useState<Record<string, NodeStatus>>({});
   const [cyReady, setCyReady] = useState(false);
   const [deployModal, setDeployModal] = useState<{
     show: boolean;
@@ -345,7 +345,7 @@ export default function TopologyEditor() {
   const isThisTopologyDeployed = deploymentStatus?.status === 'running' || deploymentStatus?.status === 'pending' || deploymentStatus?.status === 'deploying';
 
   // Node containers (when a node is selected and topology is deployed)
-  const { data: _selectedNodeContainers }: { data?: ContainerInfo[] } = useQuery({
+  useQuery({
     queryKey: ['node-containers', id, selectedElement?.data?.id],
     queryFn: () => diagnosticApi.getNodeContainers(id!, selectedElement.data.id),
     enabled: !isNewTopology && selectedElement?.type === 'node' && isThisTopologyDeployed && clusterStatus?.connected,
@@ -1705,7 +1705,6 @@ export default function TopologyEditor() {
           {/* Left Panel - Applications & Network */}
           {id && (
             <ResizablePanel minWidth={220} maxWidth={600} defaultWidth={leftPanelWidth} side="left" key="left"
-              // @ts-ignore
               setWidth={setLeftPanelWidth}
             >
               <div className="bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
@@ -1764,7 +1763,6 @@ export default function TopologyEditor() {
           {/* Right Panel - Chaos, Presets, Scenarios, Tests */}
           {id && (
             <ResizablePanel minWidth={260} maxWidth={700} defaultWidth={rightPanelWidth} side="right" key="right"
-              // @ts-ignore
               setWidth={setRightPanelWidth}
             >
               <div className="bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col h-full">

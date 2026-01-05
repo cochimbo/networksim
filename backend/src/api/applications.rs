@@ -285,23 +285,58 @@ pub async fn logs(
     let mut errors = Vec::new();
 
     for node_id in &app.node_selector {
-        let pod_name = format!("ns-{}-{}", &app.topology_id.to_string()[..8.min(app.topology_id.to_string().len())], node_id).to_lowercase();
-        let container_name = format!("app-{}", app.id.simple());
-
-        match k8s.get_container_logs(&pod_name, &container_name, "networksim-sim", 1000).await {
-            Ok(logs) => {
-                all_logs.push(format!("=== Logs from image {} (node {}) ===", app.image_name, node_id));
-                all_logs.push(logs);
-                all_logs.push("".to_string());
+        // Find the pod for this application on this node
+        let label_selector = format!("networksim.io/application={},networksim.io/node={}", app.id, node_id);
+        
+        match k8s.list_pods(&label_selector).await {
+            Ok(pods) => {
+                if let Some(pod) = pods.first() {
+                    if let Some(pod_name) = &pod.metadata.name {
+                        let container_name = format!("app-{}", app.id.simple());
+                        
+                        match k8s.get_container_logs(pod_name, &container_name, k8s.namespace(), 1000).await {
+                            Ok(logs) => {
+                                all_logs.push(format!("=== Logs from image {} (node {}) ===", app.image_name, node_id));
+                                all_logs.push(logs);
+                                all_logs.push("".to_string());
+                            }
+                            Err(e) => {
+                                errors.push(format!("Failed to get logs from node {}: {}", node_id, e));
+                            }
+                        }
+                    } else {
+                         errors.push(format!("Pod for node {} has no name", node_id));
+                    }
+                } else {
+                    // Fallback to old logic just in case (sidecar model)
+                    let pod_name = format!("ns-{}-{}", &app.topology_id.to_string()[..8.min(app.topology_id.to_string().len())], node_id).to_lowercase();
+                    let container_name = format!("app-{}", app.id.simple());
+                    
+                    match k8s.get_container_logs(&pod_name, &container_name, k8s.namespace(), 1000).await {
+                        Ok(logs) => {
+                            all_logs.push(format!("=== Logs from image {} (node {}) ===", app.image_name, node_id));
+                            all_logs.push(logs);
+                            all_logs.push("".to_string());
+                        }
+                        Err(e) => {
+                             errors.push(format!("No pods found for app {} on node {} and fallback failed: {}", app.id, node_id, e));
+                        }
+                    }
+                }
             }
             Err(e) => {
-                errors.push(format!("Failed to get logs from node {}: {}", node_id, e));
+                errors.push(format!("Failed to list pods for node {}: {}", node_id, e));
             }
         }
     }
 
     if all_logs.is_empty() && !errors.is_empty() {
-        return Err(AppError::internal(&format!("Failed to get application logs: {}", errors.join(", "))));
+        // If we have errors, return them as logs so the user sees something
+        let error_logs = errors.join("\n");
+        return Ok(Json(serde_json::json!({
+            "logs": format!("Failed to retrieve logs:\n{}", error_logs),
+            "truncated": false
+        })));
     }
 
     let combined_logs = all_logs.join("\n");

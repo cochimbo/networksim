@@ -101,6 +101,7 @@ export function TestRunner({
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topologyId]);
 
   // Poll running test status

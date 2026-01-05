@@ -78,6 +78,7 @@ export function NetworkMatrix({
     if (!report && nodes.length > 0) {
       runDiagnostic();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes.length]);
 
   const getConnectivityForPair = (from: string, to: string) => {

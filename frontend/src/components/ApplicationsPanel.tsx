@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import EnvVarsEditor from './EnvVarsEditor';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Play, Trash2, Package, ChevronDown, ChevronUp, HardDrive, Cpu, Heart } from 'lucide-react';
+import { Plus, Play, Trash2, Package, ChevronDown, ChevronUp, HardDrive, Cpu, Heart, FileText } from 'lucide-react';
 import { applicationsApi, DeployAppRequest, AppRuntimeStatus, VolumeMount, HealthCheck } from '../services/api';
 import envIcon from '../assets/icons/env-icon.png';
 import { SkeletonList } from './Skeleton';
+import { LogViewerModal } from './LogViewerModal';
 import './ApplicationsPanel.css';
 
 interface ApplicationsPanelProps {
@@ -93,6 +94,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
   const [deleteError, setDeleteError] = useState<string>('');
   const [appStatuses, setAppStatuses] = useState<Record<string, AppRuntimeStatus>>({});
   const [showEnvEditor, setShowEnvEditor] = useState<{ appId: string, env: any[] } | null>(null);
+  const [logViewer, setLogViewer] = useState<{ appId: string; appName: string } | null>(null);
 
   // Actualizar deployForm cuando cambia el nodo seleccionado
   useEffect(() => {
@@ -128,6 +130,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
         loadAppStatus(app.id);
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applications, isTopologyDeployed]);
 
   // Función para recargar todos los estados de runtime
@@ -206,7 +209,6 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
       cpu_limit: deployForm.cpu_limit || undefined,
       memory_limit: deployForm.memory_limit || undefined,
     };
-    // eslint-disable-next-line no-console
     console.log('Deploy payload:', deployPayload);
     deployMutation.mutate(deployPayload);
   };
@@ -568,6 +570,14 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                         <img src={envIcon} alt="Env" className="h-4 w-7" />
                       </button>
                       <button
+                        onClick={() => setLogViewer({ appId: app.id, appName: app.image_name })}
+                        disabled={!isTopologyDeployed}
+                        className="p-1 rounded hover:bg-gray-100 disabled:opacity-50"
+                        title={isTopologyDeployed ? "View Logs" : "Logs available only when deployed"}
+                      >
+                        <FileText className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={() => {
                           if (!isTopologyDeployed) {
                             uninstallMutation.mutate(app.id);
@@ -614,6 +624,15 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
               setShowEnvEditor(null);
             }}
             onClose={() => setShowEnvEditor(null)}
+          />
+        )}
+        {logViewer && (
+          <LogViewerModal
+            isOpen={true}
+            onClose={() => setLogViewer(null)}
+            topologyId={topologyId}
+            appId={logViewer.appId}
+            appName={logViewer.appName}
           />
         )}
       </div>

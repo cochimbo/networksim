@@ -183,6 +183,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
 
   useEffect(() => {
     fetchConditions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topologyId]);
 
   useEffect(() => {

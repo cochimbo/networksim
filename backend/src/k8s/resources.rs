@@ -752,8 +752,19 @@ pub fn create_application_deployment(app: &Application, node_id: &str, topology_
     // Build a kubernetes-safe deployment name (max 63 chars)
     let deployment_name = make_deployment_name(&app.id.simple().to_string(), node_id);
 
+    // Extract simple name from image for the label (remove registry and tag)
+    // e.g. "host.k3d.internal:5000/my-busybox" -> "my-busybox"
+    let simple_image_name = app.image_name
+        .split('/')
+        .last()
+        .unwrap_or(&app.image_name)
+        .split(':')
+        .next()
+        .unwrap_or(&app.image_name)
+        .to_string();
+
     let mut labels = BTreeMap::new();
-    labels.insert("app.kubernetes.io/name".to_string(), app.image_name.replace(":", "-"));
+    labels.insert("app.kubernetes.io/name".to_string(), simple_image_name);
     labels.insert("app.kubernetes.io/managed-by".to_string(), "networksim".to_string());
     // Ensure the instance label is set so lookups by app.kubernetes.io/instance work
     labels.insert("app.kubernetes.io/instance".to_string(), deployment_name.clone());
