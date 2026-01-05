@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: networksim-backend:latest
+    restart: always
+    environment:
+      - DATABASE_URL=sqlite:///app/data/networksim.db
+      - RUST_LOG=info
+    volumes:
+      - backend_data:/app/data
+      # Mount kubeconfig if you want to connect to a local cluster (optional)
+      # - ~/.kube/config:/root/.kube/config:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - networksim-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: networksim-frontend:latest
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - networksim-net
+
+volumes:
+  backend_data:
+
+networks:
+  networksim-net:
+    driver: bridge
