@@ -76,6 +76,19 @@ cd frontend
 npm run dev
 ```
 
+### Opción 3: Producción (Docker Compose)
+
+Para ejecutar la versión optimizada para producción (contenedores Docker):
+
+```bash
+./scripts/start-prod.sh
+```
+
+Esto levantará:
+- Backend (Rust) en contenedor optimizado
+- Frontend (React) servido por Nginx
+- Nginx como Reverse Proxy en puerto 3000
+
 ## Características
 
 ### Chaos Engineering

@@ -133,3 +133,25 @@ tail -f /tmp/backend.log
 # Ejecutar comando en pod
 kubectl exec -it <pod> -n networksim-sim -- sh
 ```
+
+## Proceso de Release
+
+El proyecto utiliza GitHub Actions para automatizar la construcción y publicación de imágenes Docker.
+
+1.  **Crear un Tag:**
+    Para lanzar una nueva versión, crea un tag que empiece por `v` (ej: `v1.0.0`).
+
+    ```bash
+    git tag v1.0.0
+    git push origin v1.0.0
+    ```
+
+2.  **CI/CD Pipeline:**
+    - El workflow `Release` se activará automáticamente.
+    - Construirá las imágenes de Backend y Frontend.
+    - Las subirá al GitHub Container Registry (GHCR).
+    - Etiquetas generadas: `latest` y `v1.0.0`.
+
+3.  **Despliegue:**
+    Las imágenes pueden ser utilizadas directamente desde `ghcr.io/cochimbo/networksim/backend` y `frontend`.
+
