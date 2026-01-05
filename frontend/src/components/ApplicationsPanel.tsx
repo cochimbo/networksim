@@ -186,6 +186,13 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
 
   // Eliminado: logsMutation
 
+  const handleUseLocalRegistry = () => {
+    const prefix = 'host.k3d.internal:5000/';
+    if (!deployForm.chart.startsWith(prefix)) {
+      setDeployForm(prev => ({ ...prev, chart: prefix + prev.chart }));
+    }
+  };
+
   const handleDeploy = () => {
     if (!deployForm.chart.trim()) {
       setChartValidationError('Image name is required');
@@ -244,6 +251,17 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
 
             {/* Basic fields */}
             <div className="space-y-2 mb-3">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-medium text-gray-700">Image Name</label>
+                <button
+                  type="button"
+                  onClick={handleUseLocalRegistry}
+                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                  title="Prefix with host.k3d.internal:5000/"
+                >
+                  Use local registry
+                </button>
+              </div>
               <input
                 type="text"
                 placeholder="Image name (e.g. nginx:latest)"
