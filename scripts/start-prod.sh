@@ -21,7 +21,7 @@ fi
 # Generate SSL certificates if needed
 if [ ! -f "../certs/nginx.crt" ] || [ ! -f "../certs/nginx.key" ]; then
     echo "Generating SSL certificates..."
-    ./generate-certs.sh
+    "$(dirname "$0")/generate-certs.sh"
 fi
 
 # Build and start containers
