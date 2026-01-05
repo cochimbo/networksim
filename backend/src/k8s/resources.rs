@@ -508,8 +508,87 @@ pub fn create_pod_spec_with_applications(topology_id: &str, node: &Node, applica
     }
 }
 
+/// Parse volume configuration from app values and return (volumes, volume_mounts)
+fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1::Volume>, Vec<k8s_openapi::api::core::v1::VolumeMount>) {
+    use k8s_openapi::api::core::v1::{Volume, VolumeMount, EmptyDirVolumeSource, HostPathVolumeSource, ConfigMapVolumeSource, SecretVolumeSource};
+
+    let mut volumes = Vec::new();
+    let mut volume_mounts = Vec::new();
+
+    if let Some(values) = &app.values {
+        if let Some(vol_array) = values.get("volumes").and_then(|v| v.as_array()) {
+            for vol_config in vol_array {
+                let name = vol_config.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let mount_path = vol_config.get("mountPath").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let vol_type = vol_config.get("type").and_then(|v| v.as_str()).unwrap_or("emptyDir");
+                let source = vol_config.get("source").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let read_only = vol_config.get("readOnly").and_then(|v| v.as_bool()).unwrap_or(false);
+
+                if name.is_empty() || mount_path.is_empty() {
+                    tracing::warn!("Skipping volume with empty name or mountPath in app {}", app.id);
+                    continue;
+                }
+
+                // Create volume based on type
+                let volume = match vol_type {
+                    "emptyDir" => Volume {
+                        name: name.clone(),
+                        empty_dir: Some(EmptyDirVolumeSource::default()),
+                        ..Default::default()
+                    },
+                    "hostPath" => Volume {
+                        name: name.clone(),
+                        host_path: Some(HostPathVolumeSource {
+                            path: source.clone().unwrap_or_else(|| mount_path.clone()),
+                            type_: Some("DirectoryOrCreate".to_string()),
+                        }),
+                        ..Default::default()
+                    },
+                    "configMap" => Volume {
+                        name: name.clone(),
+                        config_map: Some(ConfigMapVolumeSource {
+                            name: source.clone(),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    "secret" => Volume {
+                        name: name.clone(),
+                        secret: Some(SecretVolumeSource {
+                            secret_name: source.clone(),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    _ => {
+                        tracing::warn!("Unknown volume type '{}' for volume '{}' in app {}", vol_type, name, app.id);
+                        continue;
+                    }
+                };
+
+                volumes.push(volume);
+                volume_mounts.push(VolumeMount {
+                    name: name.clone(),
+                    mount_path,
+                    read_only: Some(read_only),
+                    ..Default::default()
+                });
+
+                tracing::info!("Added volume '{}' ({}) for app {}", name, vol_type, app.id);
+            }
+        }
+    }
+
+    (volumes, volume_mounts)
+}
+
 /// Create a container spec for an application
 pub fn create_application_container(app: &Application) -> Container {
+    create_application_container_with_mounts(app, Vec::new())
+}
+
+/// Create a container spec for an application with volume mounts
+pub fn create_application_container_with_mounts(app: &Application, volume_mounts: Vec<k8s_openapi::api::core::v1::VolumeMount>) -> Container {
     // Use image_name as the full image reference
     let image = app.image_name.clone();
 
@@ -645,6 +724,7 @@ pub fn create_application_container(app: &Application) -> Container {
         command,
         args,
         env: Some(env_vars),
+        volume_mounts: if volume_mounts.is_empty() { None } else { Some(volume_mounts) },
         // Basic resource limits for applications
         resources: Some(ResourceRequirements {
             limits: Some({
@@ -671,20 +751,36 @@ pub fn create_application_deployment(app: &Application, node_id: &str, topology_
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
     // Build a kubernetes-safe deployment name (max 63 chars)
     let deployment_name = make_deployment_name(&app.id.simple().to_string(), node_id);
-    
+
+    // Extract simple name from image for the label (remove registry and tag)
+    // e.g. "host.k3d.internal:5000/my-busybox" -> "my-busybox"
+    let simple_image_name = app.image_name
+        .split('/')
+        .last()
+        .unwrap_or(&app.image_name)
+        .split(':')
+        .next()
+        .unwrap_or(&app.image_name)
+        .to_string();
+
     let mut labels = BTreeMap::new();
-    labels.insert("app.kubernetes.io/name".to_string(), app.image_name.replace(":", "-"));
+    labels.insert("app.kubernetes.io/name".to_string(), simple_image_name);
     labels.insert("app.kubernetes.io/managed-by".to_string(), "networksim".to_string());
     // Ensure the instance label is set so lookups by app.kubernetes.io/instance work
     labels.insert("app.kubernetes.io/instance".to_string(), deployment_name.clone());
     labels.insert("networksim.io/topology".to_string(), topology_id.to_string());
     labels.insert("networksim.io/node".to_string(), node_id.to_string());
     labels.insert("networksim.io/application".to_string(), app.id.to_string());
-    
-    let app_container = create_application_container(app);
-    
+
+    // Parse volumes from app configuration
+    let (volumes, volume_mounts) = parse_volumes_from_app(app);
+
+    // Create container with volume mounts
+    let app_container = create_application_container_with_mounts(app, volume_mounts);
+
     let pod_spec = PodSpec {
         containers: vec![app_container],
+        volumes: if volumes.is_empty() { None } else { Some(volumes) },
         restart_policy: Some("Always".to_string()),
         ..Default::default()
     };

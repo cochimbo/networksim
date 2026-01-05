@@ -34,6 +34,7 @@ struct ChaosConditionRow {
     params: String,
     status: String,
     k8s_name: Option<String>,
+    started_at: Option<String>,
     created_at: String,
     updated_at: String,
 }
@@ -134,10 +135,11 @@ impl Database {
         condition: &ChaosCondition,
     ) -> Result<(), sqlx::Error> {
         let now = Utc::now().to_rfc3339();
+        let started_at = condition.started_at.map(|dt| dt.to_rfc3339());
         sqlx::query(
             r#"
-            INSERT INTO chaos_conditions (id, topology_id, source_node_id, target_node_id, chaos_type, direction, duration, params, status, k8s_name, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO chaos_conditions (id, topology_id, source_node_id, target_node_id, chaos_type, direction, duration, params, status, k8s_name, started_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(&condition.id)
@@ -150,6 +152,7 @@ impl Database {
         .bind(condition.params.to_string())
         .bind(condition.status.to_string())
         .bind(&condition.k8s_name)
+        .bind(&started_at)
         .bind(&now)
         .bind(&now)
         .execute(&self.pool)
@@ -164,7 +167,7 @@ impl Database {
         id: &str,
     ) -> Result<Option<ChaosCondition>, sqlx::Error> {
         let row: Option<ChaosConditionRow> = sqlx::query_as(
-            "SELECT id, topology_id, source_node_id, target_node_id, chaos_type, direction, duration, params, status, k8s_name, created_at, updated_at FROM chaos_conditions WHERE id = ?",
+            "SELECT id, topology_id, source_node_id, target_node_id, chaos_type, direction, duration, params, status, k8s_name, started_at, created_at, updated_at FROM chaos_conditions WHERE id = ?",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -179,7 +182,7 @@ impl Database {
         topology_id: &str,
     ) -> Result<Vec<ChaosCondition>, sqlx::Error> {
         let rows: Vec<ChaosConditionRow> = sqlx::query_as(
-            "SELECT id, topology_id, source_node_id, target_node_id, chaos_type, direction, duration, params, status, k8s_name, created_at, updated_at FROM chaos_conditions WHERE topology_id = ? ORDER BY created_at",
+            "SELECT id, topology_id, source_node_id, target_node_id, chaos_type, direction, duration, params, status, k8s_name, started_at, created_at, updated_at FROM chaos_conditions WHERE topology_id = ? ORDER BY created_at",
         )
         .bind(topology_id)
         .fetch_all(&self.pool)
@@ -189,6 +192,7 @@ impl Database {
     }
 
     /// Update chaos condition status and k8s_name
+    /// Sets started_at when status becomes Active, clears it otherwise
     pub async fn update_chaos_condition_status(
         &self,
         id: &str,
@@ -196,11 +200,19 @@ impl Database {
         k8s_name: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         let now = Utc::now().to_rfc3339();
+        // Set started_at when activating, clear when pausing/pending
+        let started_at = if *status == ChaosConditionStatus::Active {
+            Some(now.clone())
+        } else {
+            None
+        };
+
         sqlx::query(
-            "UPDATE chaos_conditions SET status = ?, k8s_name = ?, updated_at = ? WHERE id = ?",
+            "UPDATE chaos_conditions SET status = ?, k8s_name = ?, started_at = ?, updated_at = ? WHERE id = ?",
         )
         .bind(status.to_string())
         .bind(k8s_name)
+        .bind(&started_at)
         .bind(&now)
         .bind(id)
         .execute(&self.pool)
@@ -420,6 +432,10 @@ impl Database {
             "corrupt" => ChaosType::Corrupt,
             "duplicate" => ChaosType::Duplicate,
             "partition" => ChaosType::Partition,
+            "stress-cpu" => ChaosType::StressCpu,
+            "pod-kill" => ChaosType::PodKill,
+            "io-delay" => ChaosType::IoDelay,
+            "http-abort" => ChaosType::HttpAbort,
             _ => ChaosType::Delay,
         };
 
@@ -438,6 +454,9 @@ impl Database {
         let params: serde_json::Value =
             serde_json::from_str(&row.params).map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
 
+        // Parse started_at if present
+        let started_at = row.started_at.and_then(|s| s.parse::<DateTime<Utc>>().ok());
+
         Ok(ChaosCondition {
             id: row.id,
             topology_id: row.topology_id,
@@ -449,6 +468,7 @@ impl Database {
             params,
             status,
             k8s_name: row.k8s_name,
+            started_at,
             created_at: row
                 .created_at
                 .parse::<DateTime<Utc>>()

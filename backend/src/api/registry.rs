@@ -364,9 +364,14 @@ pub async fn test_registry(
         .map_err(|e| AppError::internal(&format!("Failed to create HTTP client: {}", e)))?;
 
     let url = if row.url.starts_with("http") {
-        format!("{}/v2/", row.url)
+        format!("{}/v2/", row.url.trim_end_matches('/'))
     } else {
-        format!("https://{}/v2/", row.url)
+        // If insecure is set, default to http, otherwise https
+        if row.is_insecure != 0 {
+            format!("http://{}/v2/", row.url.trim_end_matches('/'))
+        } else {
+            format!("https://{}/v2/", row.url.trim_end_matches('/'))
+        }
     };
 
     let mut request = client.get(&url);

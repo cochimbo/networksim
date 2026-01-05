@@ -121,4 +121,35 @@ export function SkeletonStats() {
   );
 }
 
+export function SkeletonTopologyCard() {
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-3">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <Skeleton height={20} width="60%" className="mb-2" />
+        </div>
+        <div className="flex gap-1">
+          <Skeleton variant="circular" width={28} height={28} />
+          <Skeleton variant="circular" width={28} height={28} />
+        </div>
+      </div>
+      <Skeleton height={14} width="80%" />
+      <div className="flex items-center gap-4 pt-2">
+        <Skeleton height={14} width={70} />
+        <Skeleton height={14} width={90} />
+      </div>
+    </div>
+  );
+}
+
+export function SkeletonTopologyGrid({ count = 6 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {Array.from({ length: count }, (_, i) => (
+        <SkeletonTopologyCard key={i} />
+      ))}
+    </div>
+  );
+}
+
 export default Skeleton;

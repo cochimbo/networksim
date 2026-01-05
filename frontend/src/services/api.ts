@@ -27,6 +27,7 @@ export interface Node {
   name: string;
   position: Position;
   config: NodeConfig;
+  group?: string;  // Optional group name for visual grouping
 }
 
 export interface LinkProperties {
@@ -38,6 +39,7 @@ export interface Link {
   id: string;
   source: string;
   target: string;
+  label?: string;  // Optional label for the connection
   properties?: LinkProperties;
 }
 
@@ -102,6 +104,11 @@ export const topologyApi = {
 
   status: async (id: string): Promise<any> => {
     const response = await api.get(`/api/topologies/${id}/status`);
+    return response.data;
+  },
+
+  duplicate: async (id: string): Promise<Topology> => {
+    const response = await api.post(`/api/topologies/${id}/duplicate`);
     return response.data;
   },
 };
@@ -230,6 +237,7 @@ export interface ChaosCondition {
   params: ChaosParams;
   k8s_name?: string;
   status: ChaosConditionStatus;
+  started_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -250,11 +258,7 @@ export const chaosApi = {
   },
 
   create: async (data: CreateChaosRequest): Promise<ChaosCondition> => {
-    console.log('chaosApi.create called with data:', data);
-    console.log('API_BASE:', API_BASE);
-    console.log('Full URL:', `${API_BASE}/api/chaos`);
     const response = await api.post('/api/chaos', data);
-    console.log('Response:', response);
     return response.data;
   },
 
@@ -348,6 +352,23 @@ export const diagnosticApi = {
 // Application Types
 export type AppStatus = 'pending' | 'deploying' | 'deployed' | 'failed' | 'uninstalling';
 
+export interface VolumeMount {
+  name: string;
+  mountPath: string;
+  type: 'emptyDir' | 'hostPath' | 'configMap' | 'secret';
+  source?: string; // For hostPath, configMap, secret - the name/path
+  readOnly?: boolean;
+}
+
+export interface HealthCheck {
+  type: 'http' | 'tcp' | 'exec';
+  path?: string; // For http: /healthz
+  port?: number; // For http/tcp
+  command?: string[]; // For exec
+  initialDelaySeconds?: number;
+  periodSeconds?: number;
+}
+
 export interface Application {
   id: string;
   topology_id: string;
@@ -360,6 +381,14 @@ export interface Application {
   release_name: string;
   created_at: string;
   updated_at: string;
+  // New fields
+  replicas?: number;
+  volumes?: VolumeMount[];
+  healthCheck?: HealthCheck;
+  cpu_request?: string;
+  memory_request?: string;
+  cpu_limit?: string;
+  memory_limit?: string;
 }
 
 export interface DeployAppRequest {
@@ -367,6 +396,13 @@ export interface DeployAppRequest {
   node_selector: string[]; // List of node IDs where to deploy
   // namespace is now fixed to simulation namespace for network policies
   envvalues?: Record<string, any>;
+  replicas?: number;
+  volumes?: VolumeMount[];
+  healthCheck?: HealthCheck;
+  cpu_request?: string;
+  memory_request?: string;
+  cpu_limit?: string;
+  memory_limit?: string;
 }
 
 export interface AppLogs {
@@ -397,26 +433,13 @@ export const applicationsApi = {
   },
 
   createAppDraft: async (topologyId: string, request: DeployAppRequest): Promise<Application> => {
-    try {
-      console.log('applicationsApi.createAppDraft - request', { topologyId, request });
-      const response = await api.post(`/api/topologies/${topologyId}/apps/draft`, request);
-      console.log('applicationsApi.createAppDraft - response', { status: response.status, data: response.data });
-      return response.data;
-    } catch (e) {
-      console.error('applicationsApi.createAppDraft - error', e);
-      throw e;
-    }
+    const response = await api.post(`/api/topologies/${topologyId}/apps/draft`, request);
+    return response.data;
   },
-  updateAppValues: async (topologyId: string, appId: string, values: Record<string, any> | null): Promise<Application> => {
-    try {
-      console.log('applicationsApi.updateAppValues - request', { topologyId, appId, values });
-      const response = await api.put(`/api/topologies/${topologyId}/apps/${appId}`, { envvalues: values });
-      console.log('applicationsApi.updateAppValues - response', { status: response.status, data: response.data });
-      return response.data;
-    } catch (e) {
-      console.error('applicationsApi.updateAppValues - error', e);
-      throw e;
-    }
+
+  updateAppValues: async (topologyId: string, appId: string, values: Record<string, unknown> | null): Promise<Application> => {
+    const response = await api.put(`/api/topologies/${topologyId}/apps/${appId}`, { envvalues: values });
+    return response.data;
   },
 
   listByTopology: async (topologyId: string): Promise<Application[]> => {

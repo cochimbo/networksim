@@ -4,6 +4,7 @@ import TopologyList from './pages/TopologyList';
 import TopologyEditor from './pages/TopologyEditor';
 import Settings from './pages/Settings';
 import Scenarios from './pages/Scenarios';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Wrapper to provide key based on route param
 function TopologyEditorWithKey() {
@@ -13,18 +14,20 @@ function TopologyEditorWithKey() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/topologies" replace />} />
-          <Route path="topologies" element={<TopologyList />} />
-          <Route path="topologies/new" element={<TopologyEditorWithKey />} />
-          <Route path="topologies/:id" element={<TopologyEditorWithKey />} />
-          <Route path="scenarios" element={<Scenarios />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Navigate to="/topologies" replace />} />
+            <Route path="topologies" element={<TopologyList />} />
+            <Route path="topologies/new" element={<TopologyEditorWithKey />} />
+            <Route path="topologies/:id" element={<TopologyEditorWithKey />} />
+            <Route path="scenarios" element={<Scenarios />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

@@ -339,6 +339,9 @@ pub struct ChaosCondition {
     /// Current status: pending, active, paused
     #[serde(default)]
     pub status: ChaosConditionStatus,
+    /// When the chaos was started (activated) - for countdown timer
+    #[serde(default)]
+    pub started_at: Option<DateTime<Utc>>,
     /// When created
     pub created_at: DateTime<Utc>,
     /// When last updated

@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS chaos_conditions (
     params TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     k8s_name TEXT,
+    started_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (topology_id) REFERENCES topologies(id) ON DELETE CASCADE
@@ -205,4 +206,18 @@ INSERT OR IGNORE INTO chaos_presets (id, name, description, category, icon, chao
 ('preset-http-429', 'Rate Limit (429)', 'Simulate rate limiting with HTTP 429', 'http', '🚦', 'http-abort', 'to', '60s', '{"code": 429}', 1),
 ('preset-http-503', 'Service Unavailable', 'Return HTTP 503 Service Unavailable', 'http', '🔌', 'http-abort', 'to', '60s', '{"code": 503}', 1),
 ('preset-http-timeout', 'Gateway Timeout', 'Return HTTP 504 Gateway Timeout', 'http', '⏰', 'http-abort', 'to', '60s', '{"code": 504}', 1);
+
+-- Registry configurations
+CREATE TABLE IF NOT EXISTS registry_configs (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    username TEXT,
+    password TEXT,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    is_insecure INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 

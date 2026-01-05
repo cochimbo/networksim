@@ -597,3 +597,34 @@
 .btn-delete:hover {
   background: #ffebee;
 }
+
+/* Countdown timer */
+.countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  animation: pulse-soft 2s infinite;
+}
+
+.countdown-warning {
+  background: #fee2e2;
+  color: #dc2626;
+  animation: pulse-warning 0.5s infinite;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes pulse-warning {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.02); }
+}

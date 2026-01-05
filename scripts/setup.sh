@@ -309,6 +309,7 @@ create_cluster() {
     print_step "Creating K3d cluster without default CNI (for Calico)..."
     
     k3d cluster create $CLUSTER_NAME \
+        --registry-config "$(cd "$(dirname "$0")/.." && pwd)/registries.yaml" \
         --k3s-arg "--flannel-backend=none@server:*" \
         --k3s-arg "--disable-network-policy@server:*" \
         --servers 1 \

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import EnvVarsEditor from './EnvVarsEditor';
-  const [showEnvEditor, setShowEnvEditor] = useState(false);
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Plus, Play, Trash2, FileText, Loader2 } from 'lucide-react';
 import { applicationsApi, Application, DeployAppRequest } from '../services/api';
@@ -37,6 +36,7 @@ const COMMON_CHART_EXAMPLES = [
 
 export function ApplicationsModal({ topologyId, nodeId, nodeName, isOpen, onClose }: ApplicationsModalProps) {
   const queryClient = useQueryClient();
+  const [showEnvEditor, setShowEnvEditor] = useState(false);
   const [showDeployForm, setShowDeployForm] = useState(false);
   const [deployForm, setDeployForm] = useState<DeployAppRequest>({
     chart: '',

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   chaosApi,
@@ -13,6 +13,91 @@ import {
 } from '../services/api';
 import './ChaosPanel.css';
 import { AffectedAppsModal } from './AffectedAppsModal';
+import { useToast } from './Toast';
+
+// Countdown timer component for active chaos with duration
+function ChaosCountdown({ startedAt, duration, onExpired }: {
+  startedAt?: string;
+  duration?: string;
+  onExpired?: () => void;
+}) {
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const expiredCalledRef = useRef(false);
+
+  useEffect(() => {
+    // Reset expired flag when startedAt or duration changes
+    expiredCalledRef.current = false;
+  }, [startedAt, duration]);
+
+  useEffect(() => {
+    if (!startedAt || !duration) {
+      setRemaining(null);
+      return;
+    }
+
+    // Parse duration (e.g., "30s", "5m", "1h")
+    const parseDuration = (d: string): number => {
+      const match = d.match(/^(\d+)(s|m|h)$/);
+      if (!match) return 0;
+      const value = parseInt(match[1], 10);
+      const unit = match[2];
+      if (unit === 's') return value * 1000;
+      if (unit === 'm') return value * 60 * 1000;
+      if (unit === 'h') return value * 60 * 60 * 1000;
+      return 0;
+    };
+
+    const durationMs = parseDuration(duration);
+    if (durationMs === 0) {
+      setRemaining(null);
+      return;
+    }
+
+    const startTime = new Date(startedAt).getTime();
+    const endTime = startTime + durationMs;
+    let interval: NodeJS.Timeout | null = null;
+
+    const updateRemaining = () => {
+      const now = Date.now();
+      const left = Math.max(0, endTime - now);
+      setRemaining(left);
+
+      // Only call onExpired once
+      if (left === 0 && onExpired && !expiredCalledRef.current) {
+        expiredCalledRef.current = true;
+        if (interval) clearInterval(interval);
+        onExpired();
+      }
+    };
+
+    updateRemaining();
+    interval = setInterval(updateRemaining, 1000);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [startedAt, duration, onExpired]);
+
+  if (remaining === null) return null;
+
+  const seconds = Math.floor(remaining / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  let display: string;
+  if (hours > 0) {
+    display = `${hours}h ${minutes % 60}m`;
+  } else if (minutes > 0) {
+    display = `${minutes}m ${seconds % 60}s`;
+  } else {
+    display = `${seconds}s`;
+  }
+
+  return (
+    <span className={`countdown ${seconds < 10 ? 'countdown-warning' : ''}`}>
+      ⏱ {display}
+    </span>
+  );
+}
 
 interface ChaosPanelProps {
   topologyId: string;
@@ -71,6 +156,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
   const [pendingRequest, setPendingRequest] = useState<CreateChaosRequest | null>(null);
 
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   // Form state
   const [chaosType, setChaosType] = useState<ChaosType>('delay');
@@ -97,6 +183,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
 
   useEffect(() => {
     fetchConditions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topologyId]);
 
   useEffect(() => {
@@ -649,11 +736,21 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                           <span className="condition-params">{formatParams(c)}</span>
                         </div>
                         <div className="condition-targets">
-                          {getNodeName(c.source_node_id)} 
-                          {c.target_node_id 
+                          {getNodeName(c.source_node_id)}
+                          {c.target_node_id
                             ? ` → ${getNodeName(c.target_node_id)}`
                             : ' → All'
                           }
+                          {c.status === 'active' && c.duration && c.started_at && (
+                            <ChaosCountdown
+                              startedAt={c.started_at}
+                              duration={c.duration}
+                              onExpired={() => {
+                                toast.info(`Chaos "${CHAOS_TYPES.find(t => t.value === c.chaos_type)?.label || c.chaos_type}" expired`);
+                                fetchConditions();
+                              }}
+                            />
+                          )}
                         </div>
                       </div>
                     </div>
