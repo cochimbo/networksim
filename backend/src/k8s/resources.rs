@@ -510,7 +510,7 @@ pub fn create_pod_spec_with_applications(topology_id: &str, node: &Node, applica
 
 /// Parse volume configuration from app values and return (volumes, volume_mounts)
 fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1::Volume>, Vec<k8s_openapi::api::core::v1::VolumeMount>) {
-    use k8s_openapi::api::core::v1::{Volume, VolumeMount, EmptyDirVolumeSource, HostPathVolumeSource, ConfigMapVolumeSource, SecretVolumeSource};
+    use k8s_openapi::api::core::v1::{Volume, VolumeMount, EmptyDirVolumeSource, HostPathVolumeSource, ConfigMapVolumeSource, SecretVolumeSource, PersistentVolumeClaimVolumeSource};
 
     let mut volumes = Vec::new();
     let mut volume_mounts = Vec::new();
@@ -522,10 +522,16 @@ fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1:
                 let mount_path = vol_config.get("mountPath").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let vol_type = vol_config.get("type").and_then(|v| v.as_str()).unwrap_or("emptyDir");
                 let source = vol_config.get("source").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let sub_path = vol_config.get("subPath").and_then(|v| v.as_str()).map(|s| s.to_string());
                 let read_only = vol_config.get("readOnly").and_then(|v| v.as_bool()).unwrap_or(false);
 
-                if name.is_empty() || mount_path.is_empty() {
-                    tracing::warn!("Skipping volume with empty name or mountPath in app {}", app.id);
+                if name.is_empty() {
+                    tracing::warn!("Skipping volume with empty name in app {}", app.id);
+                    continue;
+                }
+
+                if mount_path.is_empty() {
+                    tracing::warn!("Skipping volume '{}' with empty mountPath in app {}", name, app.id);
                     continue;
                 }
 
@@ -547,7 +553,7 @@ fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1:
                     "configMap" => Volume {
                         name: name.clone(),
                         config_map: Some(ConfigMapVolumeSource {
-                            name: source.clone(),
+                            name: source.clone().or_else(|| Some(name.clone())), // Default to volume name if source missing
                             ..Default::default()
                         }),
                         ..Default::default()
@@ -555,8 +561,16 @@ fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1:
                     "secret" => Volume {
                         name: name.clone(),
                         secret: Some(SecretVolumeSource {
-                            secret_name: source.clone(),
+                            secret_name: source.clone().or_else(|| Some(name.clone())), // Default to volume name if source missing
                             ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    "pvc" | "persistentVolumeClaim" => Volume {
+                        name: name.clone(),
+                        persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
+                            claim_name: source.clone().unwrap_or_else(|| name.clone()), // Default to volume name if source missing
+                            read_only: Some(read_only),
                         }),
                         ..Default::default()
                     },
@@ -570,6 +584,7 @@ fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1:
                 volume_mounts.push(VolumeMount {
                     name: name.clone(),
                     mount_path,
+                    sub_path, 
                     read_only: Some(read_only),
                     ..Default::default()
                 });
