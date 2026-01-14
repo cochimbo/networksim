@@ -418,14 +418,14 @@ export function LiveMetrics({
 
           {/* Latency Chart */}
           {showChart && chartData.length > 0 && (
-            <div className="latency-chart bg-white p-3 rounded-lg border border-gray-200">
+            <div className="latency-chart bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-gray-600">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
                   Latency Trend ({selectedInterval})
                 </span>
                 <div className="flex items-center gap-2">
                   {chaosMarkers.length > 0 && (
-                    <span className="text-xs text-amber-600 flex items-center gap-1">
+                    <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                       ⚡ {chaosMarkers.length} chaos
                     </span>
                   )}
@@ -440,9 +440,9 @@ export function LiveMetrics({
 
           {/* Packet Loss Chart */}
           {showChart && packetLossData.some((v) => v > 0) && (
-            <div className="packet-loss-chart bg-white p-3 rounded-lg border border-gray-200">
+            <div className="packet-loss-chart bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-gray-600">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
                   Packet Loss Trend
                 </span>
                 <span className="text-xs text-gray-400">
@@ -456,21 +456,21 @@ export function LiveMetrics({
           {/* Node Status */}
           {snapshot?.node_metrics && snapshot.node_metrics.length > 0 && (
             <div className="node-status">
-              <h4 className="text-xs font-medium text-gray-600 mb-2">Node Status</h4>
+              <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Node Status</h4>
               <div className="space-y-1">
                 {snapshot.node_metrics.map((node) => (
                   <div
                     key={node.node_id}
-                    className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded text-xs"
+                    className="flex items-center justify-between py-1.5 px-2 bg-gray-50 dark:bg-gray-700 rounded text-xs"
                   >
-                    <span className="font-medium">{node.node_id}</span>
+                    <span className="font-medium dark:text-gray-200">{node.node_id}</span>
                     <span
                       className={`px-2 py-0.5 rounded ${
                         node.status === 'Running'
-                          ? 'bg-green-100 text-green-700'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                           : node.status === 'Pending'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-gray-100 text-gray-700'
+                          ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                          : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                       }`}
                     >
                       {node.status}
@@ -511,17 +511,17 @@ function StatCard({
   color: 'green' | 'red' | 'blue' | 'yellow';
 }) {
   const colorClasses = {
-    green: 'text-green-600 bg-green-50',
-    red: 'text-red-600 bg-red-50',
-    blue: 'text-blue-600 bg-blue-50',
-    yellow: 'text-yellow-600 bg-yellow-50',
+    green: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20',
+    red: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
+    blue: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
+    yellow: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
   };
 
   return (
     <div className={`stat-card p-3 rounded-lg ${colorClasses[color]} bg-opacity-50`}>
       <div className="flex items-center gap-2 mb-1">
         <span className={colorClasses[color].split(' ')[0]}>{icon}</span>
-        <span className="text-xs text-gray-600">{label}</span>
+        <span className="text-xs text-gray-600 dark:text-gray-400">{label}</span>
         {trend && trend !== 'stable' && (
           <span className={trend === 'up' ? 'text-red-500' : 'text-green-500'}>
             {trend === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}

@@ -493,7 +493,7 @@ async fn run_smoke_test(state: &AppState, topology_id: &str) -> Result<SmokeTest
     }
 
     // Test 3: K8s connection (if available)
-    if state.k8s.is_some() {
+    if state.k8s.read().await.is_some() {
         tests.push(SmokeTestResult {
             name: "kubernetes_connection".to_string(),
             status: "passed".to_string(),

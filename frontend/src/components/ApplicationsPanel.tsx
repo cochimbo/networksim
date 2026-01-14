@@ -17,11 +17,11 @@ interface ApplicationsPanelProps {
 
 // Predefined charts available
 const STATUS_COLORS = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  deploying: 'bg-blue-100 text-blue-800',
-  uninstalling: 'bg-orange-100 text-orange-800',
-  error: 'bg-red-100 text-red-800',
-  deployed: 'bg-green-100 text-green-800',
+  pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
+  deploying: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
+  uninstalling: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300',
+  error: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
+  deployed: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
 };
 
 const STATUS_LABELS = {
@@ -232,13 +232,13 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
       <div className="applications-panel-header">
         <h3>🟢 Applications</h3>
       </div>
-      <div className="p-4 flex-1 overflow-auto">
+      <div className="p-4 flex-1 overflow-auto dark:bg-gray-900">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-gray-900">{selectedNode ? `Applications for ${selectedNode.name}` : 'All Configured Applications'}</h3>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedNode ? `Applications for ${selectedNode.name}` : 'All Configured Applications'}</h3>
           {selectedNode && (
             <button
               onClick={() => setShowDeployForm(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Add App
@@ -246,17 +246,17 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
           )}
         </div>
         {showDeployForm && selectedNode && (
-          <div className="mb-4 p-4 border rounded bg-gray-50">
-            <h4 className="font-medium mb-3">Deploy New Application to <span className='font-bold'>{selectedNode.name}</span></h4>
+          <div className="mb-4 p-4 border border-gray-200 dark:border-gray-700 rounded bg-gray-50 dark:bg-gray-800">
+            <h4 className="font-medium mb-3 text-gray-900 dark:text-gray-100">Deploy New Application to <span className='font-bold'>{selectedNode.name}</span></h4>
 
             {/* Basic fields */}
             <div className="space-y-2 mb-3">
               <div className="flex justify-between items-center">
-                <label className="text-sm font-medium text-gray-700">Image Name</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Image Name</label>
                 <button
                   type="button"
                   onClick={handleUseLocalRegistry}
-                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
                   title="Prefix with host.k3d.internal:5000/"
                 >
                   Use local registry
@@ -267,20 +267,20 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                 placeholder="Image name (e.g. nginx:latest)"
                 value={deployForm.chart}
                 onChange={e => setDeployForm(prev => ({ ...prev, chart: e.target.value }))}
-                className="p-2 border rounded w-full text-sm"
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded w-full text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               />
-              {chartValidationError && <div className="text-red-600 text-sm">{chartValidationError}</div>}
+              {chartValidationError && <div className="text-red-600 dark:text-red-400 text-sm">{chartValidationError}</div>}
 
               {/* Replicas */}
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600 w-20">Replicas:</label>
+                <label className="text-sm text-gray-600 dark:text-gray-400 w-20">Replicas:</label>
                 <input
                   type="number"
                   min="1"
                   max="10"
                   value={deployForm.replicas}
                   onChange={e => setDeployForm(prev => ({ ...prev, replicas: parseInt(e.target.value) || 1 }))}
-                  className="p-2 border rounded w-20 text-sm"
+                  className="p-2 border border-gray-300 dark:border-gray-600 rounded w-20 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 />
               </div>
             </div>
@@ -289,17 +289,17 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-2"
+              className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-2"
             >
               {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               Advanced Options
             </button>
 
             {showAdvanced && (
-              <div className="space-y-3 p-3 bg-white border rounded mb-3">
+              <div className="space-y-3 p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded mb-3">
                 {/* Resource Limits */}
                 <div>
-                  <div className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  <div className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <Cpu className="h-4 w-4" /> Resources
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -308,28 +308,28 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                       placeholder="CPU Request (e.g. 100m)"
                       value={deployForm.cpu_request}
                       onChange={e => setDeployForm(prev => ({ ...prev, cpu_request: e.target.value }))}
-                      className="p-2 border rounded text-xs"
+                      className="p-2 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     />
                     <input
                       type="text"
                       placeholder="CPU Limit (e.g. 500m)"
                       value={deployForm.cpu_limit}
                       onChange={e => setDeployForm(prev => ({ ...prev, cpu_limit: e.target.value }))}
-                      className="p-2 border rounded text-xs"
+                      className="p-2 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     />
                     <input
                       type="text"
                       placeholder="Memory Request (e.g. 64Mi)"
                       value={deployForm.memory_request}
                       onChange={e => setDeployForm(prev => ({ ...prev, memory_request: e.target.value }))}
-                      className="p-2 border rounded text-xs"
+                      className="p-2 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     />
                     <input
                       type="text"
                       placeholder="Memory Limit (e.g. 256Mi)"
                       value={deployForm.memory_limit}
                       onChange={e => setDeployForm(prev => ({ ...prev, memory_limit: e.target.value }))}
-                      className="p-2 border rounded text-xs"
+                      className="p-2 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                     />
                   </div>
                 </div>
@@ -337,7 +337,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                 {/* Volumes */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    <div className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300">
                       <HardDrive className="h-4 w-4" /> Volumes
                     </div>
                     <button
@@ -346,7 +346,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                         ...prev,
                         volumes: [...prev.volumes, { name: `vol-${prev.volumes.length + 1}`, mountPath: '/data', type: 'emptyDir' }]
                       }))}
-                      className="text-xs text-blue-600 hover:text-blue-800"
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                     >
                       + Add Volume
                     </button>
@@ -360,7 +360,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                           newVols[idx] = { ...vol, type: e.target.value as VolumeMount['type'] };
                           setDeployForm(prev => ({ ...prev, volumes: newVols }));
                         }}
-                        className="p-1 border rounded text-xs w-24"
+                        className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-24 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       >
                         <option value="emptyDir">emptyDir</option>
                         <option value="hostPath">hostPath</option>
@@ -376,7 +376,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                           newVols[idx] = { ...vol, mountPath: e.target.value };
                           setDeployForm(prev => ({ ...prev, volumes: newVols }));
                         }}
-                        className="p-1 border rounded text-xs flex-1"
+                        className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                       />
                       {vol.type !== 'emptyDir' && (
                         <input
@@ -388,7 +388,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                             newVols[idx] = { ...vol, source: e.target.value };
                             setDeployForm(prev => ({ ...prev, volumes: newVols }));
                           }}
-                          className="p-1 border rounded text-xs w-28"
+                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-28 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                         />
                       )}
                       <button
@@ -397,7 +397,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                           ...prev,
                           volumes: prev.volumes.filter((_, i) => i !== idx)
                         }))}
-                        className="text-red-500 hover:text-red-700"
+                        className="text-red-500 hover:text-red-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-1"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
@@ -407,7 +407,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
 
                 {/* Health Check */}
                 <div>
-                  <div className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  <div className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <Heart className="h-4 w-4" /> Health Check
                   </div>
                   <div className="flex items-center gap-2">
@@ -423,7 +423,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                           }));
                         }
                       }}
-                      className="p-1 border rounded text-xs"
+                      className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                     >
                       <option value="">None</option>
                       <option value="http">HTTP</option>
@@ -439,7 +439,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                             ...prev,
                             healthCheck: { ...prev.healthCheck!, path: e.target.value }
                           }))}
-                          className="p-1 border rounded text-xs w-20"
+                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                         />
                         <input
                           type="number"
@@ -449,7 +449,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                             ...prev,
                             healthCheck: { ...prev.healthCheck!, port: parseInt(e.target.value) || 80 }
                           }))}
-                          className="p-1 border rounded text-xs w-16"
+                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-16 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         />
                       </>
                     )}
@@ -462,7 +462,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                           ...prev,
                           healthCheck: { ...prev.healthCheck!, port: parseInt(e.target.value) || 80 }
                         }))}
-                        className="p-1 border rounded text-xs w-16"
+                        className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-16 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                       />
                     )}
                   </div>
@@ -474,14 +474,14 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
               <button
                 onClick={handleDeploy}
                 disabled={deployMutation.isPending}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 <Play className="h-4 w-4" />
                 Schedule
               </button>
               <button
                 onClick={() => { setShowDeployForm(false); setShowAdvanced(false); }}
-                className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 transition-colors"
               >
                 Cancel
               </button>
@@ -489,12 +489,12 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
           </div>
         )}
         {deleteError && (
-          <div className="mb-2 text-red-600 text-sm font-semibold">{deleteError}</div>
+          <div className="mb-2 text-red-600 dark:text-red-400 text-sm font-semibold">{deleteError}</div>
         )}
         {isLoadingApps ? (
           <SkeletonList count={3} />
         ) : (selectedNode ? applications.filter(app => app.node_selector.includes(selectedNode.id)) : applications).length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>{selectedNode ? `No applications on ${selectedNode.name}` : 'No applications configured'}</p>
             <p className="text-sm">Click "Add App" to get started</p>
@@ -506,10 +506,10 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
               const runningNodes = appStatus?.node_statuses?.filter((ns: any) => ns.running).length || 0;
               const totalNodes = app.node_selector.length;
               return (
-                <div key={app.id} className="border border-gray-200 rounded-lg p-3">
+                <div key={app.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex flex-col gap-0.5">
-                      <h4 className="font-bold text-[11px] leading-tight break-all">{app.id}</h4>
+                      <h4 className="font-bold text-[11px] leading-tight break-all text-gray-900 dark:text-gray-100">{app.id}</h4>
                       <span className={`block mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium w-fit ${STATUS_COLORS[mapStatus(app.status, isTopologyDeployed)]}`}>
                         {STATUS_LABELS[mapStatus(app.status, isTopologyDeployed)]}
                       </span>
@@ -517,31 +517,31 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                         <span className="text-[11px] font-bold text-gray-400 break-all">{app.id}</span>
                       )}
                       {isTopologyDeployed && appStatus && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
                           ({runningNodes}/{totalNodes} running)
                         </span>
                       )}
                       {/* Show replicas and resources */}
                       <div className="flex flex-wrap gap-2 mt-1">
                         {(app.replicas && app.replicas > 1) && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded">
                             {app.replicas}x replicas
                           </span>
                         )}
                         {(app.cpu_limit || app.memory_limit) && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded flex items-center gap-1">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 rounded flex items-center gap-1">
                             <Cpu className="h-3 w-3" />
                             {app.cpu_limit || app.cpu_request || '-'} / {app.memory_limit || app.memory_request || '-'}
                           </span>
                         )}
                         {(app.volumes && app.volumes.length > 0) && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded flex items-center gap-1">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 rounded flex items-center gap-1">
                             <HardDrive className="h-3 w-3" />
                             {app.volumes.length} vol
                           </span>
                         )}
                         {app.healthCheck && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded flex items-center gap-1">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 rounded flex items-center gap-1">
                             <Heart className="h-3 w-3" />
                             {app.healthCheck.type}
                           </span>
@@ -582,7 +582,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                           }
                         }}
                         disabled={isTopologyDeployed}
-                        className="p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="p-1 rounded bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         title={isTopologyDeployed ? "Cannot edit env vars while topology is deployed" : "Editar variables de entorno"}
                       >
                         <img src={envIcon} alt="Env" className="h-4 w-7" />
@@ -590,7 +590,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                       <button
                         onClick={() => setLogViewer({ appId: app.id, appName: app.image_name })}
                         disabled={!isTopologyDeployed}
-                        className="p-1 rounded hover:bg-gray-100 disabled:opacity-50"
+                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50"
                         title={isTopologyDeployed ? "View Logs" : "Logs available only when deployed"}
                       >
                         <FileText className="h-4 w-4" />
@@ -602,14 +602,14 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                           }
                         }}
                         disabled={uninstallMutation.isPending || isTopologyDeployed}
-                        className="p-1 rounded hover:bg-gray-100 disabled:opacity-50"
+                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50"
                         title="Uninstall"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </div>
-                  <div className="text-xs text-gray-600 space-y-1">
+                  <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
                     <div>Image: {app.image_name}</div>
                     <div>Nodes: {getNodeNames(app.node_selector)}</div>
                     {/* Eliminado campo Version */}

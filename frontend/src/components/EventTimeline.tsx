@@ -42,27 +42,27 @@ interface EventTimelineProps {
 const severityConfig = {
   info: {
     icon: Info,
-    color: 'text-blue-500',
-    bg: 'bg-blue-50',
-    border: 'border-blue-200',
+    color: 'text-blue-500 dark:text-blue-400',
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    border: 'border-blue-200 dark:border-blue-800',
   },
   success: {
     icon: CheckCircle,
-    color: 'text-green-500',
-    bg: 'bg-green-50',
-    border: 'border-green-200',
+    color: 'text-green-500 dark:text-green-400',
+    bg: 'bg-green-50 dark:bg-green-900/20',
+    border: 'border-green-200 dark:border-green-800',
   },
   warning: {
     icon: AlertTriangle,
-    color: 'text-yellow-500',
-    bg: 'bg-yellow-50',
-    border: 'border-yellow-200',
+    color: 'text-yellow-500 dark:text-yellow-400',
+    bg: 'bg-yellow-50 dark:bg-yellow-900/20',
+    border: 'border-yellow-200 dark:border-yellow-800',
   },
   error: {
     icon: AlertCircle,
-    color: 'text-red-500',
-    bg: 'bg-red-50',
-    border: 'border-red-200',
+    color: 'text-red-500 dark:text-red-400',
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    border: 'border-red-200 dark:border-red-800',
   },
 };
 
@@ -138,10 +138,10 @@ export function EventTimeline({
   return (
     <div className={`event-timeline flex flex-col h-full ${className}`}>
       {/* Header */}
-      <div className="timeline-header flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+      <div className="timeline-header flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
         <div className="flex items-center gap-2">
           <Activity size={18} className="text-primary-500" />
-          <h3 className="font-semibold text-gray-700">Event Timeline</h3>
+          <h3 className="font-semibold text-gray-700 dark:text-gray-300">Event Timeline</h3>
           <span
             className={`w-2 h-2 rounded-full ${
               isConnected ? 'bg-green-500' : 'bg-gray-400'

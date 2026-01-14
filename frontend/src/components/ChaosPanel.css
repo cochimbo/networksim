@@ -628,3 +628,66 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.9; transform: scale(1.02); }
 }
+
+/* Dark Mode Overrides */
+.dark .chaos-panel {
+  background-color: transparent;
+}
+
+.dark .chaos-panel-header {
+  background: #1f2937; /* gray-800 */
+  border-bottom: 1px solid #374151; /* gray-700 */
+}
+
+.dark .condition-item,
+.dark .condition-item.status-active,
+.dark .condition-item.status-paused,
+.dark .condition-item.status-pending {
+  background-color: #1f2937; /* gray-800 */
+  border: 1px solid #374151; /* gray-700 */
+  color: #e5e7eb; /* gray-200 */
+}
+
+.dark .chaos-form {
+  background-color: #1f2937; /* gray-800 */
+  border: 1px solid #374151; /* gray-700 */
+  color: #e5e7eb;
+}
+
+.dark .section-header h4 {
+  color: #d1d5db; /* gray-300 */
+}
+
+.dark .form-group label {
+  color: #d1d5db; /* gray-300 */
+}
+
+.dark .form-group input,
+.dark .form-group select {
+  background-color: #374151; /* gray-700 */
+  border-color: #4b5563; /* gray-600 */
+  color: #f3f4f6; /* gray-100 */
+}
+
+.dark .info-text {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #93c5fd;
+}
+
+.dark .countdown {
+  background-color: #78350f; /* amber-900 */
+  color: #fcd34d; /* amber-300 */
+}
+
+.dark .empty-text {
+  color: #9ca3af; /* gray-400 */
+}
+
+.dark .btn-secondary {
+  background-color: #374151; /* gray-700 */
+  color: #e5e7eb;
+  border-color: #4b5563;
+}
+.dark .btn-secondary:hover {
+  background-color: #4b5563; /* gray-600 */
+}

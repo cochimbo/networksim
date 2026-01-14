@@ -171,7 +171,9 @@ pub async fn get_live_metrics(
     // Check K8s client
     let k8s = state
         .k8s
-        .as_ref()
+        .read()
+        .await
+        .clone()
         .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     // Get topology to know expected nodes

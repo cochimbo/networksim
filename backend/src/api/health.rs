@@ -32,7 +32,7 @@ pub async fn health_check() -> Json<HealthResponse> {
     )
 )]
 pub async fn cluster_status(State(state): State<AppState>) -> Json<ClusterStatusResponse> {
-    let connected = state.k8s.is_some();
+    let connected = state.k8s.read().await.is_some();
     let message = if connected {
         "Kubernetes cluster connected".to_string()
     } else {

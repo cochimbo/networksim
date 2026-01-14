@@ -45,13 +45,13 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 const categoryColors: Record<string, string> = {
-  latency: 'bg-amber-50 border-amber-200 text-amber-700',
-  loss: 'bg-red-50 border-red-200 text-red-700',
-  bandwidth: 'bg-violet-50 border-violet-200 text-violet-700',
-  partition: 'bg-gray-100 border-gray-300 text-gray-700',
-  corruption: 'bg-orange-50 border-orange-200 text-orange-700',
-  mixed: 'bg-purple-50 border-purple-200 text-purple-700',
-  custom: 'bg-blue-50 border-blue-200 text-blue-700',
+  latency: 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-700/50 dark:text-amber-200',
+  loss: 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-700/50 dark:text-red-200',
+  bandwidth: 'bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-900/20 dark:border-violet-700/50 dark:text-violet-200',
+  partition: 'bg-gray-100 border-gray-300 text-gray-700 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200',
+  corruption: 'bg-orange-50 border-orange-200 text-orange-700 dark:bg-orange-900/20 dark:border-orange-700/50 dark:text-orange-200',
+  mixed: 'bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-900/20 dark:border-purple-700/50 dark:text-purple-200',
+  custom: 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-700/50 dark:text-blue-200',
 };
 
 export function ChaosPresets({
@@ -135,26 +135,26 @@ export function ChaosPresets({
   const customPresets = filteredPresets.filter((p) => !p.is_builtin);
 
   return (
-    <div className={`chaos-presets ${className}`}>
+    <div className={`chaos-presets flex flex-col h-full bg-white dark:bg-gray-900 ${className}`}>
       {/* Header */}
-      <div className="presets-header flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+      <div className="presets-header flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         <div className="flex items-center gap-2">
-          <Zap size={18} className="text-purple-500" />
-          <h3 className="font-semibold text-gray-700">Chaos Presets</h3>
+          <Zap size={18} className="text-purple-500 dark:text-purple-400" />
+          <h3 className="font-semibold text-gray-700 dark:text-gray-200">Chaos Presets</h3>
         </div>
         <button
           onClick={fetchPresets}
           disabled={loading}
-          className="p-1.5 rounded hover:bg-gray-200 transition-colors"
+          className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
         >
-          <RefreshCw size={14} className={`text-gray-500 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw size={14} className={`text-gray-500 dark:text-gray-400 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
       {/* Selected Nodes Info */}
       {selectedSourceNode && (
-        <div className="selected-nodes px-3 py-2 bg-blue-50 border-b border-blue-100 text-xs">
-          <span className="text-blue-700">
+        <div className="selected-nodes px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/50 text-xs">
+          <span className="text-blue-700 dark:text-blue-300">
             Source: <strong>{selectedSourceNode}</strong>
             {selectedTargetNode && (
               <>
@@ -166,7 +166,7 @@ export function ChaosPresets({
       )}
 
       {/* Category Filter */}
-      <div className="category-filter flex gap-1 p-2 overflow-x-auto border-b border-gray-100">
+      <div className="category-filter flex gap-1 p-2 overflow-x-auto border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900">
         {categories.map((cat) => (
           <button
             key={cat}
@@ -176,7 +176,7 @@ export function ChaosPresets({
               ${
                 selectedCategory === cat
                   ? 'bg-primary-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
               }
             `}
           >
@@ -186,13 +186,13 @@ export function ChaosPresets({
       </div>
 
       {/* Presets List */}
-      <div className="presets-list flex-1 overflow-y-auto p-2">
+      <div className="presets-list flex-1 overflow-y-auto p-2 bg-white dark:bg-gray-900">
         {loading ? (
-          <div className="flex items-center justify-center h-24 text-gray-400">
+          <div className="flex items-center justify-center h-24 text-gray-400 dark:text-gray-500">
             <RefreshCw size={20} className="animate-spin" />
           </div>
         ) : filteredPresets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-24 text-gray-400">
+          <div className="flex flex-col items-center justify-center h-24 text-gray-400 dark:text-gray-500">
             <Zap size={24} className="mb-1" />
             <span className="text-sm">No presets available</span>
           </div>
@@ -201,7 +201,7 @@ export function ChaosPresets({
             {/* Built-in Presets */}
             {builtinPresets.length > 0 && (
               <div>
-                <div className="text-xs text-gray-500 px-1 mb-2">Built-in Presets</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 px-1 mb-2">Built-in Presets</div>
                 <div className="space-y-2">
                   {builtinPresets.map((preset) => (
                     <PresetCard
@@ -220,7 +220,7 @@ export function ChaosPresets({
             {/* Custom Presets */}
             {customPresets.length > 0 && (
               <div>
-                <div className="text-xs text-gray-500 px-1 mb-2">Custom Presets</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 px-1 mb-2">Custom Presets</div>
                 <div className="space-y-2">
                   {customPresets.map((preset) => (
                     <PresetCard
@@ -247,7 +247,7 @@ export function ChaosPresets({
 
       {/* Help Text */}
       {!selectedSourceNode && (
-        <div className="presets-help p-3 bg-yellow-50 border-t border-yellow-100 text-xs text-yellow-700">
+        <div className="presets-help p-3 bg-yellow-50 dark:bg-yellow-900/20 border-t border-yellow-100 dark:border-yellow-900/50 text-xs text-yellow-700 dark:text-yellow-200">
           Select a source node in the graph to apply presets
         </div>
       )}
@@ -317,7 +317,7 @@ function PresetCard({
                 e.stopPropagation();
                 onDelete();
               }}
-              className="p-1.5 rounded hover:bg-white/50 transition-colors"
+              className="p-1.5 rounded hover:bg-white/50 dark:hover:bg-black/20 transition-colors"
               title="Delete preset"
             >
               <Trash2 size={14} />
@@ -333,8 +333,8 @@ function PresetCard({
                 applied
                   ? 'bg-green-500 text-white'
                   : applying
-                  ? 'bg-gray-300'
-                  : 'bg-white/80 hover:bg-white'
+                  ? 'bg-gray-300 dark:bg-gray-600'
+                  : 'bg-white/80 hover:bg-white dark:bg-gray-900/30 dark:hover:bg-gray-800'
               }
             `}
             title={disabled ? 'Select a source node first' : 'Apply preset'}

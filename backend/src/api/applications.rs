@@ -21,7 +21,7 @@ pub async fn deploy(
     tracing::info!("📋 Request details: topology_id={}, node_id={}, image={}, envvalues={:?}",
                    topology_id, node_id, request.chart, request.values);
 
-    let k8s = state.k8s.as_ref().ok_or_else(|| {
+    let k8s = state.k8s.read().await.clone().ok_or_else(|| {
         tracing::error!("❌ K8s client not available");
         AppError::BadRequest("K8s client not available".to_string())
     })?;
@@ -180,7 +180,7 @@ pub async fn uninstall(
     let app = state.db.get_application(&app_id.to_string()).await?
         .ok_or_else(|| AppError::NotFound(format!("Application {} not found", app_id)))?;
 
-    let k8s = state.k8s.as_ref().ok_or_else(|| {
+    let k8s = state.k8s.read().await.clone().ok_or_else(|| {
         tracing::error!("❌ K8s client not available");
         AppError::BadRequest("K8s client not available".to_string())
     })?;
@@ -238,7 +238,7 @@ async fn remove_application_from_node(
     // Get the current pod for this node
     let pod_name = format!("ns-{}-{}", &topology_id[..8.min(topology_id.len())], node_id).to_lowercase();
     
-    let k8s = state.k8s.as_ref().ok_or("K8s client not available")?;
+    let k8s = state.k8s.read().await.clone().ok_or("K8s client not available")?;
     
     // Get current pod spec
     let current_pod = k8s.get_pod_in_namespace(&pod_name, "networksim-sim").await?;
@@ -278,7 +278,7 @@ pub async fn logs(
     let app = state.db.get_application(&app_id.to_string()).await?
         .ok_or_else(|| AppError::NotFound(format!("Application {} not found", app_id)))?;
 
-    let k8s = state.k8s.as_ref().ok_or_else(|| AppError::internal("K8s client not available"))?;
+    let k8s = state.k8s.read().await.clone().ok_or_else(|| AppError::internal("K8s client not available"))?;
 
     // Get logs from application containers across all selected nodes
     let mut all_logs = Vec::new();
@@ -362,7 +362,7 @@ pub async fn deploy_topology(
     }
 
     // Check if topology is deployed by verifying pods exist for all selected nodes
-    let k8s = state.k8s.as_ref().ok_or_else(|| AppError::internal("K8s client not available"))?;
+    let k8s = state.k8s.read().await.clone().ok_or_else(|| AppError::internal("K8s client not available"))?;
     
     // Check if topology is deployed using DeploymentManager
     let deployment_manager = DeploymentManager::new(k8s.clone());
@@ -561,7 +561,7 @@ pub async fn deploy_application_to_node(
     node_id: &str,
     app: &Application,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let k8s = state.k8s.as_ref().ok_or("K8s client not available")?;
+    let k8s = state.k8s.read().await.clone().ok_or("K8s client not available")?;
     
     // Create a separate deployment for the application
     use crate::k8s::resources::create_application_deployment;
@@ -620,7 +620,7 @@ pub async fn status(
     let app = state.db.get_application(&app_id.to_string()).await?
         .ok_or_else(|| AppError::NotFound(format!("Application {} not found", app_id)))?;
 
-    let k8s = state.k8s.as_ref().ok_or_else(|| AppError::internal("K8s client not available"))?;
+    let k8s = state.k8s.read().await.clone().ok_or_else(|| AppError::internal("K8s client not available"))?;
 
     let mut node_statuses = Vec::new();
     let mut all_running = true;
