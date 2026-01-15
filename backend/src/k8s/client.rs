@@ -383,6 +383,22 @@ impl K8sClient {
         }
     }
 
+    /// List PVCs
+    pub async fn list_pvcs(&self) -> Result<Vec<PersistentVolumeClaim>> {
+        let pvcs = self.pvcs();
+        let list = pvcs.list(&ListParams::default()).await?;
+        Ok(list.items)
+    }
+
+    /// Delete a PVC
+    #[instrument(skip(self))]
+    pub async fn delete_pvc(&self, name: &str) -> Result<()> {
+        let pvcs = self.pvcs();
+        pvcs.delete(name, &DeleteParams::default()).await?;
+        info!(name, "Deleted PVC");
+        Ok(())
+    }
+
     /// Access ConfigMaps API
     fn config_maps(&self) -> Api<ConfigMap> {
         Api::namespaced(self.client.clone(), &self.namespace)
@@ -395,6 +411,40 @@ impl K8sClient {
         let created = cms.create(&PostParams::default(), cm).await?;
         info!("Created ConfigMap");
         Ok(created)
+    }
+
+    /// List ConfigMaps
+    pub async fn list_config_maps(&self) -> Result<Vec<ConfigMap>> {
+        let cms = self.config_maps();
+        let list = cms.list(&ListParams::default()).await?;
+        // Filter out system configmaps (kube-root-ca.crt, etc) if needed, 
+        // usually those managed by networksim are labeled, but for now return all or filter by label later
+        Ok(list.items)
+    }
+
+    /// Get a ConfigMap
+    pub async fn get_config_map(&self, name: &str) -> Result<ConfigMap> {
+        let cms = self.config_maps();
+        Ok(cms.get(name).await?)
+    }
+
+    /// Update a ConfigMap
+    #[instrument(skip(self, cm), fields(cm_name = %cm.metadata.name.as_deref().unwrap_or("unknown")))]
+    pub async fn update_config_map(&self, cm: &ConfigMap) -> Result<ConfigMap> {
+        let cms = self.config_maps();
+        let name = cm.metadata.name.as_deref().unwrap_or("unknown");
+        let updated = cms.replace(name, &PostParams::default(), cm).await?;
+        info!("Updated ConfigMap");
+        Ok(updated)
+    }
+
+    /// Delete a ConfigMap
+    #[instrument(skip(self))]
+    pub async fn delete_config_map(&self, name: &str) -> Result<()> {
+        let cms = self.config_maps();
+        cms.delete(name, &DeleteParams::default()).await?;
+        info!(name, "Deleted ConfigMap");
+        Ok(())
     }
 
     /// Check if ConfigMap exists

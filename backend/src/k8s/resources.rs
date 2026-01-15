@@ -688,7 +688,14 @@ pub fn create_application_container_with_mounts(app: &Application, volume_mounts
                 }
             }
         } else if let Some(obj) = values.as_object() {
+            // Reserved keys that should not be converted to environment variables
+            let reserved_keys = ["replicas", "volumes", "resources", "image", "env"];
+            
             for (key, value) in obj {
+                if reserved_keys.contains(&key.as_str()) {
+                    continue;
+                }
+
                 let sval = if let Some(s) = value.as_str() { s.to_string() } else { value.to_string() };
                 let name = sanitize_name(key);
                 if name.is_empty() {

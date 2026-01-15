@@ -27,6 +27,11 @@ rules:
     resources: ["configmaps", "secrets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   
+  # Persistent Volumes
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  
   # NetworkPolicy management
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]

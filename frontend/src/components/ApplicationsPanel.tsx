@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import EnvVarsEditor from './EnvVarsEditor';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Play, Trash2, Package, ChevronDown, ChevronUp, HardDrive, Cpu, Heart, FileText, Info, Settings2 } from 'lucide-react';
-import { applicationsApi, DeployAppRequest, AppRuntimeStatus, VolumeMount, HealthCheck, Application } from '../services/api';
+import apiWrapper, { applicationsApi, DeployAppRequest, AppRuntimeStatus, VolumeMount, HealthCheck, Application, PvcDto, ConfigMapDto } from '../services/api';
 import envIcon from '../assets/icons/env-icon.png';
 import AppDetailsModal from './AppDetailsModal';
 import { SkeletonList } from './Skeleton';
@@ -69,6 +69,15 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
   const queryClient = useQueryClient();
   const [showAppDetails, setShowAppDetails] = useState<Application | null>(null);
   const [showDeployForm, setShowDeployForm] = useState(false);
+  const [availablePvcs, setAvailablePvcs] = useState<PvcDto[]>([]);
+  const [availableConfigs, setAvailableConfigs] = useState<ConfigMapDto[]>([]);
+
+  useEffect(() => {
+    if (showDeployForm) {
+      apiWrapper.listPVCs().then(setAvailablePvcs).catch(console.error);
+      apiWrapper.listConfigs().then(setAvailableConfigs).catch(console.error);
+    }
+  }, [showDeployForm]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [deployForm, setDeployForm] = useState<{
     chart: string;
@@ -269,8 +278,18 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                 placeholder="Image name (e.g. nginx:latest)"
                 value={deployForm.chart}
                 onChange={e => setDeployForm(prev => ({ ...prev, chart: e.target.value }))}
+                list="recommended-images"
+                autoComplete="off"
                 className="p-2 border border-gray-300 dark:border-gray-600 rounded w-full text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               />
+              <datalist id="recommended-images">
+                <option value="public.ecr.aws/docker/library/busybox:latest" />
+                <option value="public.ecr.aws/docker/library/alpine:3.18" />
+                <option value="public.ecr.aws/docker/library/nginx:alpine" />
+                <option value="public.ecr.aws/docker/library/redis:alpine" />
+                <option value="busybox" />
+                <option value="nginx" />
+              </datalist>
               {chartValidationError && <div className="text-red-600 dark:text-red-400 text-sm">{chartValidationError}</div>}
 
               {/* Replicas */}
@@ -355,32 +374,20 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                   </div>
                   {deployForm.volumes.map((vol, idx) => (
                     <div key={idx} className="flex flex-col gap-2 mb-2 p-2 bg-gray-100 dark:bg-gray-800/50 rounded border border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between gap-2">
                         <select
                           value={vol.type}
                           onChange={e => {
                             const newVols = [...deployForm.volumes];
-                            newVols[idx] = { ...vol, type: e.target.value as VolumeMount['type'] };
+                            newVols[idx] = { ...vol, type: e.target.value as VolumeMount['type'], source: '' };
                             setDeployForm(prev => ({ ...prev, volumes: newVols }));
                           }}
-                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-24 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         >
-                          <option value="emptyDir">emptyDir</option>
-                          <option value="configMap">configMap</option>
-                          <option value="secret">secret</option>
-                          <option value="pvc">PVC</option>
+                          <option value="emptyDir">Temporary (EmptyDir)</option>
+                          <option value="pvc">Persistent (PVC)</option>
+                          <option value="configMap">Configuration (ConfigMap)</option>
                         </select>
-                        <input
-                          type="text"
-                          placeholder="Mount path (/app/data)"
-                          value={vol.mountPath}
-                          onChange={e => {
-                            const newVols = [...deployForm.volumes];
-                            newVols[idx] = { ...vol, mountPath: e.target.value };
-                            setDeployForm(prev => ({ ...prev, volumes: newVols }));
-                          }}
-                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-0 placeholder-gray-400 dark:placeholder-gray-500"
-                        />
                         <button
                           type="button"
                           onClick={() => setDeployForm(prev => ({
@@ -393,116 +400,84 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                           <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Mount path (e.g. /app/data)"
+                          value={vol.mountPath}
+                          onChange={e => {
+                            const newVols = [...deployForm.volumes];
+                            newVols[idx] = { ...vol, mountPath: e.target.value };
+                            setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                          }}
+                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-0 placeholder-gray-400 dark:placeholder-gray-500"
+                        />
+                      </div>
                       
                       {vol.type !== 'emptyDir' && (
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-2">
-                             <span className="text-[10px] uppercase text-gray-500 dark:text-gray-400 font-bold w-12 text-right shrink-0">
-                               {vol.type === 'pvc' ? 'Claim:' : 'Src:'}
-                             </span>
+                        <div className="flex items-center gap-2">
+                           {/* Source Selection - Full Width */}
+                           {vol.type === 'pvc' ? (
+                             availablePvcs.length > 0 ? (
+                               <select
+                                 value={vol.source || ''}
+                                 onChange={e => {
+                                   const newVols = [...deployForm.volumes];
+                                   newVols[idx] = { ...vol, source: e.target.value };
+                                   setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                                 }}
+                                 className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                               >
+                                 <option value="">-- Select Volume --</option>
+                                 {availablePvcs.map(p => (
+                                   <option key={p.name} value={p.name}>{p.name} ({p.size})</option>
+                                 ))}
+                               </select>
+                             ) : (
+                               <div className="text-xs text-orange-500 flex-1 flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 p-1 rounded">
+                                  No volumes available. 
+                                  <a href="/volumes" target="_blank" className="underline font-medium hover:text-orange-700">Create one first</a>
+                               </div>
+                             )
+                           ) : vol.type === 'configMap' ? (
+                              availableConfigs.length > 0 ? (
+                                <select
+                                  value={vol.source || ''}
+                                  onChange={e => {
+                                    const newVols = [...deployForm.volumes];
+                                    newVols[idx] = { ...vol, source: e.target.value };
+                                    setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                                  }}
+                                  className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                                >
+                                  <option value="">-- Select Config Group --</option>
+                                  {availableConfigs.map(c => (
+                                    <option key={c.name} value={c.name}>{c.name}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div className="text-xs text-orange-500 flex-1 flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 p-1 rounded">
+                                   No configs available.
+                                   <a href="/volumes" target="_blank" className="underline font-medium hover:text-orange-700">Create one first</a>
+                                </div>
+                              )
+                           ) : (
                              <input
                               type="text"
-                              placeholder={
-                                vol.type === 'pvc' ? 'my-claim-name (optional if Size set)' :
-                                vol.type === 'configMap' ? 'my-config (optional if items set)' :
-                                'resource_name'
-                              }
+                              placeholder="Resource Name"
                               value={vol.source || ''}
                               onChange={e => {
                                 const newVols = [...deployForm.volumes];
                                 newVols[idx] = { ...vol, source: e.target.value };
                                 setDeployForm(prev => ({ ...prev, volumes: newVols }));
                               }}
-                              className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-0 placeholder-gray-400 dark:placeholder-gray-500"
+                              className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                             />
-                          </div>
-                          
-                          {/* Size input for PVC - enables dynamic creation */}
-                          {vol.type === 'pvc' && (
-                             <div className="flex items-center gap-2">
-                               <span className="text-[10px] uppercase text-gray-500 dark:text-gray-400 font-bold w-12 text-right shrink-0">
-                                 Size:
-                               </span>
-                               <input
-                                type="text"
-                                placeholder="e.g. 1Gi (triggers create)"
-                                value={vol.size || ''}
-                                onChange={e => {
-                                  const newVols = [...deployForm.volumes];
-                                  newVols[idx] = { ...vol, size: e.target.value };
-                                  setDeployForm(prev => ({ ...prev, volumes: newVols }));
-                                }}
-                                className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-24 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-0 placeholder-gray-400 dark:placeholder-gray-500"
-                              />
-                              <span className="text-[10px] text-gray-400 italic flex-1">
-                                Set size to auto-create PVC
-                              </span>
-                             </div>
-                          )}
-
-                          {/* Items input for ConfigMap - enables dynamic creation */}
-                          {vol.type === 'configMap' && (
-                            <div className="flex flex-col gap-1 mt-1 pl-12">
-                              <span className="text-[10px] text-gray-500 font-bold uppercase">Inline Config Files (Optional):</span>
-                              <div className="space-y-2">
-                                {Object.entries(vol.items || {}).map(([key, val], itemIdx) => (
-                                  <div key={itemIdx} className="flex flex-col gap-1 border-l-2 border-gray-300 pl-2">
-                                    <input
-                                      type="text"
-                                      placeholder="Filename (e.g. config.conf)"
-                                      value={key}
-                                      onChange={e => {
-                                        const newKey = e.target.value;
-                                        const newItems = { ...vol.items };
-                                        delete newItems[key];
-                                        newItems[newKey] = val;
-                                        const newVols = [...deployForm.volumes];
-                                        newVols[idx] = { ...vol, items: newItems };
-                                        setDeployForm(prev => ({ ...prev, volumes: newVols }));
-                                      }}
-                                      className="p-1 text-xs border border-gray-300 dark:border-gray-600 rounded"
-                                    />
-                                    <textarea
-                                      placeholder="Content..."
-                                      value={val}
-                                      onChange={e => {
-                                        const newItems = { ...vol.items, [key]: e.target.value };
-                                        const newVols = [...deployForm.volumes];
-                                        newVols[idx] = { ...vol, items: newItems };
-                                        setDeployForm(prev => ({ ...prev, volumes: newVols }));
-                                      }}
-                                      className="p-1 text-xs border border-gray-300 dark:border-gray-600 rounded font-mono h-16"
-                                    />
-                                    <button 
-                                      type="button" 
-                                      className="text-xs text-red-500 text-left"
-                                      onClick={() => {
-                                         const newItems = { ...vol.items };
-                                         delete newItems[key];
-                                         const newVols = [...deployForm.volumes];
-                                         newVols[idx] = { ...vol, items: newItems };
-                                         setDeployForm(prev => ({ ...prev, volumes: newVols }));
-                                      }}
-                                    >Remove File</button>
-                                  </div>
-                                ))}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newItems = { ...(vol.items || {}), [`file-${Object.keys(vol.items || {}).length}.txt`]: '' };
-                                    const newVols = [...deployForm.volumes];
-                                    newVols[idx] = { ...vol, items: newItems };
-                                    setDeployForm(prev => ({ ...prev, volumes: newVols }));
-                                  }}
-                                  className="text-xs text-blue-500 underline"
-                                >
-                                  + Add file content
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                           )}
                         </div>
                       )}
+
                     </div>
                   ))}
                 </div>

@@ -32,6 +32,7 @@
 - [x] Health checks (HTTP, TCP)
 - [x] Resource limits (CPU/Memory)
 - [x] Environment variables
+- [x] Advanced Volume Management (PVC, ConfigMaps, Drag & Drop)
 
 ### Monitoring & Reports
 - [x] Live metrics (latency, packet loss)
