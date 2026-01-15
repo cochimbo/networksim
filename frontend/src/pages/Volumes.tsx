@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HardDrive, FileText, Plus, Trash2, Upload, Box, RefreshCw } from 'lucide-react';
+import { HardDrive, FileText, Plus, Trash2, Upload, Box } from 'lucide-react';
 import apiWrapper, { PvcDto, ConfigMapDto } from '../services/api';
 import { useDropzone } from 'react-dropzone';
 import { useToast } from '../components/Toast';

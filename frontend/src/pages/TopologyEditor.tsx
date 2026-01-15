@@ -795,7 +795,7 @@ export default function TopologyEditor() {
   // Update styles when theme changes without destroying instance
   useEffect(() => {
     if (cyInstance.current) {
-        cyInstance.current.style(graphStyles);
+        cyInstance.current.style(graphStyles as any);
     }
   }, [graphStyles]);
 
@@ -814,7 +814,7 @@ export default function TopologyEditor() {
 
     cyInstance.current = cytoscape({
       container: container,
-      style: graphStyles,
+      style: graphStyles as any,
       layout: { name: 'preset' },
       userPanningEnabled: true,
       userZoomingEnabled: true,
