@@ -18,8 +18,14 @@ pub async fn deploy(
     Json(request): Json<DeployAppRequest>,
 ) -> AppResult<Json<Application>> {
     tracing::info!("🚀 ===== STARTING APPLICATION DEPLOYMENT =====");
-    tracing::info!("📋 Request details: topology_id={}, node_id={}, image={}, envvalues={:?}",
-                   topology_id, node_id, request.chart, request.values);
+    tracing::info!("📋 Request details: topology_id={}, node_id={}, image={}",
+                   topology_id, node_id, request.chart);
+    tracing::info!("📦 Payload breakdown: envvalues={:?}, replicas={:?}, volumes_count={:?}, values={:?}", 
+        request.envvalues.is_some(), 
+        request.replicas, 
+        request.volumes.as_ref().map(|v| v.len()),
+        request.values.is_some()
+    );
 
     let k8s = state.k8s.read().await.clone().ok_or_else(|| {
         tracing::error!("❌ K8s client not available");
@@ -37,13 +43,67 @@ pub async fn deploy(
     tracing::info!("📝 Creating application record with details: id={}, deployment_name={}, namespace={}, topology_id={}, node_selector=[{}]",
                    app_id, deployment_name, namespace, topology_id, node_id);
 
+    // Construct consolidated values object
+    let mut values_map = serde_json::Map::new();
+    
+    // Add legacy/direct values if present
+    if let Some(v) = &request.values {
+        if let Some(obj) = v.as_object() {
+            values_map.extend(obj.clone());
+        }
+    }
+    
+    // Add explicitly typed fields
+    if let Some(env) = &request.envvalues {
+        // Handle envvalues as a map of key-value pairs
+        if let Some(env_obj) = env.as_object() {
+             let mut env_array = Vec::new();
+             for (k, v) in env_obj {
+                 let val_str = if let Some(s) = v.as_str() { s.to_string() } else { v.to_string() };
+                 env_array.push(serde_json::json!({
+                     "name": k,
+                     "value": val_str
+                 }));
+             }
+             values_map.insert("env".to_string(), serde_json::Value::Array(env_array));
+        } else {
+             values_map.insert("env".to_string(), env.clone());
+        }
+    }
+    if let Some(vols) = &request.volumes {
+         values_map.insert("volumes".to_string(), serde_json::Value::Array(vols.clone()));
+    }
+    if let Some(reps) = request.replicas {
+        values_map.insert("replicas".to_string(), serde_json::Value::Number(reps.into()));
+    }
+    // Resources
+    let mut resources = serde_json::Map::new();
+    if let Some(v) = &request.cpu_request { resources.insert("cpu_request".to_string(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &request.memory_request { resources.insert("memory_request".to_string(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &request.cpu_limit { resources.insert("cpu_limit".to_string(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &request.memory_limit { resources.insert("memory_limit".to_string(), serde_json::Value::String(v.clone())); }
+    if !resources.is_empty() {
+        values_map.insert("resources".to_string(), serde_json::Value::Object(resources));
+    }
+    if let Some(hc) = &request.health_check {
+        values_map.insert("healthCheck".to_string(), hc.clone());
+    }
+
+    let final_values = if values_map.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(values_map))
+    };
+
+    tracing::info!("💾 Final consolidated values to be stored: {:?}", final_values);
+
     let app = Application {
         id: app_id,
         topology_id,
         node_selector: vec![node_id.clone()],
         image_name: request.chart.clone(),
         namespace: namespace.clone(),
-        values: request.values.clone(),
+        values: final_values,
         status: crate::models::AppStatus::Pending,
         release_name: deployment_name.clone(),
         created_at: chrono::Utc::now(),
@@ -67,6 +127,45 @@ pub async fn deploy(
         Err(e) => {
             tracing::error!("❌ Failed to update application status to Deploying: {}", e);
             return Err(e.into());
+        }
+    }
+
+    // Create dynamic ConfigMaps if requested
+    let cms = crate::k8s::resources::build_dynamic_configmaps(&app);
+    if !cms.is_empty() {
+        tracing::info!("📦 Found {} dynamic ConfigMaps to create", cms.len());
+        for cm in cms {
+            let cm_name = cm.metadata.name.clone().unwrap_or_default();
+            // Check if exists
+            let exists = k8s.config_map_exists(&cm_name).await.unwrap_or(false);
+            if !exists {
+                tracing::info!("creating ConfigMap: {}", cm_name);
+                if let Err(e) = k8s.create_config_map(&cm).await {
+                    tracing::error!("Failed to create ConfigMap {}: {}", cm_name, e);
+                }
+            } else {
+                 tracing::info!("ConfigMap {} already exists, skipping creation", cm_name);
+            }
+        }
+    }
+
+    // Create dynamic PVCs if requested
+    let pvcs = crate::k8s::resources::build_dynamic_pvcs(&app);
+    if !pvcs.is_empty() {
+        tracing::info!("📦 Found {} dynamic PVCs to create", pvcs.len());
+        for pvc in pvcs {
+            let pvc_name = pvc.metadata.name.clone().unwrap_or_default();
+            // Check if exists
+            let exists = k8s.pvc_exists(&pvc_name).await.unwrap_or(false);
+            if !exists {
+                tracing::info!("creating PVC: {}", pvc_name);
+                if let Err(e) = k8s.create_pvc(&pvc).await {
+                    tracing::error!("Failed to create PVC {}: {}", pvc_name, e);
+                    // Continue anyway, maybe it races or it's fine
+                }
+            } else {
+                 tracing::info!("PVC {} already exists, skipping creation", pvc_name);
+            }
         }
     }
 
@@ -419,6 +518,58 @@ pub async fn deploy_topology(
         crate::models::AppStatus::Pending
     };
 
+    // Construct consolidated values object
+    let mut values_map = serde_json::Map::new();
+    
+    // Add legacy/direct values if present
+    if let Some(v) = &request.values {
+        if let Some(obj) = v.as_object() {
+            values_map.extend(obj.clone());
+        }
+    }
+    
+    // Add explicitly typed fields
+    if let Some(env) = &request.envvalues {
+        // Handle envvalues as a map of key-value pairs
+        if let Some(env_obj) = env.as_object() {
+             let mut env_array = Vec::new();
+             for (k, v) in env_obj {
+                 let val_str = if let Some(s) = v.as_str() { s.to_string() } else { v.to_string() };
+                 env_array.push(serde_json::json!({
+                     "name": k,
+                     "value": val_str
+                 }));
+             }
+             values_map.insert("env".to_string(), serde_json::Value::Array(env_array));
+        } else {
+             values_map.insert("env".to_string(), env.clone());
+        }
+    }
+    if let Some(vols) = &request.volumes {
+         values_map.insert("volumes".to_string(), serde_json::Value::Array(vols.clone()));
+    }
+    if let Some(reps) = request.replicas {
+        values_map.insert("replicas".to_string(), serde_json::Value::Number(reps.into()));
+    }
+    // Resources
+    let mut resources = serde_json::Map::new();
+    if let Some(v) = &request.cpu_request { resources.insert("cpu_request".to_string(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &request.memory_request { resources.insert("memory_request".to_string(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &request.cpu_limit { resources.insert("cpu_limit".to_string(), serde_json::Value::String(v.clone())); }
+    if let Some(v) = &request.memory_limit { resources.insert("memory_limit".to_string(), serde_json::Value::String(v.clone())); }
+    if !resources.is_empty() {
+        values_map.insert("resources".to_string(), serde_json::Value::Object(resources));
+    }
+    if let Some(hc) = &request.health_check {
+        values_map.insert("healthCheck".to_string(), hc.clone());
+    }
+
+    let final_values = if values_map.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(values_map))
+    };
+
     let app = Application {
         id: app_id,
         topology_id,
@@ -427,7 +578,7 @@ pub async fn deploy_topology(
         // name: app_name.clone(),
         // version: None, // Eliminado
         namespace: namespace.clone(),
-        values: request.values.clone(),
+        values: final_values,
         status: initial_status.clone(),
         release_name: release_name.clone(),
         created_at: chrono::Utc::now(),
@@ -545,7 +696,26 @@ pub async fn update_application(
     let mut app = state.db.get_application(&app_id.to_string()).await?
         .ok_or_else(|| AppError::NotFound(format!("Application {} not found", app_id)))?;
 
-    app.values = request.values.clone();
+    // Performe smart merge of values instead of overwrite
+    if let Some(new_values) = request.values {
+        if let Some(new_obj) = new_values.as_object() {
+            // If we have an object, merge it with existing values
+            let mut final_map = if let Some(existing) = &app.values {
+                existing.as_object().cloned().unwrap_or_default()
+            } else {
+                serde_json::Map::new()
+            };
+            
+            for (k, v) in new_obj {
+                final_map.insert(k.clone(), v.clone());
+            }
+            app.values = Some(serde_json::Value::Object(final_map));
+        } else {
+             // If not an object, fall back to overwrite
+             app.values = Some(new_values);
+        }
+    }
+    
     app.updated_at = chrono::Utc::now();
 
     state.db.update_application(&app).await?;

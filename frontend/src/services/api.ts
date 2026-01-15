@@ -355,8 +355,10 @@ export type AppStatus = 'pending' | 'deploying' | 'deployed' | 'failed' | 'unins
 export interface VolumeMount {
   name: string;
   mountPath: string;
-  type: 'emptyDir' | 'hostPath' | 'configMap' | 'secret';
+  type: 'emptyDir' | 'hostPath' | 'configMap' | 'secret' | 'pvc';
   source?: string; // For hostPath, configMap, secret - the name/path
+  size?: string; // For dynamic PVC creation (e.g. "1Gi")
+  items?: Record<string, string>; // For dynamic ConfigMap creation (filename -> content)
   readOnly?: boolean;
 }
 

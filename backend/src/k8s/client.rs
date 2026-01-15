@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use k8s_openapi::api::apps::v1::Deployment;
-use k8s_openapi::api::core::v1::{Namespace, Pod, Service};
+use k8s_openapi::api::core::v1::{Namespace, Pod, Service, PersistentVolumeClaim, ConfigMap};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use kube::{
     api::{Api, DeleteParams, ListParams, PostParams},
@@ -357,5 +357,53 @@ impl K8sClient {
         let version = self.client.apiserver_version().await?;
         info!(version = %version.git_version, "Kubernetes cluster is healthy");
         Ok(true)
+    }
+
+    /// Access PVCs API
+    fn pvcs(&self) -> Api<PersistentVolumeClaim> {
+        Api::namespaced(self.client.clone(), &self.namespace)
+    }
+
+    /// Create a PersistentVolumeClaim
+    #[instrument(skip(self, pvc), fields(pvc_name = %pvc.metadata.name.as_deref().unwrap_or("unknown")))]
+    pub async fn create_pvc(&self, pvc: &PersistentVolumeClaim) -> Result<PersistentVolumeClaim> {
+        let pvcs = self.pvcs();
+        let created = pvcs.create(&PostParams::default(), pvc).await?;
+        info!("Created PVC");
+        Ok(created)
+    }
+
+    /// Check if PVC exists
+    pub async fn pvc_exists(&self, name: &str) -> Result<bool> {
+        let pvcs = self.pvcs();
+        match pvcs.get(name).await {
+            Ok(_) => Ok(true),
+            Err(kube::Error::Api(ae)) if ae.code == 404 => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Access ConfigMaps API
+    fn config_maps(&self) -> Api<ConfigMap> {
+        Api::namespaced(self.client.clone(), &self.namespace)
+    }
+
+    /// Create a ConfigMap
+    #[instrument(skip(self, cm), fields(cm_name = %cm.metadata.name.as_deref().unwrap_or("unknown")))]
+    pub async fn create_config_map(&self, cm: &ConfigMap) -> Result<ConfigMap> {
+        let cms = self.config_maps();
+        let created = cms.create(&PostParams::default(), cm).await?;
+        info!("Created ConfigMap");
+        Ok(created)
+    }
+
+    /// Check if ConfigMap exists
+    pub async fn config_map_exists(&self, name: &str) -> Result<bool> {
+        let cms = self.config_maps();
+        match cms.get(name).await {
+            Ok(_) => Ok(true),
+            Err(kube::Error::Api(ae)) if ae.code == 404 => Ok(false),
+            Err(e) => Err(e.into()),
+        }
     }
 }

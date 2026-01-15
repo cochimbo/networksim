@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import EnvVarsEditor from './EnvVarsEditor';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Play, Trash2, Package, ChevronDown, ChevronUp, HardDrive, Cpu, Heart, FileText } from 'lucide-react';
-import { applicationsApi, DeployAppRequest, AppRuntimeStatus, VolumeMount, HealthCheck } from '../services/api';
+import { Plus, Play, Trash2, Package, ChevronDown, ChevronUp, HardDrive, Cpu, Heart, FileText, Info, Settings2 } from 'lucide-react';
+import { applicationsApi, DeployAppRequest, AppRuntimeStatus, VolumeMount, HealthCheck, Application } from '../services/api';
 import envIcon from '../assets/icons/env-icon.png';
+import AppDetailsModal from './AppDetailsModal';
 import { SkeletonList } from './Skeleton';
 import { LogViewerModal } from './LogViewerModal';
 import './ApplicationsPanel.css';
@@ -66,6 +67,7 @@ const mapStatus = (backendStatus: string, isTopologyDeployed: boolean = false): 
 
 export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyDeployed = false }: ApplicationsPanelProps) {
   const queryClient = useQueryClient();
+  const [showAppDetails, setShowAppDetails] = useState<Application | null>(null);
   const [showDeployForm, setShowDeployForm] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [deployForm, setDeployForm] = useState<{
@@ -208,7 +210,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
       chart: deployForm.chart,
       node_selector: deployForm.node_selector,
       envvalues: deployForm.envvalues && Object.keys(deployForm.envvalues).length > 0 ? deployForm.envvalues : undefined,
-      replicas: deployForm.replicas > 1 ? deployForm.replicas : undefined,
+      replicas: deployForm.replicas, // Send always, backend handles default
       volumes: deployForm.volumes.length > 0 ? deployForm.volumes : undefined,
       healthCheck: deployForm.healthCheck,
       cpu_request: deployForm.cpu_request || undefined,
@@ -352,55 +354,155 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                     </button>
                   </div>
                   {deployForm.volumes.map((vol, idx) => (
-                    <div key={idx} className="flex items-center gap-2 mb-2">
-                      <select
-                        value={vol.type}
-                        onChange={e => {
-                          const newVols = [...deployForm.volumes];
-                          newVols[idx] = { ...vol, type: e.target.value as VolumeMount['type'] };
-                          setDeployForm(prev => ({ ...prev, volumes: newVols }));
-                        }}
-                        className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-24 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      >
-                        <option value="emptyDir">emptyDir</option>
-                        <option value="hostPath">hostPath</option>
-                        <option value="configMap">configMap</option>
-                        <option value="secret">secret</option>
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Mount path"
-                        value={vol.mountPath}
-                        onChange={e => {
-                          const newVols = [...deployForm.volumes];
-                          newVols[idx] = { ...vol, mountPath: e.target.value };
-                          setDeployForm(prev => ({ ...prev, volumes: newVols }));
-                        }}
-                        className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                      />
-                      {vol.type !== 'emptyDir' && (
-                        <input
-                          type="text"
-                          placeholder={vol.type === 'hostPath' ? '/host/path' : 'name'}
-                          value={vol.source || ''}
+                    <div key={idx} className="flex flex-col gap-2 mb-2 p-2 bg-gray-100 dark:bg-gray-800/50 rounded border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={vol.type}
                           onChange={e => {
                             const newVols = [...deployForm.volumes];
-                            newVols[idx] = { ...vol, source: e.target.value };
+                            newVols[idx] = { ...vol, type: e.target.value as VolumeMount['type'] };
                             setDeployForm(prev => ({ ...prev, volumes: newVols }));
                           }}
-                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-28 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-24 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        >
+                          <option value="emptyDir">emptyDir</option>
+                          <option value="configMap">configMap</option>
+                          <option value="secret">secret</option>
+                          <option value="pvc">PVC</option>
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Mount path (/app/data)"
+                          value={vol.mountPath}
+                          onChange={e => {
+                            const newVols = [...deployForm.volumes];
+                            newVols[idx] = { ...vol, mountPath: e.target.value };
+                            setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                          }}
+                          className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-0 placeholder-gray-400 dark:placeholder-gray-500"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setDeployForm(prev => ({
+                            ...prev,
+                            volumes: prev.volumes.filter((_, i) => i !== idx)
+                          }))}
+                          className="text-red-500 hover:text-red-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded p-1"
+                          title="Remove volume"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                      
+                      {vol.type !== 'emptyDir' && (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                             <span className="text-[10px] uppercase text-gray-500 dark:text-gray-400 font-bold w-12 text-right shrink-0">
+                               {vol.type === 'pvc' ? 'Claim:' : 'Src:'}
+                             </span>
+                             <input
+                              type="text"
+                              placeholder={
+                                vol.type === 'pvc' ? 'my-claim-name (optional if Size set)' :
+                                vol.type === 'configMap' ? 'my-config (optional if items set)' :
+                                'resource_name'
+                              }
+                              value={vol.source || ''}
+                              onChange={e => {
+                                const newVols = [...deployForm.volumes];
+                                newVols[idx] = { ...vol, source: e.target.value };
+                                setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                              }}
+                              className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-0 placeholder-gray-400 dark:placeholder-gray-500"
+                            />
+                          </div>
+                          
+                          {/* Size input for PVC - enables dynamic creation */}
+                          {vol.type === 'pvc' && (
+                             <div className="flex items-center gap-2">
+                               <span className="text-[10px] uppercase text-gray-500 dark:text-gray-400 font-bold w-12 text-right shrink-0">
+                                 Size:
+                               </span>
+                               <input
+                                type="text"
+                                placeholder="e.g. 1Gi (triggers create)"
+                                value={vol.size || ''}
+                                onChange={e => {
+                                  const newVols = [...deployForm.volumes];
+                                  newVols[idx] = { ...vol, size: e.target.value };
+                                  setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                                }}
+                                className="p-1 border border-gray-300 dark:border-gray-600 rounded text-xs w-24 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-0 placeholder-gray-400 dark:placeholder-gray-500"
+                              />
+                              <span className="text-[10px] text-gray-400 italic flex-1">
+                                Set size to auto-create PVC
+                              </span>
+                             </div>
+                          )}
+
+                          {/* Items input for ConfigMap - enables dynamic creation */}
+                          {vol.type === 'configMap' && (
+                            <div className="flex flex-col gap-1 mt-1 pl-12">
+                              <span className="text-[10px] text-gray-500 font-bold uppercase">Inline Config Files (Optional):</span>
+                              <div className="space-y-2">
+                                {Object.entries(vol.items || {}).map(([key, val], itemIdx) => (
+                                  <div key={itemIdx} className="flex flex-col gap-1 border-l-2 border-gray-300 pl-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Filename (e.g. config.conf)"
+                                      value={key}
+                                      onChange={e => {
+                                        const newKey = e.target.value;
+                                        const newItems = { ...vol.items };
+                                        delete newItems[key];
+                                        newItems[newKey] = val;
+                                        const newVols = [...deployForm.volumes];
+                                        newVols[idx] = { ...vol, items: newItems };
+                                        setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                                      }}
+                                      className="p-1 text-xs border border-gray-300 dark:border-gray-600 rounded"
+                                    />
+                                    <textarea
+                                      placeholder="Content..."
+                                      value={val}
+                                      onChange={e => {
+                                        const newItems = { ...vol.items, [key]: e.target.value };
+                                        const newVols = [...deployForm.volumes];
+                                        newVols[idx] = { ...vol, items: newItems };
+                                        setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                                      }}
+                                      className="p-1 text-xs border border-gray-300 dark:border-gray-600 rounded font-mono h-16"
+                                    />
+                                    <button 
+                                      type="button" 
+                                      className="text-xs text-red-500 text-left"
+                                      onClick={() => {
+                                         const newItems = { ...vol.items };
+                                         delete newItems[key];
+                                         const newVols = [...deployForm.volumes];
+                                         newVols[idx] = { ...vol, items: newItems };
+                                         setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                                      }}
+                                    >Remove File</button>
+                                  </div>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newItems = { ...(vol.items || {}), [`file-${Object.keys(vol.items || {}).length}.txt`]: '' };
+                                    const newVols = [...deployForm.volumes];
+                                    newVols[idx] = { ...vol, items: newItems };
+                                    setDeployForm(prev => ({ ...prev, volumes: newVols }));
+                                  }}
+                                  className="text-xs text-blue-500 underline"
+                                >
+                                  + Add file content
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setDeployForm(prev => ({
-                          ...prev,
-                          volumes: prev.volumes.filter((_, i) => i !== idx)
-                        }))}
-                        className="text-red-500 hover:text-red-700 hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-1"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
                     </div>
                   ))}
                 </div>
@@ -505,6 +607,16 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
               const appStatus = appStatuses[app.id] as AppRuntimeStatus | undefined;
               const runningNodes = appStatus?.node_statuses?.filter((ns: any) => ns.running).length || 0;
               const totalNodes = app.node_selector.length;
+
+              // Extract values from nested structure if present
+              const values = (app as any).values || {};
+              const replicas = values.replicas ?? app.replicas;
+              const vols = values.volumes ?? app.volumes;
+              const resources = values.resources || {};
+              const cpuLimit = resources.cpu_limit ?? app.cpu_limit;
+              const memLimit = resources.memory_limit ?? app.memory_limit;
+              const hc = values.healthCheck ?? app.healthCheck;
+
               return (
                 <div key={app.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <div className="flex items-center justify-between mb-2">
@@ -523,32 +635,42 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                       )}
                       {/* Show replicas and resources */}
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {(app.replicas && app.replicas > 1) && (
+                        {(replicas && replicas > 1) && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded">
-                            {app.replicas}x replicas
+                            {replicas}x replicas
                           </span>
                         )}
-                        {(app.cpu_limit || app.memory_limit) && (
+                        {(cpuLimit || memLimit) && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 rounded flex items-center gap-1">
                             <Cpu className="h-3 w-3" />
-                            {app.cpu_limit || app.cpu_request || '-'} / {app.memory_limit || app.memory_request || '-'}
+                            {cpuLimit || resources.cpu_request || '-'} / {memLimit || resources.memory_request || '-'}
                           </span>
                         )}
-                        {(app.volumes && app.volumes.length > 0) && (
+                        {(vols && vols.length > 0) && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 rounded flex items-center gap-1">
                             <HardDrive className="h-3 w-3" />
-                            {app.volumes.length} vol
+                            {vols.length} vol
                           </span>
                         )}
-                        {app.healthCheck && (
+                        {hc && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 rounded flex items-center gap-1">
                             <Heart className="h-3 w-3" />
-                            {app.healthCheck.type}
+                            {hc.type}
                           </span>
                         )}
                       </div>
                     </div>
                     <div className="flex gap-1">
+                      <button
+                        onClick={() => {
+                          console.log('Opening details for app:', app);
+                          setShowAppDetails(app)
+                        }}
+                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400"
+                        title="View Details"
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
                       <button
                         onClick={async () => {
                           if (isTopologyDeployed) return;
@@ -585,7 +707,7 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
                         className="p-1 rounded bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         title={isTopologyDeployed ? "Cannot edit env vars while topology is deployed" : "Editar variables de entorno"}
                       >
-                        <img src={envIcon} alt="Env" className="h-4 w-7" />
+                        <Settings2 className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => setLogViewer({ appId: app.id, appName: app.image_name })}
@@ -642,6 +764,12 @@ export function ApplicationsPanel({ topologyId, nodes, selectedNode, isTopologyD
               setShowEnvEditor(null);
             }}
             onClose={() => setShowEnvEditor(null)}
+          />
+        )}
+        {showAppDetails && (
+          <AppDetailsModal
+            app={showAppDetails}
+            onClose={() => setShowAppDetails(null)}
           />
         )}
         {logViewer && (
