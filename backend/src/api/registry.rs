@@ -185,7 +185,7 @@ pub async fn create_registry(
 
     // Create ImagePullSecret in K8s if credentials provided
     if req.username.is_some() && req.password.is_some() {
-        if let Some(k8s) = &state.k8s {
+        if let Some(k8s) = &*state.k8s.read().await {
             if let Err(e) = create_image_pull_secret(
                 k8s,
                 &id,
@@ -264,7 +264,7 @@ pub async fn update_registry(
 
     // Update ImagePullSecret in K8s
     if username.is_some() && password.is_some() {
-        if let Some(k8s) = &state.k8s {
+        if let Some(k8s) = &*state.k8s.read().await {
             if let Err(e) = create_image_pull_secret(
                 k8s,
                 &id,
@@ -315,7 +315,7 @@ pub async fn delete_registry(
     }
 
     // Delete ImagePullSecret from K8s
-    if let Some(k8s) = &state.k8s {
+    if let Some(k8s) = &*state.k8s.read().await {
         let secret_name = format!("registry-secret-{}", id);
         if let Err(e) = k8s.delete_secret(&secret_name, "networksim-sim").await {
             tracing::warn!("Failed to delete ImagePullSecret: {}", e);

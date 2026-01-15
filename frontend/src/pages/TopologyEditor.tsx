@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { ResizablePanel } from '../components/ResizablePanel';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -16,6 +16,7 @@ import { DeploymentModal, DeploymentAction, DeploymentPhase } from '../component
 import { ApplicationsPanel } from '../components/ApplicationsPanel';
 import { useWebSocketEvents, WebSocketEvent } from '../contexts/WebSocketContext';
 import { useToast } from '../components/Toast';
+import { useTheme } from '../contexts/ThemeContext';
 
 // New components
 import { TabPanel, useTabs } from '../components/TabPanel';
@@ -63,6 +64,7 @@ export default function TopologyEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { resolvedTheme } = useTheme();
   const cyContainerRef = useRef<HTMLDivElement | null>(null);
   const cyInstance = useRef<Core | null>(null);
 
@@ -521,28 +523,20 @@ export default function TopologyEditor() {
     return () => clearTimeout(autoSaveTimer);
   }, [hasUnsavedChanges, id, isNewTopology, saveMutation, name, description, nodes, links]);
 
-  // Callback ref to initialize Cytoscape when container is available
-  const cyRef = useCallback((container: HTMLDivElement | null) => {
-    // Cleanup previous instance if any
-    if (cyInstance.current) {
-      cyInstance.current.destroy();
-      cyInstance.current = null;
-      setCyReady(false);
-    }
-
-    if (!container) return;
-
-    cyContainerRef.current = container;
-
-    cyInstance.current = cytoscape({
-      container: container,
-      style: [
+  // Dynamic styles based on theme
+  const graphStyles = useMemo(() => {
+    const isDark = resolvedTheme === 'dark';
+    const nodeLabelColor = isDark ? '#f3f4f6' : '#1f2937';
+    const edgeLabelBg = isDark ? '#1f2937' : '#ffffff';
+    const edgeLabelColor = isDark ? '#e5e7eb' : '#4b5563';
+    
+    return [
         {
           selector: 'node',
           style: {
             'background-color': '#0ea5e9',
             'label': 'data(name)',
-            'color': '#1f2937',
+            'color': nodeLabelColor,
             'text-valign': 'bottom',
             'text-margin-y': 8,
             'font-size': 12,
@@ -575,10 +569,10 @@ export default function TopologyEditor() {
             'label': 'data(label)',
             'text-rotation': 'autorotate',
             'font-size': '10px',
-            'text-background-color': '#ffffff',
+            'text-background-color': edgeLabelBg,
             'text-background-opacity': 0.8,
             'text-background-padding': '2px',
-            'color': '#4b5563',
+            'color': edgeLabelColor,
           },
         },
         {
@@ -769,7 +763,7 @@ export default function TopologyEditor() {
             'label': 'data(label)',
             'font-size': 11,
             'color': '#22c55e',
-            'text-background-color': '#ffffff',
+            'text-background-color': edgeLabelBg, // Use variable
             'text-background-opacity': 0.9,
             'text-background-padding': '3px',
             'text-margin-y': -12,
@@ -788,14 +782,39 @@ export default function TopologyEditor() {
             'label': 'data(label)',
             'font-size': 11,
             'color': '#ef4444',
-            'text-background-color': '#ffffff',
+            'text-background-color': edgeLabelBg, // Use variable
             'text-background-opacity': 0.9,
             'text-background-padding': '3px',
             'text-margin-y': -12,
             'z-index': 1000,
           },
         },
-      ],
+    ];
+  }, [resolvedTheme]);
+
+  // Update styles when theme changes without destroying instance
+  useEffect(() => {
+    if (cyInstance.current) {
+        cyInstance.current.style(graphStyles);
+    }
+  }, [graphStyles]);
+
+  // Callback ref to initialize Cytoscape when container is available
+  const cyRef = useCallback((container: HTMLDivElement | null) => {
+    // Cleanup previous instance if any
+    if (cyInstance.current) {
+      cyInstance.current.destroy();
+      cyInstance.current = null;
+      setCyReady(false);
+    }
+
+    if (!container) return;
+
+    cyContainerRef.current = container;
+
+    cyInstance.current = cytoscape({
+      container: container,
+      style: graphStyles,
       layout: { name: 'preset' },
       userPanningEnabled: true,
       userZoomingEnabled: true,
@@ -1411,9 +1430,9 @@ export default function TopologyEditor() {
   const activeChaosCount = chaosConditions?.filter(c => c.status === 'active').length || 0;
 
   return (
-    <div className="flex flex-col h-full -m-6">
+    <div className="flex flex-col h-[calc(100%+3rem)] -m-6">
       {/* Toolbar */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center gap-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex flex-wrap items-center gap-4">
         {/* Name input */}
         <input
           type="text"
@@ -1756,7 +1775,7 @@ export default function TopologyEditor() {
           {/* Cytoscape canvas - main area */}
           <div
             ref={cyRef}
-            className="bg-gray-50 min-h-0"
+            className="bg-gray-50 dark:bg-gray-900 min-h-0 transition-colors duration-300"
             style={{ flex: '1 1 0%', minWidth: 0, width: `calc(100% - ${leftPanelWidth + rightPanelWidth}px)` }}
           />
 

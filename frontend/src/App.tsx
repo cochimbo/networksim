@@ -4,6 +4,7 @@ import TopologyList from './pages/TopologyList';
 import TopologyEditor from './pages/TopologyEditor';
 import Settings from './pages/Settings';
 import Scenarios from './pages/Scenarios';
+import Volumes from './pages/Volumes';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Wrapper to provide key based on route param
@@ -23,6 +24,7 @@ function App() {
             <Route path="topologies/new" element={<TopologyEditorWithKey />} />
             <Route path="topologies/:id" element={<TopologyEditorWithKey />} />
             <Route path="scenarios" element={<Scenarios />} />
+            <Route path="volumes" element={<Volumes />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

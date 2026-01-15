@@ -355,8 +355,10 @@ export type AppStatus = 'pending' | 'deploying' | 'deployed' | 'failed' | 'unins
 export interface VolumeMount {
   name: string;
   mountPath: string;
-  type: 'emptyDir' | 'hostPath' | 'configMap' | 'secret';
+  type: 'emptyDir' | 'hostPath' | 'configMap' | 'secret' | 'pvc';
   source?: string; // For hostPath, configMap, secret - the name/path
+  size?: string; // For dynamic PVC creation (e.g. "1Gi")
+  items?: Record<string, string>; // For dynamic ConfigMap creation (filename -> content)
   readOnly?: boolean;
 }
 
@@ -898,6 +900,37 @@ const apiWrapper = {
   // Diagnostic
   runDiagnostic: diagnosticApiExtended.runDiagnostic,
   getNodeContainers: diagnosticApi.getNodeContainers,
+
+  // Volumes
+  listPVCs: async () => (await api.get<PvcDto[]>('/api/volumes/pvc')).data,
+  createPVC: async (name: string, size: string) => (await api.post<PvcDto>('/api/volumes/pvc', { name, size })).data,
+  deletePVC: async (name: string) => (await api.delete<{ success: boolean }>(`/api/volumes/pvc/${name}`)).data,
+  
+  listConfigs: async () => (await api.get<ConfigMapDto[]>('/api/volumes/config')).data,
+  createConfig: async (name: string) => (await api.post<ConfigMapDto>('/api/volumes/config', { name })).data,
+  deleteConfig: async (name: string) => (await api.delete<{ success: boolean }>(`/api/volumes/config/${name}`)).data,
+  uploadConfigFile: async (name: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return (await api.post<{ success: boolean, files_added: string[] }>(`/api/volumes/config/${name}/files`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })).data;
+  },
 };
+
+// Volume Types
+export interface PvcDto {
+  name: string;
+  size: string;
+  status: string;
+  created_at?: string;
+}
+
+export interface ConfigMapDto {
+  name: string;
+  keys: string[];
+  created_at?: string;
+}
+
 
 export default apiWrapper;

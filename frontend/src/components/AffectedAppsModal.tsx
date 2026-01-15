@@ -164,14 +164,14 @@ export function AffectedAppsModal({
                   {/* Direct Apps */}
                   {directApps.length > 0 && (
                     <div className="mt-3">
-                      <div className="text-xs font-medium text-amber-600 uppercase mb-1">
+                      <div className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase mb-1">
                         Impacto Directo (origen)
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {directApps.map(app => (
                           <span
                             key={app.id}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-red-100 text-red-800"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200"
                           >
                             <Box className="h-3 w-3" />
                             {app.image_name.split('/').pop()?.split(':')[0] || app.image_name}
@@ -184,14 +184,14 @@ export function AffectedAppsModal({
                   {/* Indirect Apps */}
                   {indirectApps.length > 0 && (
                     <div className="mt-3">
-                      <div className="text-xs font-medium text-amber-600 uppercase mb-1">
+                      <div className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase mb-1">
                         Impacto Indirecto (destino)
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {indirectApps.map(app => (
                           <span
                             key={app.id}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200"
                           >
                             <Box className="h-3 w-3" />
                             {app.image_name.split('/').pop()?.split(':')[0] || app.image_name}

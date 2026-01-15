@@ -29,18 +29,18 @@ export function TabPanel({
 }: TabPanelProps) {
   return (
     <div className={`flex flex-col h-full ${className}`}>
-      <div className={`tab-header flex border-b border-gray-200 bg-gray-50 ${headerClassName}`}>
+      <div className={`tab-header flex flex-wrap border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 ${headerClassName}`}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={`
               tab-button flex items-center gap-2 px-4 py-2 text-sm font-medium
-              transition-colors duration-200 relative
+              transition-colors duration-200 relative whitespace-nowrap
               ${
                 activeTab === tab.id
-                  ? 'text-primary-600 bg-white border-b-2 border-primary-500 -mb-px'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                  ? 'text-primary-600 dark:text-primary-400 bg-white dark:bg-gray-800 border-b-2 border-primary-500 -mb-px'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
               }
             `}
           >

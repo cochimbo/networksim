@@ -82,7 +82,9 @@ pub async fn deploy(
     // Check if K8s client is available
     let k8s = state
         .k8s
-        .as_ref()
+        .read()
+        .await
+        .clone()
         .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     // Get the topology from database
@@ -179,6 +181,9 @@ pub async fn destroy(
     // Check if K8s client is available
     let k8s = state
         .k8s
+        .read()
+        .await
+        .clone()
         .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     // Create deployment manager and destroy
@@ -235,8 +240,9 @@ pub async fn status(
     info!(topology_id = %id, "Getting deployment status");
 
     // Check if K8s client is available
-    let k8s = match &state.k8s {
-        Some(k) => k.clone(),
+    let k8s_opt = state.k8s.read().await.clone();
+    let k8s = match k8s_opt {
+        Some(k) => k,
         None => {
             // Return not deployed status if K8s is not configured
             return Ok(Json(DeploymentResponse {
@@ -298,8 +304,9 @@ pub async fn get_active_deployment(
     info!("Getting active deployment");
 
     // Check if K8s client is available
-    let k8s = match &state.k8s {
-        Some(k) => k.clone(),
+    let k8s_opt = state.k8s.read().await.clone();
+    let k8s = match k8s_opt {
+        Some(k) => k,
         None => {
             return Ok(Json(None));
         }

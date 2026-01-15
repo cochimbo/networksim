@@ -182,6 +182,14 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/templates", get(api::templates::list))
         .route("/api/templates/:template_id", get(api::templates::get))
         .route("/api/templates/:template_id/generate", post(api::templates::generate))
+        // Volumes
+        .route("/api/volumes/pvc", get(api::volumes::list_pvcs))
+        .route("/api/volumes/pvc", post(api::volumes::create_pvc))
+        .route("/api/volumes/pvc/:name", delete(api::volumes::delete_pvc))
+        .route("/api/volumes/config", get(api::volumes::list_config_maps))
+        .route("/api/volumes/config", post(api::volumes::create_config_map))
+        .route("/api/volumes/config/:name", delete(api::volumes::delete_config_map))
+        .route("/api/volumes/config/:name/files", post(api::volumes::upload_file_to_config_map))
         // Reports
         .route("/api/topologies/:id/report", get(api::reports::generate_report))
         .route("/api/topologies/:id/report/html", get(api::reports::generate_html_report))

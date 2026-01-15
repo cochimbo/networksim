@@ -15,6 +15,7 @@ pub mod templates;
 pub mod test_runner;
 pub mod topologies;
 pub mod ws;
+pub mod volumes;
 
 use crate::config::Config;
 use crate::db::Database;
@@ -22,7 +23,7 @@ use crate::helm::HelmClient;
 use crate::k8s::K8sClient;
 #[allow(unused_imports)]
 use std::sync::Arc;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, RwLock};
 
 /// Shared application state
 #[derive(Clone)]
@@ -31,7 +32,7 @@ pub struct AppState {
     #[allow(dead_code)]
     pub config: Config,
     pub event_tx: broadcast::Sender<Event>,
-    pub k8s: Option<K8sClient>,
+    pub k8s: Arc<RwLock<Option<K8sClient>>>,
     pub helm: Option<HelmClient>,
 }
 
@@ -42,14 +43,14 @@ impl AppState {
             db,
             config,
             event_tx,
-            k8s: None,
+            k8s: Arc::new(RwLock::new(None)),
             helm: None,
         }
     }
 
-    pub fn with_k8s(mut self, k8s: K8sClient) -> Self {
-        self.k8s = Some(k8s);
-        self
+    pub async fn set_k8s(&self, k8s: K8sClient) {
+        let mut guard = self.k8s.write().await;
+        *guard = Some(k8s);
     }
 
     pub fn with_helm(mut self, helm: HelmClient) -> Self {

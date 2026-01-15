@@ -134,6 +134,9 @@ pub async fn run_diagnostic(
     // Check if K8s client is available
     let k8s = state
         .k8s
+        .read()
+        .await
+        .clone()
         .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     // Get the topology from database to know expected connections
@@ -442,6 +445,9 @@ pub async fn get_node_containers(
 
     let k8s = state
         .k8s
+        .read()
+        .await
+        .clone()
         .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     let client: &Client = k8s.inner();
@@ -702,7 +708,9 @@ pub async fn run_app_to_app_test(
     // Get K8s client
     let k8s = state
         .k8s
-        .as_ref()
+        .read()
+        .await
+        .clone()
         .ok_or_else(|| AppError::internal("Kubernetes client not configured"))?;
 
     // Get topology for node names

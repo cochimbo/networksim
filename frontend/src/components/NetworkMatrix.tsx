@@ -43,10 +43,10 @@ interface NetworkMatrixProps {
 }
 
 const statusConfig = {
-  pass: { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-100' },
-  fail: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-100' },
-  warning: { icon: AlertTriangle, color: 'text-yellow-500', bg: 'bg-yellow-100' },
-  skipped: { icon: Clock, color: 'text-gray-400', bg: 'bg-gray-100' },
+  pass: { icon: CheckCircle, color: 'text-green-500 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/20' },
+  fail: { icon: XCircle, color: 'text-red-500 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/20' },
+  warning: { icon: AlertTriangle, color: 'text-yellow-500 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/20' },
+  skipped: { icon: Clock, color: 'text-gray-400', bg: 'bg-gray-100 dark:bg-gray-800' },
 };
 
 export function NetworkMatrix({
@@ -89,17 +89,17 @@ export function NetworkMatrix({
   };
 
   const getCellColor = (from: string, to: string) => {
-    if (from === to) return 'bg-gray-200';
+    if (from === to) return 'bg-gray-200 dark:bg-gray-700';
 
     const test = getConnectivityForPair(from, to);
-    if (!test) return 'bg-gray-50';
+    if (!test) return 'bg-gray-50 dark:bg-gray-800';
 
     if (test.status === 'pass') {
-      return test.actual === 'connected' ? 'bg-green-200' : 'bg-green-100';
+      return test.actual === 'connected' ? 'bg-green-200 dark:bg-green-900/40' : 'bg-green-100 dark:bg-green-900/20';
     }
-    if (test.status === 'fail') return 'bg-red-200';
-    if (test.status === 'warning') return 'bg-yellow-200';
-    return 'bg-gray-100';
+    if (test.status === 'fail') return 'bg-red-200 dark:bg-red-900/40';
+    if (test.status === 'warning') return 'bg-yellow-200 dark:bg-yellow-900/40';
+    return 'bg-gray-100 dark:bg-gray-800';
   };
 
   const getCellContent = (from: string, to: string) => {
@@ -120,10 +120,10 @@ export function NetworkMatrix({
   return (
     <div className={`network-matrix ${className}`}>
       {/* Header */}
-      <div className="matrix-header flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50">
+      <div className="matrix-header flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
         <div className="flex items-center gap-2">
           <Grid3X3 size={18} className="text-primary-500" />
-          <h3 className="font-semibold text-gray-700">Connectivity Matrix</h3>
+          <h3 className="font-semibold text-gray-700 dark:text-gray-300">Connectivity Matrix</h3>
         </div>
         <button
           onClick={runDiagnostic}

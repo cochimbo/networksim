@@ -64,10 +64,10 @@ export default function TopologyList() {
       <div>
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
-            <div className="w-full h-10 bg-gray-100 rounded-lg animate-pulse" />
+            <div className="w-full h-10 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
           </div>
-          <div className="w-32 h-10 bg-gray-100 rounded-lg animate-pulse" />
-          <div className="w-36 h-10 bg-gray-100 rounded-lg animate-pulse" />
+          <div className="w-32 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+          <div className="w-36 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
         </div>
         <SkeletonTopologyGrid count={6} />
       </div>
@@ -76,7 +76,7 @@ export default function TopologyList() {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-700 dark:text-red-400">
         Error loading topologies: {(error as Error).message}
       </div>
     );
@@ -94,13 +94,13 @@ export default function TopologyList() {
             placeholder="Search topologies..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400"
             aria-label="Search topologies"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               aria-label="Clear search"
             >
               <X className="h-5 w-5" />
@@ -112,7 +112,7 @@ export default function TopologyList() {
         <select
           value={filterDeployed}
           onChange={(e) => setFilterDeployed(e.target.value as 'all' | 'deployed' | 'not-deployed')}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+          className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
           aria-label="Filter by deployment status"
         >
           <option value="all">All ({topologies?.length || 0})</option>
@@ -131,7 +131,7 @@ export default function TopologyList() {
       </div>
 
       {/* Results count */}
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
         Showing {filteredTopologies.length} of {topologies?.length || 0} topologies
       </p>
 
@@ -143,18 +143,18 @@ export default function TopologyList() {
             return (
               <div
                 key={topology.id}
-                className={`bg-white rounded-lg shadow-sm border p-4 hover:shadow-md transition-shadow ${
-                  isRunning ? 'border-green-500 ring-2 ring-green-200' : 'border-gray-200'
+                className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-4 hover:shadow-md transition-shadow ${
+                  isRunning ? 'border-green-500 dark:border-green-600 ring-2 ring-green-200 dark:ring-green-900/30' : 'border-gray-200 dark:border-gray-700'
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <Link to={`/topologies/${topology.id}`} className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-medium text-gray-900 hover:text-primary-600">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 hover:text-primary-600 dark:hover:text-primary-400">
                         {topology.name}
                       </h3>
                       {isRunning && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full">
                           <Play className="h-3 w-3" />
                           Running
                         </span>
@@ -165,7 +165,7 @@ export default function TopologyList() {
                     <button
                       onClick={() => duplicateMutation.mutate(topology.id)}
                       disabled={duplicateMutation.isPending}
-                      className="p-1 text-gray-400 hover:text-primary-600 transition-colors disabled:opacity-50"
+                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors disabled:opacity-50"
                       title="Duplicate topology"
                       aria-label="Duplicate topology"
                     >
@@ -184,8 +184,8 @@ export default function TopologyList() {
                       disabled={isRunning}
                       className={`p-1 transition-colors ${
                         isRunning
-                          ? 'text-gray-300 cursor-not-allowed'
-                          : 'text-gray-400 hover:text-red-600'
+                          ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                          : 'text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400'
                       }`}
                       title={isRunning ? 'Cannot delete while running' : 'Delete topology'}
                       aria-label={isRunning ? 'Cannot delete while running' : 'Delete topology'}
@@ -196,12 +196,12 @@ export default function TopologyList() {
                 </div>
 
                 {topology.description && (
-                  <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
                     {topology.description}
                   </p>
                 )}
 
-                <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
+                <div className="mt-4 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                   <span className="flex items-center gap-1">
                     <Network className="h-4 w-4" />
                     {topology.nodes.length} nodes
@@ -216,12 +216,12 @@ export default function TopologyList() {
           })}
         </div>
       ) : (
-        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-          <Network className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
+        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <Network className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
             {searchQuery || filterDeployed !== 'all' ? 'No matching topologies' : 'No topologies'}
           </h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {searchQuery || filterDeployed !== 'all'
               ? 'Try adjusting your search or filter.'
               : 'Get started by creating a new topology.'}

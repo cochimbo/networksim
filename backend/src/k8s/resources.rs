@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 use crate::models::{Node, NodeConfig, Application};
 
 /// Default container image for simulation nodes
-pub const DEFAULT_NODE_IMAGE: &str = "alpine:3.18";
+pub const DEFAULT_NODE_IMAGE: &str = "public.ecr.aws/docker/library/alpine:3.18";
 
 /// Create labels for a topology resource
 pub fn topology_labels(topology_id: &str, node_id: &str) -> BTreeMap<String, String> {
@@ -510,7 +510,7 @@ pub fn create_pod_spec_with_applications(topology_id: &str, node: &Node, applica
 
 /// Parse volume configuration from app values and return (volumes, volume_mounts)
 fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1::Volume>, Vec<k8s_openapi::api::core::v1::VolumeMount>) {
-    use k8s_openapi::api::core::v1::{Volume, VolumeMount, EmptyDirVolumeSource, HostPathVolumeSource, ConfigMapVolumeSource, SecretVolumeSource};
+    use k8s_openapi::api::core::v1::{Volume, VolumeMount, EmptyDirVolumeSource, HostPathVolumeSource, ConfigMapVolumeSource, SecretVolumeSource, PersistentVolumeClaimVolumeSource};
 
     let mut volumes = Vec::new();
     let mut volume_mounts = Vec::new();
@@ -522,10 +522,16 @@ fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1:
                 let mount_path = vol_config.get("mountPath").and_then(|v| v.as_str()).unwrap_or("").to_string();
                 let vol_type = vol_config.get("type").and_then(|v| v.as_str()).unwrap_or("emptyDir");
                 let source = vol_config.get("source").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let sub_path = vol_config.get("subPath").and_then(|v| v.as_str()).map(|s| s.to_string());
                 let read_only = vol_config.get("readOnly").and_then(|v| v.as_bool()).unwrap_or(false);
 
-                if name.is_empty() || mount_path.is_empty() {
-                    tracing::warn!("Skipping volume with empty name or mountPath in app {}", app.id);
+                if name.is_empty() {
+                    tracing::warn!("Skipping volume with empty name in app {}", app.id);
+                    continue;
+                }
+
+                if mount_path.is_empty() {
+                    tracing::warn!("Skipping volume '{}' with empty mountPath in app {}", name, app.id);
                     continue;
                 }
 
@@ -547,7 +553,7 @@ fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1:
                     "configMap" => Volume {
                         name: name.clone(),
                         config_map: Some(ConfigMapVolumeSource {
-                            name: source.clone(),
+                            name: source.clone().or_else(|| Some(name.clone())), // Default to volume name if source missing
                             ..Default::default()
                         }),
                         ..Default::default()
@@ -555,8 +561,16 @@ fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1:
                     "secret" => Volume {
                         name: name.clone(),
                         secret: Some(SecretVolumeSource {
-                            secret_name: source.clone(),
+                            secret_name: source.clone().or_else(|| Some(name.clone())), // Default to volume name if source missing
                             ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    "pvc" | "persistentVolumeClaim" => Volume {
+                        name: name.clone(),
+                        persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
+                            claim_name: source.clone().unwrap_or_else(|| name.clone()), // Default to volume name if source missing
+                            read_only: Some(read_only),
                         }),
                         ..Default::default()
                     },
@@ -570,6 +584,7 @@ fn parse_volumes_from_app(app: &Application) -> (Vec<k8s_openapi::api::core::v1:
                 volume_mounts.push(VolumeMount {
                     name: name.clone(),
                     mount_path,
+                    sub_path, 
                     read_only: Some(read_only),
                     ..Default::default()
                 });
@@ -673,7 +688,14 @@ pub fn create_application_container_with_mounts(app: &Application, volume_mounts
                 }
             }
         } else if let Some(obj) = values.as_object() {
+            // Reserved keys that should not be converted to environment variables
+            let reserved_keys = ["replicas", "volumes", "resources", "image", "env"];
+            
             for (key, value) in obj {
+                if reserved_keys.contains(&key.as_str()) {
+                    continue;
+                }
+
                 let sval = if let Some(s) = value.as_str() { s.to_string() } else { value.to_string() };
                 let name = sanitize_name(key);
                 if name.is_empty() {
@@ -716,6 +738,21 @@ pub fn create_application_container_with_mounts(app: &Application, volume_mounts
     } else {
         (None, None)
     };
+    
+    // Determine resources
+    let mut cpu_req = "50m".to_string();
+    let mut mem_req = "64Mi".to_string();
+    let mut cpu_lim = "200m".to_string();
+    let mut mem_lim = "256Mi".to_string();
+
+    if let Some(values) = &app.values {
+        if let Some(res) = values.get("resources").and_then(|v| v.as_object()) {
+            if let Some(v) = res.get("cpu_request").and_then(|v| v.as_str()) { cpu_req = v.to_string(); }
+            if let Some(v) = res.get("memory_request").and_then(|v| v.as_str()) { mem_req = v.to_string(); }
+            if let Some(v) = res.get("cpu_limit").and_then(|v| v.as_str()) { cpu_lim = v.to_string(); }
+            if let Some(v) = res.get("memory_limit").and_then(|v| v.as_str()) { mem_lim = v.to_string(); }
+        }
+    }
 
     Container {
         name: format!("app-{}", app.id.simple()),
@@ -729,14 +766,14 @@ pub fn create_application_container_with_mounts(app: &Application, volume_mounts
         resources: Some(ResourceRequirements {
             limits: Some({
                 let mut limits = BTreeMap::new();
-                limits.insert("cpu".to_string(), Quantity("200m".to_string()));
-                limits.insert("memory".to_string(), Quantity("256Mi".to_string()));
+                limits.insert("cpu".to_string(), Quantity(cpu_lim));
+                limits.insert("memory".to_string(), Quantity(mem_lim));
                 limits
             }),
             requests: Some({
                 let mut requests = BTreeMap::new();
-                requests.insert("cpu".to_string(), Quantity("50m".to_string()));
-                requests.insert("memory".to_string(), Quantity("64Mi".to_string()));
+                requests.insert("cpu".to_string(), Quantity(cpu_req));
+                requests.insert("memory".to_string(), Quantity(mem_req));
                 requests
             }),
             ..Default::default()
@@ -798,8 +835,15 @@ pub fn create_application_deployment(app: &Application, node_id: &str, topology_
         ..Default::default()
     };
     
+    // Determine replicas
+    let replicas = if let Some(values) = &app.values {
+        values.get("replicas").and_then(|v| v.as_i64()).map(|i| i as i32).unwrap_or(1)
+    } else {
+        1
+    };
+
     let deployment_spec = DeploymentSpec {
-        replicas: Some(1),
+        replicas: Some(replicas),
         selector: label_selector,
         template: pod_template_spec,
         strategy: Some(DeploymentStrategy {
@@ -829,4 +873,127 @@ pub fn make_deployment_name(app_id_simple: &str, node_id: &str) -> String {
     } else {
         name
     }
+}
+
+/// Build PersistentVolumeClaims for dynamic volumes
+pub fn build_dynamic_pvcs(app: &Application) -> Vec<k8s_openapi::api::core::v1::PersistentVolumeClaim> {
+    use k8s_openapi::api::core::v1::{PersistentVolumeClaim, PersistentVolumeClaimSpec, ResourceRequirements};
+    use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
+    use std::collections::BTreeMap;
+
+    let mut pvcs = Vec::new();
+
+    if let Some(values) = &app.values {
+        // Iterate volumes in config
+        if let Some(vol_array) = values.get("volumes").and_then(|v| v.as_array()) {
+            for vol_config in vol_array {
+                let vol_type = vol_config.get("type").and_then(|v| v.as_str()).unwrap_or("emptyDir");
+                
+                // Only interested in 'pvc' type
+                if vol_type == "pvc" || vol_type == "persistentVolumeClaim" {
+                    let source = vol_config.get("source").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    // If user provided a size, it implies we should ensure it exists (create it)
+                    if let Some(size) = vol_config.get("size").and_then(|v| v.as_str()) {
+                        let name = if let Some(s) = source.clone() {
+                            if s.is_empty() {
+                                // Auto-gen name if empty source
+                                format!("pvc-{}-{}", app.id.simple(), vol_config.get("name").and_then(|v| v.as_str()).unwrap_or("vol"))
+                            } else {
+                                s
+                            }
+                        } else {
+                            // Auto-gen name if no source
+                            format!("pvc-{}-{}", app.id.simple(), vol_config.get("name").and_then(|v| v.as_str()).unwrap_or("vol"))
+                        };
+
+                        let mut requests = BTreeMap::new();
+                        requests.insert("storage".to_string(), Quantity(size.to_string()));
+
+                        let pvc = PersistentVolumeClaim {
+                            metadata: ObjectMeta {
+                                name: Some(name),
+                                namespace: Some(app.namespace.clone()),
+                                labels: Some(BTreeMap::from([
+                                    ("networksim.io/application".to_string(), app.id.to_string()),
+                                    ("networksim.io/managed".to_string(), "true".to_string()),
+                                ])),
+                                ..Default::default()
+                            },
+                            spec: Some(PersistentVolumeClaimSpec {
+                                access_modes: Some(vec!["ReadWriteOnce".to_string()]),
+                                resources: Some(ResourceRequirements {
+                                    requests: Some(requests),
+                                    ..Default::default()
+                                }),
+                                ..Default::default() // Use default storage class
+                            }),
+                            ..Default::default()
+                        };
+                        pvcs.push(pvc);
+                    }
+                }
+            }
+        }
+    }
+
+    pvcs
+}
+
+/// Build ConfigMaps for dynamic configuration
+pub fn build_dynamic_configmaps(app: &Application) -> Vec<k8s_openapi::api::core::v1::ConfigMap> {
+    use k8s_openapi::api::core::v1::ConfigMap;
+    use std::collections::BTreeMap;
+
+    let mut cms = Vec::new();
+
+    if let Some(values) = &app.values {
+        // Iterate volumes in config
+        if let Some(vol_array) = values.get("volumes").and_then(|v| v.as_array()) {
+            for vol_config in vol_array {
+                let vol_type = vol_config.get("type").and_then(|v| v.as_str()).unwrap_or("emptyDir");
+                
+                // Only interested in 'configMap' type
+                if vol_type == "configMap" {
+                    // Check if 'items' (data) is provided
+                    if let Some(items) = vol_config.get("items").and_then(|v| v.as_object()) {
+                        let source = vol_config.get("source").and_then(|v| v.as_str()).map(|s| s.to_string());
+                        
+                        let name = if let Some(s) = source.clone() {
+                            if s.is_empty() {
+                                format!("cm-{}-{}", app.id.simple(), vol_config.get("name").and_then(|v| v.as_str()).unwrap_or("vol"))
+                            } else {
+                                s
+                            }
+                        } else {
+                            format!("cm-{}-{}", app.id.simple(), vol_config.get("name").and_then(|v| v.as_str()).unwrap_or("vol"))
+                        };
+
+                        let mut data = BTreeMap::new();
+                        for (key, val) in items {
+                            if let Some(val_str) = val.as_str() {
+                                data.insert(key.clone(), val_str.to_string());
+                            }
+                        }
+
+                        let cm = ConfigMap {
+                            metadata: ObjectMeta {
+                                name: Some(name),
+                                namespace: Some(app.namespace.clone()),
+                                labels: Some(BTreeMap::from([
+                                    ("networksim.io/application".to_string(), app.id.to_string()),
+                                    ("networksim.io/managed".to_string(), "true".to_string()),
+                                ])),
+                                ..Default::default()
+                            },
+                            data: Some(data),
+                            ..Default::default()
+                        };
+                        cms.push(cm);
+                    }
+                }
+            }
+        }
+    }
+
+    cms
 }

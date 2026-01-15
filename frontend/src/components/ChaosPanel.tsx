@@ -135,9 +135,9 @@ const DIRECTIONS: { value: ChaosDirection; label: string }[] = [
 ];
 
 const STATUS_LABELS: Record<ChaosConditionStatus, { label: string; color: string }> = {
-  pending: { label: 'Pending', color: '#999' },
-  active: { label: 'Active', color: '#4caf50' },
-  paused: { label: 'Paused', color: '#ff9800' },
+  pending: { label: 'Pending', color: '#9ca3af' }, // gray-400
+  active: { label: 'Active', color: '#22c55e' }, // green-500
+  paused: { label: 'Paused', color: '#f59e0b' }, // amber-500
 };
 
 export function ChaosPanel({ topologyId, nodes, links, applications = [], onClose: _onClose }: ChaosPanelProps) {
@@ -470,8 +470,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         return (
           <>
             <div className="form-group">
-              <label>Latency</label>
+              <label className="dark:text-gray-300">Latency</label>
               <input
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 type="text"
                 value={latency}
                 onChange={(e) => setLatency(e.target.value)}
@@ -479,8 +480,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               />
             </div>
             <div className="form-group">
-              <label>Jitter (optional)</label>
+              <label className="dark:text-gray-300">Jitter (optional)</label>
               <input
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 type="text"
                 value={jitter}
                 onChange={(e) => setJitter(e.target.value)}
@@ -492,8 +494,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
       case 'loss':
         return (
           <div className="form-group">
-            <label>Loss Percentage</label>
+            <label className="dark:text-gray-300">Loss Percentage</label>
             <input
+              className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
               type="number"
               min="0"
               max="100"
@@ -505,8 +508,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
       case 'bandwidth':
         return (
           <div className="form-group">
-            <label>Rate Limit</label>
+            <label className="dark:text-gray-300">Rate Limit</label>
             <input
+              className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
               type="text"
               value={bandwidthRate}
               onChange={(e) => setBandwidthRate(e.target.value)}
@@ -517,8 +521,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
       case 'corrupt':
         return (
           <div className="form-group">
-            <label>Corruption Percentage</label>
+            <label className="dark:text-gray-300">Corruption Percentage</label>
             <input
+              className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
               type="number"
               min="0"
               max="100"
@@ -530,8 +535,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
       case 'duplicate':
         return (
           <div className="form-group">
-            <label>Duplication Percentage</label>
+            <label className="dark:text-gray-300">Duplication Percentage</label>
             <input
+              className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
               type="number"
               min="0"
               max="100"
@@ -542,7 +548,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         );
       case 'partition':
         return (
-          <p className="info-text">
+          <p className="info-text dark:text-gray-400">
             Network partition will completely disconnect the selected nodes.
           </p>
         );
@@ -551,8 +557,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         return (
           <>
             <div className="form-group">
-              <label>CPU Load (%)</label>
+              <label className="dark:text-gray-300">CPU Load (%)</label>
               <input
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 type="number"
                 min="0"
                 max="100"
@@ -561,8 +568,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               />
             </div>
             <div className="form-group">
-              <label>Workers</label>
+              <label className="dark:text-gray-300">Workers</label>
               <input
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 type="number"
                 min="1"
                 max="32"
@@ -570,7 +578,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                 onChange={(e) => setCpuWorkers(parseInt(e.target.value) || 1)}
               />
             </div>
-            <p className="info-text">
+            <p className="info-text dark:text-gray-400">
               Stress CPU on target pods. Higher load and more workers = more stress.
             </p>
           </>
@@ -579,15 +587,16 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         return (
           <>
             <div className="form-group">
-              <label>Grace Period (seconds)</label>
+              <label className="dark:text-gray-300">Grace Period (seconds)</label>
               <input
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 type="number"
                 min="0"
                 value={gracePeriod}
                 onChange={(e) => setGracePeriod(parseInt(e.target.value) || 0)}
               />
             </div>
-            <p className="info-text">
+            <p className="info-text dark:text-gray-400">
               Kill target pods. Set grace period to 0 for immediate termination.
             </p>
           </>
@@ -596,8 +605,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         return (
           <>
             <div className="form-group">
-              <label>I/O Delay</label>
+              <label className="dark:text-gray-300">I/O Delay</label>
               <input
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 type="text"
                 value={ioDelay}
                 onChange={(e) => setIoDelay(e.target.value)}
@@ -605,8 +615,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               />
             </div>
             <div className="form-group">
-              <label>Percent of operations</label>
+              <label className="dark:text-gray-300">Percent of operations</label>
               <input
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 type="number"
                 min="0"
                 max="100"
@@ -614,7 +625,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                 onChange={(e) => setIoPercent(parseInt(e.target.value) || 100)}
               />
             </div>
-            <p className="info-text">
+            <p className="info-text dark:text-gray-400">
               Add latency to disk I/O operations on target pods.
             </p>
           </>
@@ -623,8 +634,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         return (
           <>
             <div className="form-group">
-              <label>HTTP Status Code</label>
+              <label className="dark:text-gray-300">HTTP Status Code</label>
               <select
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 value={httpCode}
                 onChange={(e) => setHttpCode(parseInt(e.target.value))}
               >
@@ -638,7 +650,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                 <option value={404}>404 - Not Found</option>
               </select>
             </div>
-            <p className="info-text">
+            <p className="info-text dark:text-gray-400">
               Abort HTTP requests and return the selected error code.
             </p>
           </>
@@ -652,12 +664,12 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
   const hasInactiveConditions = conditions.some(c => c.status !== 'active');
 
   return (
-    <div className="chaos-panel">
-      <div className="chaos-panel-header">
+    <div className="chaos-panel dark:bg-gray-900">
+      <div className="chaos-panel-header dark:text-gray-100 dark:border-gray-700">
         <h3>🔥 Chaos Engineering</h3>
         <div className="header-actions">
           <button 
-            className="refresh-btn"
+            className="refresh-btn dark:text-gray-400 dark:hover:text-gray-200"
             onClick={fetchConditions}
             disabled={loading}
             title="Refresh conditions"
@@ -668,14 +680,14 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         </div>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="error-message dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">{error}</div>}
 
       <div className="chaos-panel-content">
         {/* Global Controls */}
         {conditions.length > 0 && (
-          <div className="global-controls">
+          <div className="global-controls dark:border-gray-700 dark:bg-gray-800">
             <button 
-              className="btn-success"
+              className="btn-success dark:bg-green-700 dark:hover:bg-green-600"
               onClick={handleStartAll}
               disabled={loading || !hasInactiveConditions}
               title="Start all conditions"
@@ -683,7 +695,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               ▶ Start All
             </button>
             <button 
-              className="btn-warning"
+              className="btn-warning dark:bg-yellow-700 dark:hover:bg-yellow-600"
               onClick={handleStopAll}
               disabled={loading || !hasActiveConditions}
               title="Stop all conditions"
@@ -691,7 +703,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               ⏸ Stop All
             </button>
             <button 
-              className="btn-danger"
+              className="btn-danger dark:bg-red-700 dark:hover:bg-red-600"
               onClick={handleDeleteAll}
               disabled={loading}
               title="Delete all conditions"
@@ -703,23 +715,23 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
 
         {/* Conditions List */}
         <div className="section">
-          <div className="section-header">
+          <div className="section-header dark:text-gray-300">
             <h4>Chaos Conditions ({conditions.length})</h4>
           </div>
 
-          {loading && conditions.length === 0 && <div className="loading">Loading...</div>}
+          {loading && conditions.length === 0 && <div className="loading dark:text-gray-400">Loading...</div>}
 
           {conditions.length === 0 ? (
-            <p className="empty-text">No chaos conditions defined. Add one below.</p>
+            <p className="empty-text dark:text-gray-500">No chaos conditions defined. Add one below.</p>
           ) : (
             <ul className="conditions-list">
               {conditions.map((c) => {
                 const isExpanded = expandedConditions.has(c.id);
                 return (
-                  <li key={c.id} className={`condition-item status-${c.status} ${isExpanded ? 'expanded' : ''}`}>
+                  <li key={c.id} className={`condition-item status-${c.status} ${isExpanded ? 'expanded' : ''} dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700/50`}>
                     <div className="condition-main">
                       <button
-                        className="btn-icon btn-expand"
+                        className="btn-icon btn-expand dark:text-gray-400 dark:hover:text-gray-200"
                         onClick={() => toggleExpanded(c.id)}
                         title={isExpanded ? "Collapse" : "Expand"}
                       >
@@ -731,11 +743,11 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                         title={STATUS_LABELS[c.status].label}
                       />
                       <div className="condition-info">
-                        <div className="condition-type">
+                        <div className="condition-type dark:text-gray-200">
                           {CHAOS_TYPES.find(t => t.value === c.chaos_type)?.label || c.chaos_type}
-                          <span className="condition-params">{formatParams(c)}</span>
+                          <span className="condition-params dark:text-gray-400">{formatParams(c)}</span>
                         </div>
-                        <div className="condition-targets">
+                        <div className="condition-targets dark:text-gray-400">
                           {getNodeName(c.source_node_id)}
                           {c.target_node_id
                             ? ` → ${getNodeName(c.target_node_id)}`
@@ -756,7 +768,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                     </div>
                     <div className="condition-actions">
                       <button
-                        className="btn-icon btn-edit"
+                        className="btn-icon btn-edit dark:text-gray-400 dark:hover:text-blue-400"
                         onClick={() => handleEdit(c)}
                         disabled={loading}
                         title="Edit"
@@ -765,7 +777,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                       </button>
                       {c.status === 'active' ? (
                         <button
-                          className="btn-icon btn-stop"
+                          className="btn-icon btn-stop dark:text-gray-400 dark:hover:text-yellow-400"
                           onClick={() => handleStop(c.id)}
                           disabled={loading}
                           title="Stop"
@@ -774,7 +786,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                         </button>
                       ) : (
                         <button
-                          className="btn-icon btn-start"
+                          className="btn-icon btn-start dark:text-gray-400 dark:hover:text-green-400"
                           onClick={() => handleStart(c.id)}
                           disabled={loading}
                           title="Start"
@@ -783,7 +795,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                         </button>
                       )}
                       <button
-                        className="btn-icon btn-delete"
+                        className="btn-icon btn-delete dark:text-gray-400 dark:hover:text-red-400"
                         onClick={() => handleDelete(c.id)}
                         disabled={loading}
                         title="Delete"
@@ -792,7 +804,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                       </button>
                     </div>
                     {isExpanded && (
-                      <div className="condition-details">
+                      <div className="condition-details dark:bg-gray-900 dark:border-gray-700 dark:text-gray-300">
                         <div className="detail-row">
                           <strong>ID:</strong> {c.id}
                         </div>
@@ -838,16 +850,17 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         {/* Add New Condition */}
         <div className="section">
           {!showForm ? (
-            <button className="btn-primary" onClick={() => setShowForm(true)}>
+            <button className="btn-primary dark:bg-indigo-600 dark:hover:bg-indigo-500" onClick={() => setShowForm(true)}>
               + Add Chaos Condition
             </button>
           ) : (
-            <form onSubmit={handleSubmit} className="chaos-form">
-              <h4>New Chaos Condition</h4>
+            <form onSubmit={handleSubmit} className="chaos-form dark:bg-gray-800/50 dark:border-gray-700 dark:p-4 dark:rounded-lg">
+              <h4 className="dark:text-gray-200">New Chaos Condition</h4>
 
               <div className="form-group">
-                <label>Type</label>
+                <label className="dark:text-gray-300">Type</label>
                 <select
+                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   value={chaosType}
                   onChange={(e) => setChaosType(e.target.value as ChaosType)}
                 >
@@ -861,8 +874,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Source Node</label>
+                  <label className="dark:text-gray-300">Source Node</label>
                   <select
+                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                     value={sourceNode}
                     onChange={(e) => setSourceNode(e.target.value)}
                     required
@@ -877,8 +891,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
 
                 {chaosTypeRequiresTarget(chaosType) && (
                   <div className="form-group">
-                    <label>Target Node (optional)</label>
+                    <label className="dark:text-gray-300">Target Node (optional)</label>
                     <select
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       value={targetNode}
                       onChange={(e) => setTargetNode(e.target.value)}
                     >
@@ -897,8 +912,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               <div className="form-row">
                 {chaosTypeRequiresTarget(chaosType) && (
                   <div className="form-group">
-                    <label>Direction</label>
+                    <label className="dark:text-gray-300">Direction</label>
                     <select
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       value={direction}
                       onChange={(e) => setDirection(e.target.value as ChaosDirection)}
                     >
@@ -912,8 +928,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                 )}
 
                 <div className="form-group">
-                  <label>Duration (optional)</label>
+                  <label className="dark:text-gray-300">Duration (optional)</label>
                   <input
+                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                     type="text"
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
@@ -925,12 +942,12 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               {renderParams()}
 
               <div className="form-actions">
-                <button type="submit" className="btn-primary" disabled={loading}>
+                <button type="submit" className="btn-primary dark:bg-indigo-600 dark:hover:bg-indigo-500" disabled={loading}>
                   {loading ? 'Creating...' : 'Add Condition'}
                 </button>
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="btn-secondary dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   onClick={() => setShowForm(false)}
                 >
                   Cancel
@@ -943,16 +960,17 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
 
       {/* Edit Modal */}
       {editingCondition && (
-        <div className="modal-overlay" onClick={() => setEditingCondition(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Edit Chaos Condition</h3>
-              <button className="close-btn" onClick={() => setEditingCondition(null)}>×</button>
+        <div className="modal-overlay dark:bg-black/70" onClick={() => setEditingCondition(null)}>
+          <div className="modal-content dark:bg-gray-800 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header dark:border-gray-700">
+              <h3 className="dark:text-gray-100">Edit Chaos Condition</h3>
+              <button className="close-btn dark:text-gray-400 dark:hover:text-gray-200" onClick={() => setEditingCondition(null)}>×</button>
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>Direction</label>
+                <label className="dark:text-gray-300">Direction</label>
                 <select
+                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   value={editDirection}
                   onChange={(e) => setEditDirection(e.target.value as ChaosDirection)}
                 >
@@ -965,8 +983,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               </div>
 
               <div className="form-group">
-                <label>Duration (optional)</label>
+                <label className="dark:text-gray-300">Duration (optional)</label>
                 <input
+                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                   type="text"
                   value={editDuration}
                   onChange={(e) => setEditDuration(e.target.value)}
@@ -978,16 +997,18 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               {editingCondition.chaos_type === 'delay' && (
                 <>
                   <div className="form-group">
-                    <label>Latency</label>
+                    <label className="dark:text-gray-300">Latency</label>
                     <input
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       type="text"
                       value={editParams.latency || ''}
                       onChange={(e) => setEditParams({...editParams, latency: e.target.value})}
                     />
                   </div>
                   <div className="form-group">
-                    <label>Jitter (optional)</label>
+                    <label className="dark:text-gray-300">Jitter (optional)</label>
                     <input
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       type="text"
                       value={editParams.jitter || ''}
                       onChange={(e) => setEditParams({...editParams, jitter: e.target.value || undefined})}
@@ -998,8 +1019,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
 
               {editingCondition.chaos_type === 'loss' && (
                 <div className="form-group">
-                  <label>Loss Percentage</label>
+                  <label className="dark:text-gray-300">Loss Percentage</label>
                   <input
+                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                     type="number"
                     min="0"
                     max="100"
@@ -1012,24 +1034,27 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
               {editingCondition.chaos_type === 'bandwidth' && (
                 <>
                   <div className="form-group">
-                    <label>Rate</label>
+                    <label className="dark:text-gray-300">Rate</label>
                     <input
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       type="text"
                       value={editParams.rate || ''}
                       onChange={(e) => setEditParams({...editParams, rate: e.target.value})}
                     />
                   </div>
                   <div className="form-group">
-                    <label>Buffer</label>
+                    <label className="dark:text-gray-300">Buffer</label>
                     <input
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       type="number"
                       value={editParams.buffer || ''}
                       onChange={(e) => setEditParams({...editParams, buffer: parseInt(e.target.value) || undefined})}
                     />
                   </div>
                   <div className="form-group">
-                    <label>Limit</label>
+                    <label className="dark:text-gray-300">Limit</label>
                     <input
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                       type="number"
                       value={editParams.limit || ''}
                       onChange={(e) => setEditParams({...editParams, limit: parseInt(e.target.value) || undefined})}
@@ -1040,8 +1065,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
 
               {editingCondition.chaos_type === 'corrupt' && (
                 <div className="form-group">
-                  <label>Corrupt Percentage</label>
+                  <label className="dark:text-gray-300">Corrupt Percentage</label>
                   <input
+                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                     type="number"
                     min="0"
                     max="100"
@@ -1053,8 +1079,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
 
               {editingCondition.chaos_type === 'duplicate' && (
                 <div className="form-group">
-                  <label>Duplicate Percentage</label>
+                  <label className="dark:text-gray-300">Duplicate Percentage</label>
                   <input
+                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                     type="number"
                     min="0"
                     max="100"
@@ -1064,15 +1091,15 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                 </div>
               )}
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer dark:border-gray-700">
               <button
-                className="btn-secondary"
+                className="btn-secondary dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                 onClick={() => setEditingCondition(null)}
               >
                 Cancel
               </button>
               <button
-                className="btn-primary"
+                className="btn-primary dark:bg-indigo-600 dark:hover:bg-indigo-500"
                 onClick={handleEditSubmit}
                 disabled={loading}
               >

@@ -34,9 +34,21 @@ pub struct Application {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeployAppRequest {
     pub chart: String,
-    pub chart_type: Option<String>, // 'predefined' or 'custom', defaults to 'predefined'
-    pub node_selector: Vec<String>, // List of node IDs where to deploy
-    // namespace is now fixed to the simulation namespace for network policies to work
+    pub chart_type: Option<String>,
+    pub node_selector: Vec<String>,
+    
+    // Configuración detallada que el frontend envía plana
+    pub envvalues: Option<serde_json::Value>,
+    pub replicas: Option<i32>,
+    pub volumes: Option<Vec<serde_json::Value>>, // Usamos Value para ser flexibles con los tipos de volumen
+    #[serde(rename = "healthCheck")]
+    pub health_check: Option<serde_json::Value>,
+    pub cpu_request: Option<String>,
+    pub memory_request: Option<String>,
+    pub cpu_limit: Option<String>,
+    pub memory_limit: Option<String>,
+
+    // Campo legacy por si acaso, pero el frontend envía lo de arriba
     pub values: Option<serde_json::Value>,
 }
 
