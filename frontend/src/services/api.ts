@@ -142,6 +142,10 @@ export type NetworkChaosType = 'delay' | 'loss' | 'bandwidth' | 'corrupt' | 'dup
 export type NewChaosType = 'stress-cpu' | 'pod-kill' | 'io-delay' | 'http-abort';
 export type ChaosType = NetworkChaosType | NewChaosType;
 
+export interface ChaosParams {
+  [key: string]: any;
+}
+
 export type ChaosDirection = 'to' | 'from' | 'both';
 
 // NetworkChaos params

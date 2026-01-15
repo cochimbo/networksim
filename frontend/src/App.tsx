@@ -3,7 +3,6 @@ import Layout from './components/Layout';
 import TopologyList from './pages/TopologyList';
 import TopologyEditor from './pages/TopologyEditor';
 import Settings from './pages/Settings';
-import Scenarios from './pages/Scenarios';
 import Volumes from './pages/Volumes';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -23,7 +22,6 @@ function App() {
             <Route path="topologies" element={<TopologyList />} />
             <Route path="topologies/new" element={<TopologyEditorWithKey />} />
             <Route path="topologies/:id" element={<TopologyEditorWithKey />} />
-            <Route path="scenarios" element={<Scenarios />} />
             <Route path="volumes" element={<Volumes />} />
             <Route path="settings" element={<Settings />} />
           </Route>

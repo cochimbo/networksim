@@ -181,6 +181,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
   const [ioPercent, setIoPercent] = useState(100);
   const [httpCode, setHttpCode] = useState(500);
 
+  // View mode for the panel
+  const [viewMode, setViewMode] = useState<'manual' | 'palette'>('palette');
+
   useEffect(() => {
     fetchConditions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -680,11 +683,64 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         </div>
       </div>
 
-      {error && <div className="error-message dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">{error}</div>}
-
       <div className="chaos-panel-content">
+        {/* View Mode Toggle */}
+        <div className="flex p-2 bg-gray-100 dark:bg-gray-800 rounded-lg mb-4 gap-1">
+          <button
+            className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'manual' 
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+            onClick={() => setViewMode('manual')}
+          >
+            Active Chaos
+          </button>
+          <button
+            className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'palette' 
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+             onClick={() => setViewMode('palette')}
+          >
+            Tools Palette
+          </button>
+        </div>
+
+        {/* Chaos Tools Palette (Draggable) */}
+        {viewMode === 'palette' && (
+        <div className="section">
+          <div className="section-header dark:text-gray-300">
+            <h4>Chaos Tools</h4>
+          </div>
+          <p className="text-xs text-gray-500 mb-2">Drag tools to the Scenario timeline below</p>
+          <div className="grid grid-cols-2 gap-2">
+            {CHAOS_TYPES.map(type => (
+              <div
+                key={type.value}
+                className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded cursor-grab hover:bg-gray-50 dark:hover:bg-gray-700"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/json', JSON.stringify({
+                    type: 'chaos-tool',
+                    chaosType: type.value
+                  }));
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
+              >
+                <div className="p-1 bg-gray-100 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-300">
+                  <span className="text-xs">⚡</span>
+                </div>
+                <span className="text-sm font-medium dark:text-gray-200 truncate">{type.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        )}
+
         {/* Global Controls */}
-        {conditions.length > 0 && (
+        {viewMode === 'manual' && conditions.length > 0 && (
           <div className="global-controls dark:border-gray-700 dark:bg-gray-800">
             <button 
               className="btn-success dark:bg-green-700 dark:hover:bg-green-600"
@@ -714,6 +770,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         )}
 
         {/* Conditions List */}
+        {viewMode === 'manual' && (
         <div className="section">
           <div className="section-header dark:text-gray-300">
             <h4>Chaos Conditions ({conditions.length})</h4>
@@ -846,6 +903,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
             </ul>
           )}
         </div>
+        )}
 
         {/* Add New Condition */}
         <div className="section">
@@ -925,6 +983,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                       ))}
                     </select>
                   </div>
+              
                 )}
 
                 <div className="form-group">

@@ -6,7 +6,7 @@ import cytoscape, { Core } from 'cytoscape';
 import {
   Save, Trash2, Circle, ArrowRight, Link as LinkIcon, ZoomIn, ZoomOut, Maximize,
   Play, Square, Loader2, Zap, Bookmark, Activity, TestTube, Grid3X3,
-  ChevronUp, ChevronDown, Clock, Film, BarChart3, FileDown, LayoutTemplate,
+  ChevronUp, ChevronDown, LayoutTemplate, FileDown,
   Undo2, Redo2, Copy, Grid
 } from 'lucide-react';
 import { topologyApi, clusterApi, deploymentApi, chaosApi, diagnosticApi, Topology, Node, Link } from '../services/api';
@@ -21,16 +21,14 @@ import { useTheme } from '../contexts/ThemeContext';
 // New components
 import { TabPanel, useTabs } from '../components/TabPanel';
 import ChaosPresets from '../components/ChaosPresets';
-import LiveMetrics from '../components/LiveMetrics';
 import TestRunner from '../components/TestRunner';
-import EventTimeline from '../components/EventTimeline';
 import NetworkMatrix from '../components/NetworkMatrix';
 import ExportImport from '../components/ExportImport';
-import ChaosScenarios from '../components/ChaosScenarios';
-import MetricsComparison from '../components/MetricsComparison';
 import ImpactDashboard from '../components/ImpactDashboard';
 import AppToAppTest from '../components/AppToAppTest';
 import { TemplateSelector } from '../components/TemplateSelector';
+import { VerticalResizablePanel } from '../components/VerticalResizablePanel';
+import { ScenarioEditor } from '../components/ScenarioEditor/ScenarioEditor';
 import { ExportReport } from '../components/ExportReport';
 import { applicationsApi, GeneratedTopology } from '../services/api';
 
@@ -60,6 +58,7 @@ export default function TopologyEditor() {
   // Panel widths for resizable panels
   const [leftPanelWidth, setLeftPanelWidth] = useState(320);
   const [rightPanelWidth, setRightPanelWidth] = useState(380);
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(350);
   const [nodeModal, setNodeModal] = useState<{ open: boolean; node: any } | null>(null);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -100,7 +99,7 @@ export default function TopologyEditor() {
   const { activeTab: rightTab, setActiveTab: setRightTab } = useTabs('chaos');
   const { activeTab: leftTab, setActiveTab: setLeftTab } = useTabs('apps');
   const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
-  const [bottomPanelTab, setBottomPanelTab] = useState<'metrics' | 'events' | 'comparison'>('metrics');
+
 
   // Tooltip state
   const [tooltip, setTooltip] = useState<{
@@ -1795,7 +1794,6 @@ export default function TopologyEditor() {
                       badgeColor: 'warning'
                     },
                     { id: 'presets', label: 'Presets', icon: <Bookmark size={14} /> },
-                    { id: 'scenarios', label: 'Scenarios', icon: <Film size={14} /> },
                     { id: 'tests', label: 'Tests', icon: <TestTube size={14} /> },
                   ]}
                   activeTab={rightTab}
@@ -1816,12 +1814,6 @@ export default function TopologyEditor() {
                       selectedSourceNode={selectedElement?.type === 'node' ? selectedElement.data.id : undefined}
                       selectedTargetNode={undefined}
                       onApply={handlePresetApplied}
-                    />
-                  )}
-                  {rightTab === 'scenarios' && (
-                    <ChaosScenarios
-                      topologyId={id}
-                      nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
                     />
                   )}
                   {rightTab === 'tests' && (
@@ -1846,69 +1838,24 @@ export default function TopologyEditor() {
           )}
         </div>
 
-        {/* Bottom Panel - Metrics, Events, Comparison (collapsible) */}
-        {id && isThisTopologyDeployed && bottomPanelOpen && (
-          <div className="h-72 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex flex-col">
-            {/* Bottom Panel Tabs */}
-            <div className="flex items-center border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-2">
-              <button
-                onClick={() => setBottomPanelTab('metrics')}
-                className={`px-3 py-2 text-sm font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
-                  bottomPanelTab === 'metrics'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                <Activity size={14} />
-                Live Metrics
-              </button>
-              <button
-                onClick={() => setBottomPanelTab('events')}
-                className={`px-3 py-2 text-sm font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
-                  bottomPanelTab === 'events'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                <Clock size={14} />
-                Events
-              </button>
-              <button
-                onClick={() => setBottomPanelTab('comparison')}
-                className={`px-3 py-2 text-sm font-medium flex items-center gap-1.5 border-b-2 transition-colors ${
-                  bottomPanelTab === 'comparison'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                <BarChart3 size={14} />
-                Compare
-              </button>
-              <div className="flex-1" />
-              <button
-                onClick={() => setBottomPanelOpen(false)}
-                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-              >
-                <ChevronDown size={16} />
-              </button>
-            </div>
-
-            {/* Bottom Panel Content */}
-            <div className="flex-1 overflow-hidden">
-              {bottomPanelTab === 'metrics' && (
-                <div className="h-full p-2">
-                  <LiveMetrics topologyId={id} refreshInterval={5000} chaosConditions={chaosConditions} />
-                </div>
-              )}
-              {bottomPanelTab === 'events' && (
-                <EventTimeline topologyId={id} maxEvents={50} compact />
-              )}
-              {bottomPanelTab === 'comparison' && (
-                <MetricsComparison topologyId={id} />
-              )}
-            </div>
-          </div>
+        {/* Scenario Editor Panel - Always visible at bottom */}
+        {id && (
+          <VerticalResizablePanel
+            minHeight={200}
+            maxHeight={800}
+            defaultHeight={bottomPanelHeight}
+            setHeight={setBottomPanelHeight}
+          >
+             <ScenarioEditor 
+                nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
+                topologyId={id}
+                onRun={() => {}}
+                onStop={() => {}}
+                isRunning={false}
+             />
+          </VerticalResizablePanel>
         )}
+
       </div>
 
       {/* Chaos Legend Panel - horizontal */}
