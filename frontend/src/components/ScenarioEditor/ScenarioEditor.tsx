@@ -113,6 +113,27 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
     setSelectedStepId(null);
   };
 
+  // Handle keyboard shortcuts (Delete/Backspace)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedStepId || isRunning) return;
+
+      const target = e.target as HTMLElement;
+      // Ignore if user is typing in an input/textarea
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable) {
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+         e.preventDefault();
+         handleStepDelete(selectedStepId);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedStepId, isRunning]);
+
   const handleTimelineClick = (e: React.MouseEvent) => {
     // Deselect if clicking empty space
      if ((e.target as HTMLElement).classList.contains('timeline-track-area')) {
