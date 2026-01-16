@@ -3,6 +3,19 @@ import { calculateTrackLayout, ROW_HEIGHT, ROW_GAP } from './layoutUtils';
 import { ScenarioStep } from './ScenarioEditor';
 import { Zap } from 'lucide-react';
 
+const CHAOS_ICONS: Record<string, string> = {
+  'delay': '⏱️',
+  'loss': '📉',
+  'bandwidth': '📊',
+  'corrupt': '🔧',
+  'duplicate': '📋',
+  'partition': '🚫',
+  'stress-cpu': '💻',
+  'pod-kill': '💀',
+  'io-delay': '💾',
+  'http-abort': '🌐'
+};
+
 interface TimelineTracksProps {
   nodes: Array<{ id: string; name: string }>;
   steps: ScenarioStep[];
@@ -270,7 +283,9 @@ const TimelineJob: React.FC<TimelineJobProps> = ({ step, zoom, isSelected, onSel
             onMouseDown={(e) => handleResizeStart(e, 'left')}
         />
         )}
-        <Zap size={12} className={isSelected ? 'text-primary-600 dark:text-white' : 'opacity-70'} />
+        <span className="text-base leading-none select-none flex-shrink-0">
+            {CHAOS_ICONS[step.type] || <Zap size={14} />}
+        </span>
         <span className="truncate font-medium">{step.type}</span>
 
         {/* Resize Handle Right */}
