@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: testdistributed-app-headless
+  namespace: networksim-sim
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: testdistributed_app_simple
+  ports:
+    - port: 37020
+      targetPort: 37020
+      protocol: UDP
