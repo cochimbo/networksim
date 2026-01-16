@@ -237,70 +237,74 @@ pub async fn get_live_metrics(
     // Collect network metrics between all pairs
     let node_ids: Vec<String> = pod_info.keys().cloned().collect();
 
+    // Prepare tasks for parallel execution
+    let mut tasks = Vec::new();
     for from_node in &node_ids {
-        let (from_pod, _from_ip) = match pod_info.get(from_node) {
-            Some(info) => info,
-            None => continue,
+        if let Some((from_pod, _)) = pod_info.get(from_node) {
+            for to_node in &node_ids {
+                if from_node == to_node { continue; }
+                if let Some((_, to_ip)) = pod_info.get(to_node) {
+                     tasks.push((from_node.clone(), to_node.clone(), from_pod.clone(), to_ip.clone()));
+                }
+            }
+        }
+    }
+
+    // Measure in parallel to avoid timeouts (approx 2s total instead of N*2s)
+    let futures = tasks.iter().map(|(_, _, from_pod, to_ip)| {
+        let client = client.clone();
+        async move {
+            measure_connectivity(&client, from_pod, to_ip).await
+        }
+    });
+    
+    let results = futures::future::join_all(futures).await;
+
+    // Process network metrics results
+    for ((from_node, to_node, _, _), (is_connected, latency_ms, packet_loss)) in tasks.into_iter().zip(results) {
+        // Get apps on source and target nodes
+        let source_apps: Vec<&Application> = apps_by_node.get(&from_node).cloned().unwrap_or_default();
+        let target_apps: Vec<&Application> = apps_by_node.get(&to_node).cloned().unwrap_or_default();
+
+        // Get chaos conditions affecting this pair
+        let chaos_conditions = &all_chaos;
+        let affecting_chaos: Vec<String> = chaos_conditions
+            .iter()
+            .filter(|c| {
+                c.source_node_id == from_node &&
+                (c.target_node_id.is_none() || c.target_node_id.as_ref() == Some(&to_node)) &&
+                format!("{:?}", c.status).to_lowercase() == "active"
+            })
+            .map(|c| format!("{}:{:?}", c.id, c.chaos_type))
+            .collect();
+
+        let metric = NetworkMetric {
+            id: 0,
+            topology_id: topology_id.clone(),
+            source_node_id: from_node,
+            target_node_id: to_node,
+            latency_ms,
+            packet_loss_percent: packet_loss,
+            bandwidth_bps: None,
+            jitter_ms: None,
+            is_connected,
+            measured_at: now,
+            source_app_id: source_apps.first().map(|a| a.id.to_string()),
+            source_app_name: source_apps.first().map(|a| a.image_name.clone()),
+            target_app_id: target_apps.first().map(|a| a.id.to_string()),
+            target_app_name: target_apps.first().map(|a| a.image_name.clone()),
+            chaos_conditions: if affecting_chaos.is_empty() { None } else { Some(affecting_chaos) },
         };
 
-        for to_node in &node_ids {
-            if from_node == to_node {
-                continue;
-            }
+        let _ = save_network_metric(&state, &metric).await;
+        network_metrics.push(metric);
+    }
 
-            let (_to_pod, to_ip) = match pod_info.get(to_node) {
-                Some(info) => info,
-                None => continue,
-            };
-
-            // Measure connectivity and latency
-            let (is_connected, latency_ms, packet_loss) =
-                measure_connectivity(client, from_pod, to_ip).await;
-
-            // Get apps on source and target nodes (from pre-loaded data)
-            let source_apps: Vec<&Application> = apps_by_node.get(from_node).cloned().unwrap_or_default();
-            let target_apps: Vec<&Application> = apps_by_node.get(to_node).cloned().unwrap_or_default();
-
-            // Get chaos conditions affecting this pair (from pre-loaded data)
-            let chaos_conditions = &all_chaos;
-            let affecting_chaos: Vec<String> = chaos_conditions
-                .iter()
-                .filter(|c| {
-                    c.source_node_id == *from_node &&
-                    (c.target_node_id.is_none() || c.target_node_id.as_ref() == Some(to_node)) &&
-                    format!("{:?}", c.status).to_lowercase() == "active"
-                })
-                .map(|c| format!("{}:{:?}", c.id, c.chaos_type))
-                .collect();
-
-            let metric = NetworkMetric {
-                id: 0,
-                topology_id: topology_id.clone(),
-                source_node_id: from_node.clone(),
-                target_node_id: to_node.clone(),
-                latency_ms,
-                packet_loss_percent: packet_loss,
-                bandwidth_bps: None, // Would need iperf for this
-                jitter_ms: None,
-                is_connected,
-                measured_at: now,
-                source_app_id: source_apps.first().map(|a| a.id.to_string()),
-                source_app_name: source_apps.first().map(|a| a.image_name.clone()),
-                target_app_id: target_apps.first().map(|a| a.id.to_string()),
-                target_app_name: target_apps.first().map(|a| a.image_name.clone()),
-                chaos_conditions: if affecting_chaos.is_empty() { None } else { Some(affecting_chaos) },
-            };
-
-            // Save to database for historical data
-            let _ = save_network_metric(&state, &metric).await;
-
-            network_metrics.push(metric);
-        }
-
-        // Collect node metrics
+    // Collect node metrics
+    for from_node in &node_ids {
         let (pod_name, _) = match pod_info.get(from_node) {
             Some(info) => info,
-            None => continue, // Skip if pod info not found
+            None => continue,
         };
         let pod_status = get_pod_status(&pod_list, pod_name);
 
@@ -309,7 +313,7 @@ pub async fn get_live_metrics(
             topology_id: topology_id.clone(),
             node_id: from_node.clone(),
             pod_name: Some(pod_name.clone()),
-            cpu_usage_percent: None, // Would need metrics-server
+            cpu_usage_percent: None, 
             memory_usage_bytes: None,
             memory_limit_bytes: None,
             rx_bytes: None,
@@ -548,21 +552,19 @@ async fn measure_connectivity(
     let pods: Api<Pod> = Api::namespaced(client.clone(), "networksim-sim");
 
     let ap = AttachParams {
-        stdin: true,
+        stdin: true, // Required for some exec implementations even if not used
         stdout: true,
         stderr: true,
         tty: false,
         ..Default::default()
     };
 
-    // Ping with timing
+    // Ping parameters: 3 packets, 2s timeout per packet.
+    // -q: Quiet output (header and summary only) to reduce data transfer.
     let command = vec![
         "sh".to_string(),
         "-c".to_string(),
-        format!(
-            "ping -c 5 -W 2 {} 2>/dev/null | tail -1 | awk -F'/' '{{print $5}}'",
-            to_ip
-        ),
+        format!("ping -c 3 -W 2 -q {} 2>&1", to_ip),
     ];
 
     match pods.exec(from_pod, command, &ap).await {
@@ -574,20 +576,63 @@ async fn measure_connectivity(
             let mut stdout_str = String::new();
             if let Some(mut stdout) = attached.stdout() {
                 use tokio::io::AsyncReadExt;
-                let mut buf = [0u8; 256];
-                if let Ok(n) = stdout.read(&mut buf).await {
-                    stdout_str = String::from_utf8_lossy(&buf[..n]).trim().to_string();
+                let mut buf = Vec::new(); // Use Vec to read all
+                if stdout.read_to_end(&mut buf).await.is_ok() {
+                    stdout_str = String::from_utf8_lossy(&buf).to_string();
                 }
             }
 
-            if let Ok(latency) = stdout_str.parse::<f64>() {
-                (true, Some(latency), Some(0.0))
+            // Parse output
+            let mut loss: Option<f64> = None;
+            let mut latency: Option<f64> = None;
+
+            for line in stdout_str.lines() {
+                // Parse packet loss: "3 packets transmitted, 3 packets received, 0% packet loss"
+                if line.contains("packet loss") {
+                    if let Some(start) = line.find("received, ") {
+                        if let Some(end) = line[start..].find("% packet loss") {
+                             // "received, 0" -> "0"
+                             let loss_str = &line[start + 10..start + end];
+                             if let Ok(val) = loss_str.trim().parse::<f64>() {
+                                 loss = Some(val);
+                             }
+                        }
+                    }
+                }
+                
+                // Parse latency: "round-trip min/avg/max = 0.1/0.2/0.3 ms" or "rtt min/avg/max/mdev = ..."
+                if line.contains("min/avg/max") {
+                    if let Some(eq_idx) = line.find(" = ") {
+                        let parts: Vec<&str> = line[eq_idx + 3..].split('/').collect();
+                        if parts.len() >= 2 {
+                            if let Ok(val) = parts[1].parse::<f64>() {
+                                latency = Some(val);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Determination logic
+            if let Some(l) = latency {
+                // We have latency, so we are connected. Use parsed loss or 0.0.
+                (true, Some(l), loss.or(Some(0.0)))
+            } else if let Some(loss_val) = loss {
+                // No latency parsed (all failed?), but we have loss stats.
+                if loss_val >= 100.0 {
+                    (false, None, Some(100.0))
+                } else {
+                     // Weird partial state: loss < 100 but no latency stats?
+                     // Treat as connected if some packets passed (loss < 100)
+                     (true, None, Some(loss_val))
+                }
             } else if stdout_str.is_empty() {
-                // No response = blocked
-                (false, None, Some(100.0))
+                 // Empty output -> exec failed or silent failure -> Assume blocked
+                 (false, None, Some(100.0))
             } else {
-                // Connected but couldn't parse latency
-                (true, None, None)
+                 // Output exists but couldn't parse. Maybe "Network unreachable" etc.
+                 // Assume blocked/failure
+                 (false, None, Some(100.0))
             }
         }
         Err(e) => {

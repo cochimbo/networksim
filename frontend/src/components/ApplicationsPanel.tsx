@@ -3,7 +3,6 @@ import EnvVarsEditor from './EnvVarsEditor';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Play, Trash2, Package, ChevronDown, ChevronUp, HardDrive, Cpu, Heart, FileText, Info, Settings2 } from 'lucide-react';
 import apiWrapper, { applicationsApi, DeployAppRequest, AppRuntimeStatus, VolumeMount, HealthCheck, Application, PvcDto, ConfigMapDto } from '../services/api';
-import envIcon from '../assets/icons/env-icon.png';
 import AppDetailsModal from './AppDetailsModal';
 import { SkeletonList } from './Skeleton';
 import { LogViewerModal } from './LogViewerModal';

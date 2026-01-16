@@ -16,7 +16,7 @@ RUN rm -f Cargo.lock || true
 RUN cargo build --release
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl iputils-ping \
     && update-ca-certificates || true \
     && rm -rf /var/lib/apt/lists/*
 

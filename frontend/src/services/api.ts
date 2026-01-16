@@ -297,6 +297,52 @@ export const chaosApi = {
   },
 };
 
+// Scenarios
+export interface Scenario {
+  id: string;
+  topology_id: string;
+  name: string;
+  description?: string;
+  total_duration: number;
+  steps: any[]; // ScenarioStep[] but simplified
+  created_at: string;
+  updated_at: string;
+}
+
+export const scenariosApi = {
+  list: async (topologyId: string): Promise<Scenario[]> => {
+    const response = await api.get(`/api/topologies/${topologyId}/scenarios`);
+    return response.data.data;
+  },
+  
+  get: async (id: string): Promise<Scenario> => {
+    const response = await api.get(`/api/scenarios/${id}`);
+    return response.data.data;
+  },
+
+  create: async (topologyId: string, data: Partial<Scenario>): Promise<Scenario> => {
+    // Strip fields that shouldn't be sent to backend
+    const { id, created_at, updated_at, topology_id, ...payload } = data as any;
+    const response = await api.post(`/api/topologies/${topologyId}/scenarios`, payload);
+    return response.data.data;
+  },
+
+  update: async (id: string, data: Partial<Scenario>): Promise<Scenario> => {
+    // Strip fields that shouldn't be sent to backend
+    const { id: _id, created_at, updated_at, topology_id, ...payload } = data as any;
+    const response = await api.put(`/api/scenarios/${id}`, payload);
+    return response.data.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/api/scenarios/${id}`);
+  },
+
+  run: async (id: string): Promise<void> => {
+    await api.post(`/api/scenarios/${id}/run`);
+  }
+};
+
 // Cluster Status
 export interface ClusterStatus {
   connected: boolean;

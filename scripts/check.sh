@@ -4,6 +4,11 @@
 
 set -e
 
+# Asegurar que estamos en la raíz del proyecto
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="$SCRIPT_DIR/.."
+cd "$PROJECT_DIR"
+
 echo "🔍 Running pre-commit checks..."
 
 # Backend checks

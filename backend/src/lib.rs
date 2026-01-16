@@ -193,6 +193,8 @@ pub fn create_router(state: AppState) -> Router {
         // Reports
         .route("/api/topologies/:id/report", get(api::reports::generate_report))
         .route("/api/topologies/:id/report/html", get(api::reports::generate_html_report))
+        // Scenarios
+        .merge(api::scenarios::router())
         // OpenAPI / Swagger UI
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         // State and middleware

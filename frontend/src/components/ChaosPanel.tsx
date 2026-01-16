@@ -107,19 +107,19 @@ interface ChaosPanelProps {
   onClose?: () => void;
 }
 
-const CHAOS_TYPES: { value: ChaosType; label: string; description: string; category: 'network' | 'stress' | 'pod' | 'io' | 'http' }[] = [
+const CHAOS_TYPES: { value: ChaosType; label: string; description: string; category: 'network' | 'stress' | 'pod' | 'io' | 'http'; icon: string }[] = [
   // Network chaos types
-  { value: 'delay', label: 'Delay', description: 'Add latency to network traffic', category: 'network' },
-  { value: 'loss', label: 'Packet Loss', description: 'Drop a percentage of packets', category: 'network' },
-  { value: 'bandwidth', label: 'Bandwidth', description: 'Limit network bandwidth', category: 'network' },
-  { value: 'corrupt', label: 'Corrupt', description: 'Corrupt packet data', category: 'network' },
-  { value: 'duplicate', label: 'Duplicate', description: 'Duplicate packets', category: 'network' },
-  { value: 'partition', label: 'Partition', description: 'Complete network partition', category: 'network' },
+  { value: 'delay', label: 'Delay', description: 'Add latency to network traffic', category: 'network', icon: '⏱️' },
+  { value: 'loss', label: 'Packet Loss', description: 'Drop a percentage of packets', category: 'network', icon: '📉' },
+  { value: 'bandwidth', label: 'Bandwidth', description: 'Limit network bandwidth', category: 'network', icon: '📊' },
+  { value: 'corrupt', label: 'Corrupt', description: 'Corrupt packet data', category: 'network', icon: '🔧' },
+  { value: 'duplicate', label: 'Duplicate', description: 'Duplicate packets', category: 'network', icon: '📋' },
+  { value: 'partition', label: 'Partition', description: 'Complete network partition', category: 'network', icon: '🚫' },
   // New chaos types
-  { value: 'stress-cpu', label: 'CPU Stress', description: 'Stress CPU on target pods', category: 'stress' },
-  { value: 'pod-kill', label: 'Pod Kill', description: 'Kill target pods', category: 'pod' },
-  { value: 'io-delay', label: 'I/O Delay', description: 'Add latency to disk I/O', category: 'io' },
-  { value: 'http-abort', label: 'HTTP Abort', description: 'Abort HTTP requests with error code', category: 'http' },
+  { value: 'stress-cpu', label: 'CPU Stress', description: 'Stress CPU on target pods', category: 'stress', icon: '💻' },
+  { value: 'pod-kill', label: 'Pod Kill', description: 'Kill target pods', category: 'pod', icon: '💀' },
+  { value: 'io-delay', label: 'I/O Delay', description: 'Add latency to disk I/O', category: 'io', icon: '💾' },
+  { value: 'http-abort', label: 'HTTP Abort', description: 'Abort HTTP requests with error code', category: 'http', icon: '🌐' },
 ];
 
 // Helper to check if chaos type requires target node
@@ -138,6 +138,24 @@ const STATUS_LABELS: Record<ChaosConditionStatus, { label: string; color: string
   pending: { label: 'Pending', color: '#9ca3af' }, // gray-400
   active: { label: 'Active', color: '#22c55e' }, // green-500
   paused: { label: 'Paused', color: '#f59e0b' }, // amber-500
+};
+
+const getChaosColorClass = (type: string) => {
+  if (type.includes('stress')) return 'bg-orange-100 border-orange-500 text-orange-800 dark:bg-orange-900/50 dark:border-orange-400 dark:text-orange-100';
+  if (type.includes('pod')) return 'bg-gray-200 border-gray-500 text-gray-800 dark:bg-gray-600 dark:border-gray-400 dark:text-gray-100';
+  if (type === 'partition') return 'bg-slate-800 border-slate-600 text-slate-100 dark:bg-black dark:border-slate-500 dark:text-white';
+  
+  if (type === 'delay') return 'bg-blue-100 border-blue-500 text-blue-800 dark:bg-blue-900/50 dark:border-blue-400 dark:text-blue-100';
+  if (type === 'loss') return 'bg-pink-100 border-pink-500 text-pink-800 dark:bg-pink-900/50 dark:border-pink-400 dark:text-pink-100';
+  if (type === 'bandwidth') return 'bg-cyan-100 border-cyan-500 text-cyan-800 dark:bg-cyan-900/50 dark:border-cyan-400 dark:text-cyan-100';
+  if (type === 'corrupt') return 'bg-yellow-100 border-yellow-500 text-yellow-800 dark:bg-yellow-900/50 dark:border-yellow-400 dark:text-yellow-100';
+  if (type === 'duplicate') return 'bg-violet-100 border-violet-500 text-violet-800 dark:bg-violet-900/50 dark:border-violet-400 dark:text-violet-100';
+  
+  if (type === 'io-delay') return 'bg-emerald-100 border-emerald-500 text-emerald-800 dark:bg-emerald-900/50 dark:border-emerald-400 dark:text-emerald-100';
+  if (type === 'http-abort') return 'bg-rose-100 border-rose-500 text-rose-800 dark:bg-rose-900/50 dark:border-rose-400 dark:text-rose-100';
+
+  // Default
+  return 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/20 dark:border-indigo-800 dark:text-indigo-200';
 };
 
 export function ChaosPanel({ topologyId, nodes, links, applications = [], onClose: _onClose }: ChaosPanelProps) {
@@ -180,6 +198,9 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
   const [ioDelay, setIoDelay] = useState('100ms');
   const [ioPercent, setIoPercent] = useState(100);
   const [httpCode, setHttpCode] = useState(500);
+
+  // View mode for the panel
+  const [viewMode, setViewMode] = useState<'manual' | 'palette'>('palette');
 
   useEffect(() => {
     fetchConditions();
@@ -680,11 +701,64 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         </div>
       </div>
 
-      {error && <div className="error-message dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">{error}</div>}
-
       <div className="chaos-panel-content">
+        {/* View Mode Toggle */}
+        <div className="flex p-2 bg-gray-100 dark:bg-gray-800 rounded-lg mb-4 gap-1">
+          <button
+            className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'manual' 
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+            onClick={() => setViewMode('manual')}
+          >
+            Active Chaos
+          </button>
+          <button
+            className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors ${
+              viewMode === 'palette' 
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' 
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+             onClick={() => setViewMode('palette')}
+          >
+            Tools Palette
+          </button>
+        </div>
+
+        {/* Chaos Tools Palette (Draggable) */}
+        {viewMode === 'palette' && (
+        <div className="section">
+          <div className="section-header dark:text-gray-300">
+            <h4>Chaos Tools</h4>
+          </div>
+          <p className="text-xs text-gray-500 mb-2">Drag tools to the Scenario timeline below</p>
+          <div className="grid grid-cols-2 gap-2">
+            {CHAOS_TYPES.map(type => (
+              <div
+                key={type.value}
+                className={`flex items-center gap-2 p-2 border rounded cursor-grab hover:brightness-95 dark:hover:brightness-110 ${getChaosColorClass(type.value)}`}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/json', JSON.stringify({
+                    type: 'chaos-tool',
+                    chaosType: type.value
+                  }));
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
+              >
+                <div className={`p-1 rounded bg-black/5 dark:bg-white/10 flex items-center justify-center w-8 h-8`}>
+                  <span className="text-lg">{type.icon}</span>
+                </div>
+                <span className="text-sm font-medium truncate">{type.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        )}
+
         {/* Global Controls */}
-        {conditions.length > 0 && (
+        {viewMode === 'manual' && conditions.length > 0 && (
           <div className="global-controls dark:border-gray-700 dark:bg-gray-800">
             <button 
               className="btn-success dark:bg-green-700 dark:hover:bg-green-600"
@@ -714,6 +788,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
         )}
 
         {/* Conditions List */}
+        {viewMode === 'manual' && (
         <div className="section">
           <div className="section-header dark:text-gray-300">
             <h4>Chaos Conditions ({conditions.length})</h4>
@@ -846,6 +921,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
             </ul>
           )}
         </div>
+        )}
 
         {/* Add New Condition */}
         <div className="section">
@@ -925,6 +1001,7 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
                       ))}
                     </select>
                   </div>
+              
                 )}
 
                 <div className="form-group">

@@ -8,7 +8,6 @@ import { ThemeToggle } from '../contexts/ThemeContext';
 
 const navigation = [
   { name: 'Topologies', href: '/topologies', icon: Network },
-  { name: 'Scenarios', href: '/scenarios', icon: PlayCircle },
   { name: 'Volumes', href: '/volumes', icon: HardDrive },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

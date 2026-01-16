@@ -14,7 +14,10 @@
 #
 
 set -e
-
+# Ensure we are running from the project root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="$SCRIPT_DIR/.."
+cd "$PROJECT_DIR"
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
