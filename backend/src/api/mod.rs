@@ -16,6 +16,7 @@ pub mod test_runner;
 pub mod topologies;
 pub mod ws;
 pub mod volumes;
+pub mod scenarios;
 
 use crate::config::Config;
 use crate::db::Database;

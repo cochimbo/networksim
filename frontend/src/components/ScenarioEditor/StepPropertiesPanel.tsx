@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { ChaosType } from '../../services/api';
+import React from 'react';
 import { ScenarioStep } from './ScenarioEditor';
-import { X, Save } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface StepPropertiesPanelProps {
   step: ScenarioStep | null;
@@ -123,7 +122,15 @@ const ChaosParamsForm: React.FC<{ step: ScenarioStep; onChange: (params: any) =>
   }
 };
 
-const InputField = ({ label, value, onChange, placeholder, type = 'text' }: any) => (
+interface InputFieldProps {
+  label: string;
+  value: string | number;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+}
+
+const InputField: React.FC<InputFieldProps> = ({ label, value, onChange, placeholder, type = 'text' }) => (
   <div className="space-y-0.5">
     <label className="text-xs font-medium text-gray-600 dark:text-gray-400">{label}</label>
     <input

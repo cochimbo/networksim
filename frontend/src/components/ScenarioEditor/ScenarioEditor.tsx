@@ -22,11 +22,9 @@ export interface ScenarioStep {
   laneId: string; // usually sourceNodeId
 }
 
-export interface Scenario {
-  id: string;
-  name: string;
-  description?: string;
-  totalDuration: number;
+import { Scenario as ApiScenario } from '../../services/api';
+
+export interface Scenario extends Omit<ApiScenario, 'steps'> {
   steps: ScenarioStep[];
 }
 
@@ -36,6 +34,8 @@ interface ScenarioEditorProps {
   onRun?: (scenario: Scenario) => void;
   onStop?: () => void;
   isRunning?: boolean;
+  initialScenario?: Scenario;
+  onSave?: (scenario: Partial<Scenario>) => void;
 }
 
 const DEFAULT_DURATION = 60; // 1 minute default
@@ -45,14 +45,23 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
   nodes, 
   onRun,
   onStop,
-  isRunning = false
+  isRunning = false,
+  initialScenario,
+  onSave
 }) => {
-  const [scenario, setScenario] = useState<Scenario>({
+  const [scenario, setScenario] = useState<Scenario>(initialScenario || {
     id: crypto.randomUUID(),
     name: 'New Scenario',
-    totalDuration: DEFAULT_DURATION,
+    total_duration: DEFAULT_DURATION,
     steps: []
   });
+
+  // Reset when initialScenario changes
+  useEffect(() => {
+    if (initialScenario) {
+        setScenario(initialScenario);
+    }
+  }, [initialScenario]);
   
   const [currentTime, setCurrentTime] = useState(0); // Playhead position
   const [zoom, setZoom] = useState(PIXELS_PER_SECOND_DEFAULT);
@@ -68,16 +77,16 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
       const startTime = Date.now() - (currentTime * 1000);
       interval = setInterval(() => {
         const newTime = (Date.now() - startTime) / 1000;
-        if (newTime >= scenario.totalDuration) {
+        if (newTime >= scenario.total_duration) {
           onStop?.();
-          setCurrentTime(scenario.totalDuration);
+          setCurrentTime(scenario.total_duration);
         } else {
           setCurrentTime(newTime);
         }
       }, 50); // 20fps update
     }
     return () => clearInterval(interval);
-  }, [isRunning, scenario.totalDuration, onStop]);
+  }, [isRunning, scenario.total_duration, onStop]);
 
   const handleStepChange = (updatedStep: ScenarioStep) => {
     setScenario(prev => ({
@@ -116,7 +125,7 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
         <TimelineControls 
           isRunning={isRunning} 
           currentTime={currentTime}
-          totalDuration={scenario.totalDuration}
+          totalDuration={scenario.total_duration}
           onPlay={() => onRun?.(scenario)}
           onStop={onStop || (() => {})}
           onSeek={setCurrentTime}
@@ -131,10 +140,10 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
            <input 
              type="number" 
              className="w-16 h-7 px-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-             value={scenario.totalDuration}
+             value={scenario.total_duration}
              onChange={(e) => {
                 const val = parseInt(e.target.value) || 60;
-                setScenario(prev => ({ ...prev, totalDuration: val }));
+                setScenario(prev => ({ ...prev, total_duration: val }));
              }}
              min={10}
              max={3600}
@@ -144,16 +153,24 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
 
         <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2" />
         
-        <button className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700" title="Zoom In" onClick={() => setZoom(z => z * 1.2)}>
-          <ZoomIn size={16} />
-        </button>
-        <button className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700" title="Zoom Out" onClick={() => setZoom(z => Math.max(5, z / 1.2))}>
+        <button title="Zoom Out" className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700" onClick={() => setZoom(z => Math.max(5, z / 1.2))}>
           <ZoomOut size={16} />
         </button>
         
         <div className="flex-1" />
         
-        <button className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700">
+        <input 
+            type="text" 
+            value={scenario.name}
+            onChange={(e) => setScenario(prev => ({ ...prev, name: e.target.value }))}
+            className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-transparent"
+            placeholder="Scenario Name"
+        />
+
+        <button 
+            onClick={() => onSave?.(scenario)}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
+        >
             <Save size={14} /> Save
         </button>
       </div>
@@ -192,11 +209,11 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
         >
             <div 
                 className="relative min-h-full"
-                style={{ width: `${scenario.totalDuration * zoom + 100}px` }}
+                style={{ width: `${scenario.total_duration * zoom + 100}px` }}
             >
                 {/* Ruler */}
                 <TimelineRuler 
-                    duration={scenario.totalDuration} 
+                    duration={scenario.total_duration} 
                     zoom={zoom} 
                 />
                 
@@ -214,7 +231,7 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
                         nodes={nodes}
                         steps={scenario.steps}
                         zoom={zoom}
-                        totalDuration={scenario.totalDuration}
+                        totalDuration={scenario.total_duration}
                         onStepUpdate={handleStepChange}
                         onStepAdd={handleStepAdd}
                         selectedStepId={selectedStepId}

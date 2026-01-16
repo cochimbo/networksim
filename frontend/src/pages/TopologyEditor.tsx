@@ -28,7 +28,7 @@ import ImpactDashboard from '../components/ImpactDashboard';
 import AppToAppTest from '../components/AppToAppTest';
 import { TemplateSelector } from '../components/TemplateSelector';
 import { VerticalResizablePanel } from '../components/VerticalResizablePanel';
-import { ScenarioEditor } from '../components/ScenarioEditor/ScenarioEditor';
+import { ScenarioManager } from '../components/ScenarioEditor/ScenarioManager';
 import { ExportReport } from '../components/ExportReport';
 import { applicationsApi, GeneratedTopology } from '../services/api';
 
@@ -1846,12 +1846,9 @@ export default function TopologyEditor() {
             defaultHeight={bottomPanelHeight}
             setHeight={setBottomPanelHeight}
           >
-             <ScenarioEditor 
+             <ScenarioManager 
                 nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
                 topologyId={id}
-                onRun={() => {}}
-                onStop={() => {}}
-                isRunning={false}
              />
           </VerticalResizablePanel>
         )}
