@@ -34,6 +34,7 @@ interface ScenarioEditorProps {
   onRun?: (scenario: Scenario) => void;
   onStop?: () => void;
   isRunning?: boolean;
+  isDeploymentReady?: boolean;
   initialScenario?: Scenario;
   onSave?: (scenario: Partial<Scenario>) => void;
 }
@@ -46,6 +47,7 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
   onRun,
   onStop,
   isRunning = false,
+  isDeploymentReady = false,
   initialScenario,
   onSave
 }) => {
@@ -124,10 +126,19 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
       <div className="flex items-center gap-2 p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
         <TimelineControls 
           isRunning={isRunning} 
+          isDeploymentReady={isDeploymentReady}
           currentTime={currentTime}
           totalDuration={scenario.total_duration}
-          onPlay={() => onRun?.(scenario)}
-          onStop={onStop || (() => {})}
+          // The backend always runs from t=0, so we must reset time on play to match visual state
+          onPlay={() => {
+            setCurrentTime(0);
+            onRun?.(scenario);
+          }}
+          // Reset time on stop as resume is not supported
+          onStop={() => {
+            setCurrentTime(0);
+            onStop?.();
+          }}
           onSeek={setCurrentTime}
         />
         
@@ -155,6 +166,9 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
         
         <button title="Zoom Out" className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700" onClick={() => setZoom(z => Math.max(5, z / 1.2))}>
           <ZoomOut size={16} />
+        </button>
+        <button title="Zoom In" className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700" onClick={() => setZoom(z => Math.min(100, z * 1.2))}>
+          <ZoomIn size={16} />
         </button>
         
         <div className="flex-1" />
@@ -236,6 +250,7 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
                         onStepAdd={handleStepAdd}
                         selectedStepId={selectedStepId}
                         onSelectStep={setSelectedStepId}
+                        readOnly={isRunning}
                     />
                 </div>
             </div>

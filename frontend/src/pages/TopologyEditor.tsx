@@ -1849,6 +1849,7 @@ export default function TopologyEditor() {
              <ScenarioManager 
                 nodes={nodes.map(n => ({ id: n.id, name: n.name }))}
                 topologyId={id}
+                isDeploymentReady={deploymentStatus?.status === 'running'}
              />
           </VerticalResizablePanel>
         )}

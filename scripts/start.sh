@@ -14,7 +14,10 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-PROJECT_DIR=".."
+# Obtener directorio del script y raíz del proyecto
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_DIR="$SCRIPT_DIR/.."
+
 BACKEND_LOG="/tmp/networksim-backend.log"
 FRONTEND_LOG="/tmp/networksim-frontend.log"
 

@@ -3,6 +3,7 @@ import { Play, Square, SkipBack, SkipForward } from 'lucide-react';
 
 interface TimelineControlsProps {
   isRunning: boolean;
+  isDeploymentReady?: boolean;
   currentTime: number;
   totalDuration: number;
   onPlay: () => void;
@@ -12,6 +13,7 @@ interface TimelineControlsProps {
 
 export const TimelineControls: React.FC<TimelineControlsProps> = ({
   isRunning,
+  isDeploymentReady = true,
   currentTime,
   totalDuration,
   onPlay,
@@ -25,15 +27,21 @@ export const TimelineControls: React.FC<TimelineControlsProps> = ({
            className="p-1.5 rounded hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
            onClick={() => onSeek(0)}
            title="Reset"
+           disabled={isRunning}
          >
            <SkipBack size={16} />
          </button>
          
          {!isRunning ? (
             <button 
-                className="p-1.5 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400"
-                onClick={onPlay}
-                title="Play"
+                className={`p-1.5 rounded 
+                    ${!isDeploymentReady 
+                        ? 'text-gray-400 cursor-not-allowed' 
+                        : 'hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400'
+                    }`}
+                onClick={isDeploymentReady ? onPlay : undefined}
+                disabled={!isDeploymentReady}
+                title={!isDeploymentReady ? "Deployment must be running to play scenario" : "Play"}
             >
                 <Play size={18} fill="currentColor" />
             </button>

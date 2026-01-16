@@ -4,16 +4,18 @@ import {
   ChevronRight, Calendar 
 } from 'lucide-react';
 import { ScenarioEditor } from './ScenarioEditor';
-import { scenariosApi, Scenario } from '../../services/api';
+import { scenariosApi, chaosApi, Scenario } from '../../services/api';
 
 interface ScenarioManagerProps {
   topologyId: string;
   nodes: Array<{ id: string; name: string }>;
+  isDeploymentReady?: boolean;
 }
 
 export const ScenarioManager: React.FC<ScenarioManagerProps> = ({ 
   topologyId, 
-  nodes 
+  nodes,
+  isDeploymentReady = false,
 }) => {
   const [mode, setMode] = useState<'list' | 'edit'>('list');
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -75,12 +77,18 @@ export const ScenarioManager: React.FC<ScenarioManagerProps> = ({
       try {
           if (selectedScenario?.id) {
               // Update
-              await scenariosApi.update(selectedScenario.id, scenarioData);
+              const updated = await scenariosApi.update(selectedScenario.id, scenarioData);
+              setSelectedScenario(updated);
           } else {
               // Create
-              await scenariosApi.create(topologyId, scenarioData as any);
+              const created = await scenariosApi.create(topologyId, scenarioData as any);
+              setSelectedScenario(created);
           }
-          setMode('list');
+          // Don't switch back to list mode, let user continue editing
+          // setMode('list');
+          
+          // Optional: Show success feedback (could be replaced by a Toast)
+          // alert('Scenario saved successfully');
       } catch (err: any) {
            console.error("Failed to save scenario", err);
            const msg = err.response?.data?.error || err.message || "Unknown error";
@@ -113,11 +121,23 @@ export const ScenarioManager: React.FC<ScenarioManagerProps> = ({
                     onRun={async (s) => {
                          if (!s.id) return; // Must be saved
                          setIsRunning(true);
-                         await scenariosApi.run(s.id);
-                         // TODO: Poll for status?
-                         setIsRunning(false);
+                         try {
+                            await scenariosApi.run(s.id);
+                         } catch (err) {
+                            console.error("Failed to run scenario", err);
+                            setIsRunning(false);
+                         }
+                    }}
+                    onStop={async () => {
+                        setIsRunning(false);
+                        try {
+                             await chaosApi.stopAll(topologyId);
+                        } catch (err) {
+                             console.error("Failed to stop chaos", err);
+                        }
                     }}
                     isRunning={isRunning}
+                    isDeploymentReady={isDeploymentReady}
                 />
             </div>
         </div>
@@ -193,7 +213,13 @@ export const ScenarioManager: React.FC<ScenarioManagerProps> = ({
 
                             <button 
                                 onClick={() => handleRun(scenario)}
-                                className="w-full mt-4 flex items-center justify-center gap-2 py-2 bg-gray-50 dark:bg-gray-800 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-gray-700 dark:text-gray-300 hover:text-primary-700 border border-gray-200 dark:border-gray-700 rounded transition-colors text-sm font-medium"
+                                disabled={!isDeploymentReady}
+                                className={`w-full mt-4 flex items-center justify-center gap-2 py-2 rounded transition-colors text-sm font-medium
+                                    ${!isDeploymentReady 
+                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                        : 'bg-gray-50 dark:bg-gray-800 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-gray-700 dark:text-gray-300 hover:text-primary-700 border border-gray-200 dark:border-gray-700'
+                                    }`}
+                                title={!isDeploymentReady ? "Deployment must be running to execute scenarios" : ""}
                             >
                                 <Play size={14} />
                                 Run Scenario

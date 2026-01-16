@@ -89,13 +89,19 @@ async fn execute_scenario_logic(state: AppState, scenario: Scenario) -> Result<(
             // We use the "networksim-sim" namespace or from config if available (hardcoded for now to match other modules)
             match crate::chaos::ChaosClient::new("networksim-sim").await {
                Ok(client) => {
+                   let direction = if condition.target_node_id.is_some() {
+                        ChaosDirection::To
+                   } else {
+                        ChaosDirection::To // Default to egress only for "all" 
+                   };
+
                    let res = client.create_chaos(
                        &condition.topology_id,
                        &condition.id,
                        &condition.source_node_id,
                        condition.target_node_id.as_deref(),
                        &condition.chaos_type,
-                       &ChaosDirection::Both, // TODO: support direction from params
+                       &direction,
                        condition.duration.as_deref(),
                        &condition.params
                    ).await;

@@ -12,6 +12,7 @@ interface TimelineTracksProps {
   onStepAdd: (step: ScenarioStep) => void;
   selectedStepId: string | null;
   onSelectStep: (id: string | null) => void;
+  readOnly?: boolean;
 }
 
 export const TimelineTracks: React.FC<TimelineTracksProps> = ({
@@ -22,11 +23,13 @@ export const TimelineTracks: React.FC<TimelineTracksProps> = ({
   onStepUpdate,
   onStepAdd,
   selectedStepId,
-  onSelectStep
+  onSelectStep,
+  readOnly = false
 }) => {
   const [dragOverLaneId, setDragOverLaneId] = React.useState<string | null>(null);
 
   const handleDragOver = (e: React.DragEvent, nodeId: string) => {
+    if (readOnly) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     if (dragOverLaneId !== nodeId) {
@@ -40,6 +43,7 @@ export const TimelineTracks: React.FC<TimelineTracksProps> = ({
   };
 
   const handleDrop = (e: React.DragEvent, nodeId: string) => {
+    if (readOnly) return;
     e.preventDefault();
     setDragOverLaneId(null);
     const data = e.dataTransfer.getData('application/json');
@@ -108,6 +112,7 @@ export const TimelineTracks: React.FC<TimelineTracksProps> = ({
               maxDuration={totalDuration}
               top={(rowMap.get(step.id) || 0) * (ROW_HEIGHT + ROW_GAP) + 8} // 8px top padding
               height={ROW_HEIGHT}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -127,6 +132,7 @@ interface TimelineJobProps {
   maxDuration: number;
   top: number;
   height: number;
+  readOnly?: boolean;
 }
 
 const getChaosColorClass = (type: string) => {
@@ -147,7 +153,7 @@ const getChaosColorClass = (type: string) => {
   return 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/20 dark:border-indigo-800 dark:text-indigo-200';
 };
 
-const TimelineJob: React.FC<TimelineJobProps> = ({ step, zoom, isSelected, onSelect, onUpdate, maxDuration, top, height }) => {
+const TimelineJob: React.FC<TimelineJobProps> = ({ step, zoom, isSelected, onSelect, onUpdate, maxDuration, top, height, readOnly }) => {
   // Local state for smooth dragging without re-layout
   const [localStep, setLocalStep] = React.useState(step);
   const isInteracting = useRef(false);
@@ -169,8 +175,11 @@ const TimelineJob: React.FC<TimelineJobProps> = ({ step, zoom, isSelected, onSel
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault(); // Prevent text selection
     onSelect();
     
+    if (readOnly) return;
+
     isDragging.current = true;
     isInteracting.current = true;
     startX.current = e.clientX;
@@ -183,7 +192,9 @@ const TimelineJob: React.FC<TimelineJobProps> = ({ step, zoom, isSelected, onSel
   };
 
   const handleResizeStart = (e: React.MouseEvent, side: 'left' | 'right') => {
+    if (readOnly) return;
     e.stopPropagation();
+    e.preventDefault(); // Prevent text selection
     isResizing.current = side;
     isInteracting.current = true;
     startX.current = e.clientX;
@@ -206,7 +217,7 @@ const TimelineJob: React.FC<TimelineJobProps> = ({ step, zoom, isSelected, onSel
       const newStart = Math.max(0, Math.min(maxDuration - updated.duration, originalStart.current + deltaSeconds));
       updated.startAt = newStart;
     } else if (isResizing.current === 'right') {
-        const newDuration = Math.max(1, originalDuration.current + deltaSeconds);
+        const newDuration = Math.max(1, Math.min(maxDuration - updated.startAt, originalDuration.current + deltaSeconds));
         updated.duration = newDuration;
     } else if (isResizing.current === 'left') {
         // Changing start time AND duration
@@ -242,6 +253,7 @@ const TimelineJob: React.FC<TimelineJobProps> = ({ step, zoom, isSelected, onSel
             : 'z-10 hover:brightness-95 dark:hover:brightness-110'
         }
         ${getChaosColorClass(step.type)}
+        ${readOnly ? 'cursor-default opacity-80' : 'cursor-grab'}
       `}
       style={{
         left: `${localStep.startAt * zoom}px`,
@@ -252,18 +264,22 @@ const TimelineJob: React.FC<TimelineJobProps> = ({ step, zoom, isSelected, onSel
       onMouseDown={handleMouseDown}
     >
         {/* Resize Handle Left */}
+        {!readOnly && (
         <div 
             className="absolute top-0 bottom-0 left-0 w-2 cursor-col-resize hover:bg-black/10 dark:hover:bg-white/10 z-30" 
             onMouseDown={(e) => handleResizeStart(e, 'left')}
         />
+        )}
         <Zap size={12} className={isSelected ? 'text-primary-600 dark:text-white' : 'opacity-70'} />
         <span className="truncate font-medium">{step.type}</span>
 
         {/* Resize Handle Right */}
+        {!readOnly && (
         <div 
             className="absolute top-0 bottom-0 right-0 w-2 cursor-col-resize hover:bg-black/10 dark:hover:bg-white/10 z-30"
             onMouseDown={(e) => handleResizeStart(e, 'right')}
         />
+        )}
     </div>
   );
 };
