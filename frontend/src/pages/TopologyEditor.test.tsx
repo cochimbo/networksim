@@ -12,6 +12,8 @@ vi.mock('cytoscape', () => ({
     on: vi.fn(),
     add: vi.fn(),
     elements: vi.fn(() => ({ remove: vi.fn() })),
+    style: vi.fn(),
+    nodes: vi.fn(() => []),
     $: vi.fn(() => ({ 
       remove: vi.fn(),
       data: vi.fn(),
@@ -42,6 +44,10 @@ vi.mock('../services/api', () => ({
     create: vi.fn(),
     update: vi.fn(),
     list: vi.fn(() => Promise.resolve([])),
+  },
+  templatesApi: {
+    list: vi.fn(() => Promise.resolve([])),
+    get: vi.fn(),
   },
   clusterApi: {
     status: vi.fn(() => Promise.resolve({ status: 'running' })),

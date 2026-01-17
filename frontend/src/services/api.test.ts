@@ -1,15 +1,30 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock fetch globally before any imports
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
+// Use vi.hoisted to ensure mock functions are initialized before vi.mock
+const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
+  mockGet: vi.fn(),
+  mockPost: vi.fn(),
+  mockPut: vi.fn(),
+  mockDelete: vi.fn(),
+}));
 
-// Import after mocking
+// Mock axios module
+vi.mock('axios', () => ({
+  default: {
+    create: vi.fn(() => ({
+      get: mockGet,
+      post: mockPost,
+      put: mockPut,
+      delete: mockDelete,
+    })),
+  },
+}));
+
 import api from './api';
 
 describe('API Service', () => {
   beforeEach(() => {
-    mockFetch.mockClear();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -23,17 +38,13 @@ describe('API Service', () => {
         { id: '2', name: 'Topology 2', nodes: [], links: [] },
       ];
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockTopologies),
+      mockGet.mockResolvedValueOnce({
+        data: mockTopologies,
       });
 
       const result = await api.listTopologies();
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/topologies'),
-        expect.any(Object)
-      );
+      expect(mockGet).toHaveBeenCalledWith('/api/topologies');
       expect(result).toEqual(mockTopologies);
     });
 
@@ -46,37 +57,26 @@ describe('API Service', () => {
 
       const createdTopology = { id: '123', ...newTopology };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(createdTopology),
+      mockPost.mockResolvedValueOnce({
+        data: createdTopology,
       });
 
       const result = await api.createTopology(newTopology);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/topologies'),
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify(newTopology),
-        })
-      );
+      expect(mockPost).toHaveBeenCalledWith('/api/topologies', newTopology);
       expect(result).toEqual(createdTopology);
     });
 
     it('should get topology by ID', async () => {
       const topology = { id: '123', name: 'Test', nodes: [], links: [] };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(topology),
+      mockGet.mockResolvedValueOnce({
+        data: topology,
       });
 
       const result = await api.getTopology('123');
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/topologies/123'),
-        expect.any(Object)
-      );
+      expect(mockGet).toHaveBeenCalledWith('/api/topologies/123');
       expect(result).toEqual(topology);
     });
 
@@ -84,37 +84,24 @@ describe('API Service', () => {
       const updates = { name: 'Updated Name' };
       const updatedTopology = { id: '123', name: 'Updated Name', nodes: [], links: [] };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(updatedTopology),
+      mockPut.mockResolvedValueOnce({
+        data: updatedTopology,
       });
 
       const result = await api.updateTopology('123', updates);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/topologies/123'),
-        expect.objectContaining({
-          method: 'PUT',
-          body: JSON.stringify(updates),
-        })
-      );
+      expect(mockPut).toHaveBeenCalledWith('/api/topologies/123', updates);
       expect(result).toEqual(updatedTopology);
     });
 
     it('should delete topology', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({}),
+      mockDelete.mockResolvedValueOnce({
+        data: {},
       });
 
       await api.deleteTopology('123');
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/topologies/123'),
-        expect.objectContaining({
-          method: 'DELETE',
-        })
-      );
+      expect(mockDelete).toHaveBeenCalledWith('/api/topologies/123');
     });
   });
 
@@ -122,79 +109,61 @@ describe('API Service', () => {
     it('should deploy topology', async () => {
       const deployResponse = { status: 'deployed', pods: 3 };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(deployResponse),
+      mockPost.mockResolvedValueOnce({
+        data: deployResponse,
       });
 
       const result = await api.deployTopology('123');
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/topologies/123/deploy'),
-        expect.objectContaining({
-          method: 'POST',
-        })
-      );
+      expect(mockPost).toHaveBeenCalledWith('/api/topologies/123/deploy');
       expect(result).toEqual(deployResponse);
     });
 
     it('should destroy deployment', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({}),
+      mockDelete.mockResolvedValueOnce({
+        data: {},
       });
 
       await api.destroyDeployment('123');
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/topologies/123/deploy'),
-        expect.objectContaining({
-          method: 'DELETE',
-        })
-      );
+      expect(mockDelete).toHaveBeenCalledWith('/api/topologies/123/deploy');
     });
 
     it('should get deployment status', async () => {
       const status = { deployed: true, pods: [{ name: 'pod-1', status: 'Running' }] };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(status),
+      mockGet.mockResolvedValueOnce({
+        data: status,
       });
 
       const result = await api.getDeploymentStatus('123');
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/topologies/123/status'),
-        expect.any(Object)
-      );
+      expect(mockGet).toHaveBeenCalledWith('/api/topologies/123/status');
       expect(result).toEqual(status);
     });
   });
 
   describe('Error Handling', () => {
     it('should throw on non-ok response', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: () => Promise.resolve({ error: 'Topology not found' }),
-      });
+      const error = new Error('Not Found');
+      // @ts-ignore
+      error.response = { status: 404, data: { error: 'Topology not found' } };
+      
+      mockGet.mockRejectedValueOnce(error);
 
       await expect(api.getTopology('nonexistent')).rejects.toThrow();
     });
 
     it('should throw on network error', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockGet.mockRejectedValueOnce(new Error('Network Error'));
 
-      await expect(api.listTopologies()).rejects.toThrow('Network error');
+      await expect(api.listTopologies()).rejects.toThrow('Network Error');
     });
   });
 });
 
 describe('API URL Construction', () => {
   it('should construct correct base URL', () => {
-    // Test that API uses the correct base URL
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
     expect(baseUrl).toContain('localhost:8080');
   });
