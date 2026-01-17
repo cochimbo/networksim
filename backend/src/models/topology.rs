@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use utoipa::ToSchema;
 
 /// A network topology containing nodes and links
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Topology {
     pub id: String,
     pub name: String,
@@ -16,7 +17,7 @@ pub struct Topology {
 }
 
 /// A node in the network topology
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Node {
     pub id: String,
     pub name: String,
@@ -26,14 +27,14 @@ pub struct Node {
 }
 
 /// Position of a node on the canvas
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct Position {
     pub x: f64,
     pub y: f64,
 }
 
 /// Configuration for a node
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct NodeConfig {
     #[serde(default)]
     pub image: Option<String>,
@@ -46,14 +47,14 @@ pub struct NodeConfig {
 }
 
 /// Environment variable
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EnvVar {
     pub name: String,
     pub value: String,
 }
 
 /// A link between two nodes
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Link {
     pub id: String,
     pub source: String,
@@ -63,7 +64,7 @@ pub struct Link {
 }
 
 /// Properties of a link
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct LinkProperties {
     #[serde(default)]
     pub bandwidth: Option<String>,
@@ -72,7 +73,7 @@ pub struct LinkProperties {
 }
 
 /// Request to create a new topology
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateTopologyRequest {
     pub name: Option<String>,
     #[serde(default)]
@@ -84,7 +85,7 @@ pub struct CreateTopologyRequest {
 }
 
 /// Request to update an existing topology
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateTopologyRequest {
     pub name: Option<String>,
     #[serde(default)]

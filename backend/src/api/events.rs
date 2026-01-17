@@ -10,12 +10,13 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use tracing::info;
+use utoipa::ToSchema;
 
 use crate::api::AppState;
 use crate::error::{AppError, AppResult};
 
 /// Event severity levels
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum EventSeverity {
     Info,
@@ -36,7 +37,7 @@ impl std::fmt::Display for EventSeverity {
 }
 
 /// Event source types
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum EventSourceType {
     Node,
@@ -63,7 +64,7 @@ impl std::fmt::Display for EventSourceType {
 }
 
 /// System event
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Event {
     pub id: i64,
     pub topology_id: Option<String>,
@@ -72,6 +73,7 @@ pub struct Event {
     pub severity: String,
     pub title: String,
     pub description: Option<String>,
+    #[schema(value_type = Option<Object>)]
     pub metadata: Option<serde_json::Value>,
     pub source_type: Option<String>,
     pub source_id: Option<String>,
@@ -94,7 +96,7 @@ struct EventRow {
 }
 
 /// Create event request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEventRequest {
     pub topology_id: Option<String>,
     pub event_type: String,
@@ -102,13 +104,14 @@ pub struct CreateEventRequest {
     pub severity: Option<String>,
     pub title: String,
     pub description: Option<String>,
+    #[schema(value_type = Option<Object>)]
     pub metadata: Option<serde_json::Value>,
     pub source_type: Option<String>,
     pub source_id: Option<String>,
 }
 
 /// Query parameters for listing events
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
 pub struct ListEventsQuery {
     pub topology_id: Option<String>,
     pub event_type: Option<String>,
@@ -121,7 +124,7 @@ pub struct ListEventsQuery {
 }
 
 /// Events list response with pagination
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct EventsResponse {
     pub events: Vec<Event>,
     pub total: i64,
@@ -129,8 +132,18 @@ pub struct EventsResponse {
 }
 
 /// List events with filtering
-///
-/// GET /api/events
+#[utoipa::path(
+    get,
+    path = "/api/events",
+    tag = "events",
+    params(
+        ListEventsQuery
+    ),
+    responses(
+        (status = 200, description = "List of events", body = EventsResponse),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn list_events(
     State(state): State<AppState>,
     Query(query): Query<ListEventsQuery>,
@@ -210,8 +223,20 @@ pub async fn list_events(
 }
 
 /// Get events for a specific topology
-///
-/// GET /api/topologies/:id/events
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{id}/events",
+    tag = "events",
+    params(
+        ("id" = String, Path, description = "Topology ID"),
+        ListEventsQuery
+    ),
+    responses(
+        (status = 200, description = "List of topology events", body = EventsResponse),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn list_topology_events(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -223,8 +248,16 @@ pub async fn list_topology_events(
 }
 
 /// Create a new event
-///
-/// POST /api/events
+#[utoipa::path(
+    post,
+    path = "/api/events",
+    tag = "events",
+    request_body = CreateEventRequest,
+    responses(
+        (status = 200, description = "Event created", body = Event),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn create_event(
     State(state): State<AppState>,
     Json(request): Json<CreateEventRequest>,
@@ -277,8 +310,18 @@ pub async fn create_event(
 }
 
 /// Get event statistics
-///
-/// GET /api/events/stats
+#[utoipa::path(
+    get,
+    path = "/api/events/stats",
+    tag = "events",
+    params(
+        ListEventsQuery
+    ),
+    responses(
+        (status = 200, description = "Event statistics", body = Object),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn event_stats(
     State(state): State<AppState>,
     Query(query): Query<ListEventsQuery>,

@@ -12,6 +12,22 @@ use crate::models::Application;
 use serde::Deserialize;
 
 /// Deploy an application to a node
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{topology_id}/nodes/{node_id}/apps",
+    tag = "applications",
+    params(
+        ("topology_id" = Uuid, Path, description = "Topology ID"),
+        ("node_id" = String, Path, description = "Node ID")
+    ),
+    request_body = DeployAppRequest,
+    responses(
+        (status = 200, description = "App deployed", body = Application),
+        (status = 400, description = "Bad request"),
+        (status = 404, description = "Topology or node not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn deploy(
     State(state): State<AppState>,
     Path((topology_id, node_id)): Path<(Uuid, String)>,
@@ -208,6 +224,20 @@ pub async fn deploy(
 }
 
 /// List all applications for a node
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/nodes/{node_id}/apps",
+    tag = "applications",
+    params(
+        ("topology_id" = Uuid, Path, description = "Topology ID"),
+        ("node_id" = String, Path, description = "Node ID")
+    ),
+    responses(
+        (status = 200, description = "List of applications", body = Vec<Application>),
+        (status = 404, description = "Topology or node not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn list_by_node(
     State(state): State<AppState>,
     Path((_topology_id, node_id)): Path<(Uuid, String)>,
@@ -221,6 +251,20 @@ pub async fn list_by_node(
 }
 
 /// Get application details
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/apps/{app_id}",
+    tag = "applications",
+    params(
+        ("topology_id" = Uuid, Path, description = "Topology ID"),
+        ("app_id" = Uuid, Path, description = "Application ID")
+    ),
+    responses(
+        (status = 200, description = "Application details", body = Application),
+        (status = 404, description = "Application not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn get(
     State(state): State<AppState>,
     Path((_topology_id, app_id)): Path<(Uuid, Uuid)>,
@@ -271,6 +315,20 @@ pub async fn uninstall_application_by_id(
 }
 
 /// Uninstall an application
+#[utoipa::path(
+    delete,
+    path = "/api/topologies/{topology_id}/apps/{app_id}",
+    tag = "applications",
+    params(
+        ("topology_id" = Uuid, Path, description = "Topology ID"),
+        ("app_id" = Uuid, Path, description = "Application ID")
+    ),
+    responses(
+        (status = 200, description = "Application uninstalled"),
+        (status = 404, description = "Application not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn uninstall(
     State(state): State<AppState>,
     Path((_topology_id, app_id)): Path<(Uuid, Uuid)>,
@@ -369,6 +427,20 @@ async fn remove_application_from_node(
 }
 
 /// Get application logs
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/apps/{app_id}/logs",
+    tag = "applications",
+    params(
+        ("topology_id" = Uuid, Path, description = "Topology ID"),
+        ("app_id" = Uuid, Path, description = "Application ID")
+    ),
+    responses(
+        (status = 200, description = "Application logs"),
+        (status = 404, description = "Application not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn logs(
     State(state): State<AppState>,
     Path((_topology_id, app_id)): Path<(Uuid, Uuid)>,

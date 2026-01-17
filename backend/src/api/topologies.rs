@@ -54,7 +54,7 @@ struct TopologyRow {
         ("per_page" = Option<u32>, Query, description = "Items per page (max 100)")
     ),
     responses(
-        (status = 200, description = "List of all topologies", body = Vec<super::openapi::TopologySchema>),
+        (status = 200, description = "List of all topologies", body = Vec<Topology>),
         (status = 500, description = "Internal server error")
     )
 )]
@@ -107,9 +107,9 @@ pub async fn list(
     post,
     path = "/api/topologies",
     tag = "topologies",
-    request_body = super::openapi::CreateTopologyRequest,
+    request_body = CreateTopologyRequest,
     responses(
-        (status = 200, description = "Topology created successfully", body = super::openapi::TopologySchema),
+        (status = 200, description = "Topology created successfully", body = Topology),
         (status = 400, description = "Invalid topology data"),
         (status = 500, description = "Internal server error")
     )
@@ -168,7 +168,7 @@ pub async fn create(
         ("id" = String, Path, description = "Topology ID")
     ),
     responses(
-        (status = 200, description = "Topology found", body = super::openapi::TopologySchema),
+        (status = 200, description = "Topology found", body = Topology),
         (status = 404, description = "Topology not found"),
         (status = 500, description = "Internal server error")
     )
@@ -215,9 +215,9 @@ pub async fn get(
     params(
         ("id" = String, Path, description = "Topology ID")
     ),
-    request_body = super::openapi::UpdateTopologyRequest,
+    request_body = UpdateTopologyRequest,
     responses(
-        (status = 200, description = "Topology updated", body = super::openapi::TopologySchema),
+        (status = 200, description = "Topology updated", body = Topology),
         (status = 404, description = "Topology not found"),
         (status = 500, description = "Internal server error")
     )

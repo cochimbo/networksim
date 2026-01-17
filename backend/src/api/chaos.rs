@@ -27,7 +27,7 @@ const CHAOS_NAMESPACE: &str = "networksim-sim";
         ("topology_id" = String, Path, description = "Topology ID")
     ),
     responses(
-        (status = 200, description = "List of chaos conditions", body = Vec<super::openapi::ChaosConditionSchema>),
+        (status = 200, description = "List of chaos conditions", body = Vec<ChaosCondition>),
         (status = 404, description = "Topology not found"),
         (status = 500, description = "Internal server error")
     )
@@ -56,9 +56,9 @@ pub async fn list(
     post,
     path = "/api/chaos",
     tag = "chaos",
-    request_body = super::openapi::CreateChaosRequest,
+    request_body = CreateChaosRequest,
     responses(
-        (status = 200, description = "Chaos condition created", body = super::openapi::ChaosConditionSchema),
+        (status = 200, description = "Chaos condition created", body = ChaosCondition),
         (status = 404, description = "Topology or node not found"),
         (status = 500, description = "Internal server error")
     )
@@ -138,7 +138,7 @@ pub async fn create(
         ("condition_id" = String, Path, description = "Chaos condition ID")
     ),
     responses(
-        (status = 200, description = "Chaos condition started", body = super::openapi::ChaosConditionSchema),
+        (status = 200, description = "Chaos condition started", body = ChaosCondition),
         (status = 404, description = "Condition not found"),
         (status = 500, description = "Internal server error")
     )
@@ -220,7 +220,7 @@ pub async fn start(
         ("condition_id" = String, Path, description = "Chaos condition ID")
     ),
     responses(
-        (status = 200, description = "Chaos condition stopped", body = super::openapi::ChaosConditionSchema),
+        (status = 200, description = "Chaos condition stopped", body = ChaosCondition),
         (status = 404, description = "Condition not found"),
         (status = 500, description = "Internal server error")
     )

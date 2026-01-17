@@ -18,6 +18,7 @@ use sqlx::FromRow;
 use std::collections::HashMap;
 use tokio::io::AsyncWriteExt;
 use tracing::{info, warn};
+use utoipa::{IntoParams, ToSchema};
 
 use crate::models::Application;
 
@@ -25,7 +26,7 @@ use crate::api::AppState;
 use crate::error::{AppError, AppResult};
 
 /// Network metrics between two nodes
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct NetworkMetric {
     pub id: i64,
     pub topology_id: String,
@@ -69,7 +70,7 @@ struct NetworkMetricRow {
 }
 
 /// Node-level metrics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct NodeMetric {
     pub id: i64,
     pub topology_id: String,
@@ -105,7 +106,7 @@ struct NodeMetricRow {
 }
 
 /// Query parameters for metrics
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct MetricsQuery {
     pub since: Option<String>,      // ISO 8601 timestamp
     pub until: Option<String>,      // ISO 8601 timestamp
@@ -116,13 +117,13 @@ pub struct MetricsQuery {
 }
 
 /// Aggregated metrics response
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AggregatedMetrics {
     pub interval: String,
     pub data_points: Vec<MetricDataPoint>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MetricDataPoint {
     pub timestamp: DateTime<Utc>,
     pub avg_latency_ms: Option<f64>,
@@ -133,7 +134,7 @@ pub struct MetricDataPoint {
 }
 
 /// Live metrics snapshot
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct LiveMetricsSnapshot {
     pub topology_id: String,
     pub timestamp: DateTime<Utc>,
@@ -142,7 +143,7 @@ pub struct LiveMetricsSnapshot {
     pub summary: MetricsSummary,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MetricsSummary {
     pub total_nodes: usize,
     pub total_pairs: usize,
@@ -162,6 +163,19 @@ pub struct MetricsSummary {
 /// Get live metrics snapshot for a topology
 ///
 /// GET /api/topologies/:id/metrics/live
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{id}/metrics/live",
+    params(
+        ("id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Live metrics snapshot", body = LiveMetricsSnapshot),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "metrics"
+)]
 pub async fn get_live_metrics(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -404,6 +418,20 @@ pub async fn get_live_metrics(
 /// Get historical network metrics
 ///
 /// GET /api/topologies/:id/metrics/history
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{id}/metrics/history",
+    params(
+        ("id" = String, Path, description = "Topology ID"),
+        MetricsQuery
+    ),
+    responses(
+        (status = 200, description = "Historical metrics list", body = Vec<NetworkMetric>),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "metrics"
+)]
 pub async fn get_metrics_history(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -465,6 +493,20 @@ pub async fn get_metrics_history(
 /// Get aggregated metrics (for charts)
 ///
 /// GET /api/topologies/:id/metrics/aggregated
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{id}/metrics/aggregated",
+    params(
+        ("id" = String, Path, description = "Topology ID"),
+        MetricsQuery
+    ),
+    responses(
+        (status = 200, description = "Aggregated metrics for charts", body = AggregatedMetrics),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "metrics"
+)]
 pub async fn get_aggregated_metrics(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -728,7 +770,7 @@ pub async fn cleanup_old_metrics(state: &AppState, retention_hours: i64) -> Resu
 }
 
 /// Metrics grouped by application
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AppMetrics {
     pub app_id: String,
     pub app_name: String,
@@ -743,7 +785,7 @@ pub struct AppMetrics {
 }
 
 /// Response for metrics by app endpoint
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MetricsByAppResponse {
     pub topology_id: String,
     pub timestamp: DateTime<Utc>,
@@ -753,6 +795,19 @@ pub struct MetricsByAppResponse {
 /// Get metrics aggregated by application
 ///
 /// GET /api/topologies/:topology_id/metrics/by-app
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/metrics/by-app",
+    params(
+        ("topology_id" = String, Path, description = "Topology ID")
+    ),
+    responses(
+        (status = 200, description = "Metrics grouped by application", body = MetricsByAppResponse),
+        (status = 404, description = "Topology not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "metrics"
+)]
 pub async fn get_metrics_by_app(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,

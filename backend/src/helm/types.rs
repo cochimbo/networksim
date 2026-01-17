@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+use utoipa::ToSchema;
 
 /// Estado de una aplicación Helm
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "TEXT")]
 #[serde(rename_all = "lowercase")]
 pub enum AppStatus {
@@ -15,7 +16,7 @@ pub enum AppStatus {
 }
 
 /// Información de una aplicación desplegada con Helm
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Application {
     pub id: Uuid,
     pub node_id: String,
@@ -31,17 +32,20 @@ pub struct Application {
 }
 
 /// Request para desplegar una aplicación
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DeployAppRequest {
     pub chart: String,
     pub chart_type: Option<String>,
     pub node_selector: Vec<String>,
     
     // Configuración detallada que el frontend envía plana
+    #[schema(value_type = Option<Object>)]
     pub envvalues: Option<serde_json::Value>,
     pub replicas: Option<i32>,
+    #[schema(value_type = Option<Vec<Object>>)]
     pub volumes: Option<Vec<serde_json::Value>>, // Usamos Value para ser flexibles con los tipos de volumen
     #[serde(rename = "healthCheck")]
+    #[schema(value_type = Option<Object>)]
     pub health_check: Option<serde_json::Value>,
     pub cpu_request: Option<String>,
     pub memory_request: Option<String>,

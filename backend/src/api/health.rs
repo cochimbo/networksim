@@ -1,20 +1,30 @@
 use axum::{extract::State, Json};
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::api::AppState;
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct HealthResponse {
     pub status: String,
     pub version: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct ClusterStatusResponse {
     pub connected: bool,
     pub message: String,
 }
 
+/// System health check
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "system",
+    responses(
+        (status = 200, description = "System is healthy", body = HealthResponse)
+    )
+)]
 pub async fn health_check() -> Json<HealthResponse> {
     Json(HealthResponse {
         status: "ok".to_string(),
@@ -28,7 +38,7 @@ pub async fn health_check() -> Json<HealthResponse> {
     path = "/api/cluster/status",
     tag = "cluster",
     responses(
-        (status = 200, description = "Cluster status", body = super::openapi::ClusterStatusSchema),
+        (status = 200, description = "Cluster status", body = ClusterStatusResponse),
     )
 )]
 pub async fn cluster_status(State(state): State<AppState>) -> Json<ClusterStatusResponse> {

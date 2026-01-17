@@ -9,9 +9,10 @@ use crate::api::AppState;
 use crate::api::applications::deploy_application_to_node;
 use crate::error::{AppError, AppResult};
 use crate::k8s::{DeploymentManager, DeploymentState, DeploymentStatus as K8sDeploymentStatus};
+use utoipa::ToSchema;
 
 /// Response for deployment operations
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DeploymentResponse {
     pub topology_id: String,
     pub status: String,
@@ -20,7 +21,7 @@ pub struct DeploymentResponse {
 }
 
 /// Status of a single node in a deployment
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct NodeStatusResponse {
     pub id: String,
     pub name: String,
@@ -67,7 +68,7 @@ impl From<K8sDeploymentStatus> for DeploymentResponse {
         ("id" = String, Path, description = "Topology ID")
     ),
     responses(
-        (status = 200, description = "Deployment started", body = super::openapi::DeploymentStatusSchema),
+        (status = 200, description = "Deployment started", body = DeploymentResponse),
         (status = 400, description = "Cannot deploy empty topology"),
         (status = 404, description = "Topology not found"),
         (status = 500, description = "Internal server error")
@@ -228,7 +229,7 @@ pub async fn destroy(
         ("id" = String, Path, description = "Topology ID")
     ),
     responses(
-        (status = 200, description = "Deployment status", body = super::openapi::DeploymentStatusSchema),
+        (status = 200, description = "Deployment status", body = DeploymentResponse),
         (status = 404, description = "Topology not found"),
         (status = 500, description = "Internal server error")
     )
