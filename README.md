@@ -154,61 +154,48 @@ networksim/
 │   └── vite.config.ts
 ├── scripts/                 # Scripts de utilidad
 │   ├── setup.sh             # Instalación del cluster
-│   └── start.sh             # Iniciar servicios
+│   ├── start.sh             # Iniciar servicios
+│   ├── check-pods.sh        # Verificar estado de pods
+│   └── ... (ver sección Scripts)
 └── docs/                    # Documentación adicional
 ```
 
+## Scripts de Utilidad
+
+La carpeta `scripts/` contiene varias herramientas para facilitar el desarrollo y operación:
+
+- **Cluster & Entorno**:
+  - `setup.sh`: Instala dependencias y levanta el cluster K3d con Chaos Mesh.
+  - `start.sh`: Inicia el backend y frontend en modo desarrollo.
+  - `start-prod.sh`: Inicia la versión de producción con Docker Compose.
+  - `setup-registry.sh`: Configura el registry local de Docker.
+  - `generate-certs.sh`: Genera certificados SSL autofirmados para desarrollo.
+
+- **Verificación y Test**:
+  - `check-pods.sh`: Comprueba que todos los pods del sistema estén running.
+  - `smoke-test.sh`: Ejecuta un test básico de funcionalidad end-to-end.
+  - `chaos-validation.sh`: Valida instalación y CRDs de Chaos Mesh.
+  - `network-diagnostic.sh`: Herramienta para diagnosticar problemas de red en el cluster.
+
 ## API Reference
 
-### Topologías
-```
-GET    /api/topologies                    Lista paginada
-POST   /api/topologies                    Crear topología
-GET    /api/topologies/:id                Obtener topología
-PUT    /api/topologies/:id                Actualizar
-DELETE /api/topologies/:id                Eliminar
-POST   /api/topologies/:id/deploy         Desplegar en K8s
-DELETE /api/topologies/:id/undeploy       Eliminar de K8s
-GET    /api/topologies/:id/status         Estado del despliegue
-```
+La documentación completa de la API está disponible en Swagger UI:
+➡️ **http://localhost:8080/swagger-ui/**
 
-### Chaos
-```
-GET    /api/topologies/:id/chaos              Listar condiciones
-POST   /api/topologies/:id/chaos              Crear condición
-POST   /api/topologies/:id/chaos/:cid/start   Activar
-POST   /api/topologies/:id/chaos/:cid/stop    Pausar
-PUT    /api/topologies/:id/chaos/:cid         Actualizar
-DELETE /api/topologies/:id/chaos/:cid         Eliminar
-DELETE /api/topologies/:id/chaos              Eliminar todas
-```
+Ahí encontrarás la especificación detallada de todos los endpoints, schemas de solicitud/respuesta y podrás probar las peticiones directamente.
 
-### Aplicaciones
-```
-GET    /api/topologies/:id/apps               Listar apps
-POST   /api/topologies/:id/nodes/:nid/apps    Desplegar en nodo
-GET    /api/topologies/:id/apps/:aid          Obtener app
-PUT    /api/topologies/:id/apps/:aid          Actualizar
-DELETE /api/topologies/:id/apps/:aid          Desinstalar
-GET    /api/topologies/:id/apps/:aid/logs     Ver logs
-```
+### Endpoints Principales
 
-### Métricas y Tests
-```
-GET    /api/topologies/:id/metrics/live       Métricas en vivo
-POST   /api/topologies/:id/tests/app-to-app   Test de conectividad
-GET    /api/topologies/:id/diagnostic         Diagnóstico de red
-```
+- **/api/topologies**: Gestión del ciclo de vida de las topologías (CRUD, Despliegue, Estado)
+- **/api/chaos**: Inyección de fallos (NetworkChaos, PodChaos, StressChaos, etc.)
+- **/api/applications**: Gestión de aplicaciones desplegadas en los nodos
+- **/api/scenarios**: Creación y ejecución de escenarios de pruebas automatizados
+- **/api/diagnostic**: Pruebas de conectividad y diagnósticos de red
+- **/api/metrics**: Métricas en tiempo real y estadísticas
+- **/api/templates**: Plantillas predefinidas de topologías
+- **/api/presets**: Configuraciones predefinidas de caos
 
-### Otros
-```
-GET    /api/templates                   Plantillas de topología
-GET    /api/presets                     Presets de chaos
-GET    /api/reports/:id/json            Exportar JSON
-GET    /api/reports/:id/html            Exportar HTML
-GET    /health                          Health check
-GET    /api/cluster/status              Estado del cluster
-```
+Consulta el Swagger UI para ver la lista completa.
 
 ## Comandos Útiles
 
@@ -262,9 +249,31 @@ kubectl get pods -n chaos-mesh
 
 MIT
 
-## Pruebas con el binario `testdistributed_app`
+## Pruebas con `testdistributed_app_simple` (Python)
 
-Este repositorio incluye una pequeña aplicación de prueba basada en libp2p llamada `testdistributed_app` (ubicada en `testdistributed_app/`). Está pensada para validar comportamiento de descubrimiento/gossip y hacer pruebas de convergencia en entornos aislados (docker-compose, simuladores de red, etc.).
+Este repositorio incluye una aplicación de prueba minimalista escrita en Python (`testdistributed_app_simple/`). Es ideal para validaciones rápidas de conectividad y descubrimiento en la simulación.
+
+- **Ubicación**: `testdistributed_app_simple/`
+- **Lenguaje**: Python 3 (sin dependencias externas complejas)
+- **Protocolo**: UDP (Broadcast/Multicast simulation via Headless Service)
+- **Funcionalidad**: Envía mensajes "Hola" periódicos y escucha respuestas de peers.
+
+> **Nota sobre Headless Service**: Esta aplicación utiliza un [Headless Service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services) de Kubernetes para el descubrimiento de pares (peer discovery). El servicio `testdistributed-app-headless` permite que cada pod resuelva vía DNS las IPs de todos los demás pods asociados, simulando un mecanismo de broadcast en un entorno donde el broadcast real no siempre es fiable o posible (dependiendo del CNI).
+
+### Uso Rápido
+1. Construir e inyectar al cluster:
+   ```bash
+   cd testdistributed_app_simple
+   ./build_and_push.sh
+   # Si falla la resolución de nombres en k3d:
+   # k3d image import -c networksim localhost:5000/testdistributed_app_simple:latest
+   ```
+2. Desplegar en la topología usando la UI de NetworkSim.
+3. Observar los logs para ver el intercambio de mensajes entre nodos.
+
+## Pruebas Avanzadas con `testdistributed_app` (Rust/libp2p)
+
+Este repositorio también incluye una aplicación de prueba basada en libp2p llamada `testdistributed_app` (ubicada en `testdistributed_app/`). Está pensada para validar comportamiento de descubrimiento/gossip y hacer pruebas de convergencia en entornos aislados (docker-compose, simuladores de red, etc.).
 
 Resumen rápido:
 - Binario: `testdistributed_app/target/release/testdistributed_app` (o `cargo build` para modo debug).
@@ -275,7 +284,7 @@ Resumen rápido:
 	- `testdistributed_app/scripts/integration_compose_logs.sh` — similar a `integration_compose.sh` pero captura logs por contenedor en `testdistributed_app/logs/`.
 	- `testdistributed_app/build_and_push.sh` — construye y (opcionalmente) empuja la imagen a un registry local (`localhost:5000`).
 
-Cómo ejecutar una prueba rápida con 3 nodos (docker-compose):
+### Ejecución con Docker Compose (fuera del cluster)
 
 ```bash
 # construir imagen local si hace falta
@@ -288,7 +297,7 @@ cd testdistributed_app
 # Los logs por contenedor se guardarán en testdistributed_app/logs/<timestamp>/
 ```
 
-Cómo ejecutar en modo local sin Docker (útil para depuración):
+### Ejecución Local
 
 ```bash
 # en una terminal (nodo A)
@@ -297,19 +306,11 @@ HTTP_PORT=9091 INTERVAL_SECONDS=2 ANTI_ENTROPY_SECONDS=6 RUST_LOG=info ./target/
 
 # en otra terminal (nodo B)
 HTTP_PORT=9092 INTERVAL_SECONDS=2 ANTI_ENTROPY_SECONDS=6 RUST_LOG=info ./target/debug/testdistributed_app
-
-# etc. Ajusta puertos y variables de entorno al lanzar múltiples instancias.
 ```
 
-Variables útiles:
-- `HTTP_PORT`: puerto interno del servidor HTTP de inspección (por defecto 9090 en contenedor).
+### Variables útiles
+- `HTTP_PORT`: puerto interno del servidor HTTP de inspección.
 - `INTERVAL_SECONDS`: frecuencia de publicación de heartbeat.
-- `ANTI_ENTROPY_SECONDS`: frecuencia de sincronización DHT/anti-entropy.
-- `PEER_TTL_SECONDS`: tiempo para considerar un peer como "lost" si no se le ve.
 - `RUST_LOG`: nivel de logging (ej. `info`, `debug`).
 
-Consejos:
-- Para pruebas en simuladores de red, utiliza `integration_compose_logs.sh` y luego reproduce condiciones (latencia/pérdida) sobre la red Docker para validar descubrimiento/pérdida de peers.
-- Usa `RUST_LOG=debug` para trazas más detalladas (Kademlia, gossipsub, mdns).
-- Los endpoints HTTP `/peers` permiten consultar el mapa de peers desde cada nodo para medir convergencia.
 
