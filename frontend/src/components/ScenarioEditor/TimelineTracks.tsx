@@ -50,10 +50,6 @@ export const TimelineTracks: React.FC<TimelineTracksProps> = ({
     }
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    // Optional: could add logic to clear if leaving the component entirely
-    // e.currentTarget does not contain e.relatedTarget
-  };
 
   const handleDrop = (e: React.DragEvent, nodeId: string) => {
     if (readOnly) return;

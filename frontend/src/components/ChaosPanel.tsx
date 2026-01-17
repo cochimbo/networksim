@@ -162,6 +162,11 @@ export function ChaosPanel({ topologyId, nodes, links, applications = [], onClos
   const [conditions, setConditions] = useState<ChaosCondition[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Use error if needed, or suppress
+  useEffect(() => {
+    if (error) console.error(error);
+  }, [error]);
   const [showForm, setShowForm] = useState(false);
   const [expandedConditions, setExpandedConditions] = useState<Set<string>>(new Set());
   const [editingCondition, setEditingCondition] = useState<ChaosCondition | null>(null);

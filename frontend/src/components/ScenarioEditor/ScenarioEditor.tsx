@@ -1,7 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { 
-  Play, Square, Save, Download, Upload, Plus,
-  ZoomIn, ZoomOut, Clock
+  ZoomIn, ZoomOut, Clock, Save
 } from 'lucide-react';
 import { ChaosType, ChaosParams } from '../../services/api';
 import { TimelineRuler } from './TimelineRuler';
@@ -44,6 +43,7 @@ const PIXELS_PER_SECOND_DEFAULT = 20;
 
 export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ 
   nodes, 
+  topologyId,
   onRun,
   onStop,
   isRunning = false,
@@ -55,7 +55,10 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({
     id: crypto.randomUUID(),
     name: 'New Scenario',
     total_duration: DEFAULT_DURATION,
-    steps: []
+    steps: [],
+    topology_id: topologyId,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   });
 
   // Reset when initialScenario changes

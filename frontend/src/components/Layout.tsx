@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Network, Settings, PlayCircle, ChevronLeft, ChevronRight, HardDrive } from 'lucide-react';
+import { Network, Settings, ChevronLeft, ChevronRight, HardDrive } from 'lucide-react';
 import clsx from 'clsx';
 import { ConnectionStatus } from './ConnectionStatus';
 import { ClusterStatus } from './ClusterStatus';

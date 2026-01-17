@@ -74,48 +74,48 @@ const ChaosParamsForm: React.FC<{ step: ScenarioStep; onChange: (params: any) =>
     case 'delay':
       return (
         <>
-          <InputField label="Latency" value={step.params.latency || '100ms'} onChange={(v) => handleChange('latency', v)} placeholder="100ms" />
-          <InputField label="Jitter" value={step.params.jitter || '0ms'} onChange={(v) => handleChange('jitter', v)} placeholder="20ms" />
-          <InputField label="Correlation" value={step.params.correlation || ''} onChange={(v) => handleChange('correlation', v)} placeholder="0" />
+          <InputField label="Latency" value={(step.params as any).latency || '100ms'} onChange={(v) => handleChange('latency', v)} placeholder="100ms" />
+          <InputField label="Jitter" value={(step.params as any).jitter || '0ms'} onChange={(v) => handleChange('jitter', v)} placeholder="20ms" />
+          <InputField label="Correlation" value={(step.params as any).correlation || ''} onChange={(v) => handleChange('correlation', v)} placeholder="0" />
         </>
       );
     case 'loss':
       return (
         <>
-           <InputField label="Loss Percentage" value={step.params.loss || '10'} onChange={(v) => handleChange('loss', v)} placeholder="10" type="number" />
-           <InputField label="Correlation" value={step.params.correlation || ''} onChange={(v) => handleChange('correlation', v)} placeholder="0" />
+           <InputField label="Loss Percentage" value={(step.params as any).loss || '10'} onChange={(v) => handleChange('loss', v)} placeholder="10" type="number" />
+           <InputField label="Correlation" value={(step.params as any).correlation || ''} onChange={(v) => handleChange('correlation', v)} placeholder="0" />
         </>
       );
     case 'duplicate':
       return (
-          <InputField label="Duplicate Percentage" value={step.params.duplicate || '10'} onChange={(v) => handleChange('duplicate', v)} placeholder="10" type="number" />
+          <InputField label="Duplicate Percentage" value={(step.params as any).duplicate || '10'} onChange={(v) => handleChange('duplicate', v)} placeholder="10" type="number" />
       );
     case 'corrupt':
       return (
-           <InputField label="Corrupt Percentage" value={step.params.corrupt || '10'} onChange={(v) => handleChange('corrupt', v)} placeholder="10" type="number" />
+           <InputField label="Corrupt Percentage" value={(step.params as any).corrupt || '10'} onChange={(v) => handleChange('corrupt', v)} placeholder="10" type="number" />
       );
      case 'bandwidth':
       return (
         <>
-           <InputField label="Rate" value={step.params.rate || '1mbps'} onChange={(v) => handleChange('rate', v)} placeholder="1mbps" />
-           <InputField label="Limit" value={step.params.limit || ''} onChange={(v) => handleChange('limit', v)} placeholder="Bytes" />
-           <InputField label="Buffer" value={step.params.buffer || ''} onChange={(v) => handleChange('buffer', v)} placeholder="Bytes" />
+           <InputField label="Rate" value={(step.params as any).rate || '1mbps'} onChange={(v) => handleChange('rate', v)} placeholder="1mbps" />
+           <InputField label="Limit" value={(step.params as any).limit || ''} onChange={(v) => handleChange('limit', v)} placeholder="Bytes" />
+           <InputField label="Buffer" value={(step.params as any).buffer || ''} onChange={(v) => handleChange('buffer', v)} placeholder="Bytes" />
         </>
       );
     case 'stress-cpu':
        return (
         <>
-           <InputField label="Load %" value={step.params.load || '80'} onChange={(v) => handleChange('load', v)} placeholder="80" type="number" />
-           <InputField label="Workers" value={step.params.workers || '1'} onChange={(v) => handleChange('workers', v)} placeholder="1" type="number" />
+           <InputField label="Load %" value={(step.params as any).load || '80'} onChange={(v) => handleChange('load', v)} placeholder="80" type="number" />
+           <InputField label="Workers" value={(step.params as any).workers || '1'} onChange={(v) => handleChange('workers', v)} placeholder="1" type="number" />
         </>
       );
     case 'io-delay':
         return (
-             <InputField label="Delay" value={step.params.delay || '100ms'} onChange={(v) => handleChange('delay', v)} placeholder="100ms" />
+             <InputField label="Delay" value={(step.params as any).delay || '100ms'} onChange={(v) => handleChange('delay', v)} placeholder="100ms" />
         );
     case 'http-abort': 
         return (
-             <InputField label="Error Code" value={step.params.code || '500'} onChange={(v) => handleChange('code', v)} type="number" />
+             <InputField label="Error Code" value={(step.params as any).code || '500'} onChange={(v) => handleChange('code', v)} type="number" />
         );
     default:
       return <div className="text-xs text-gray-500 italic">No configuration available for this type.</div>;
