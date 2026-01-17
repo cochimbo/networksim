@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use sqlx::FromRow;
 use strum::Display;
+use utoipa::ToSchema;
 
 /// Estado de una aplicación Helm
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, Display, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, Display, PartialEq, ToSchema)]
 #[sqlx(type_name = "TEXT")]
 #[serde(rename_all = "lowercase")]
 pub enum AppStatus {
@@ -36,7 +37,7 @@ impl From<&str> for AppStatus {
 }
 
 /// Modelo de base de datos para aplicaciones desplegadas con Helm
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Application {
     pub id: Uuid,
     pub topology_id: Uuid,

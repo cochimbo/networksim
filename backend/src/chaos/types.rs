@@ -2,9 +2,10 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Types of chaos conditions that can be applied
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChaosType {
     // ---- NetworkChaos types ----
@@ -91,7 +92,7 @@ impl ChaosType {
 }
 
 /// Parameters for delay chaos
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct DelayParams {
     /// Latency to add (e.g., "100ms", "1s")
     pub latency: String,
@@ -104,7 +105,7 @@ pub struct DelayParams {
 }
 
 /// Parameters for packet loss chaos
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct LossParams {
     /// Loss percentage (e.g., "25" for 25%)
     pub loss: String,
@@ -114,7 +115,7 @@ pub struct LossParams {
 }
 
 /// Parameters for bandwidth limiting
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct BandwidthParams {
     /// Rate limit (e.g., "1mbps", "100kbps")
     pub rate: String,
@@ -127,7 +128,7 @@ pub struct BandwidthParams {
 }
 
 /// Parameters for packet corruption
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct CorruptParams {
     /// Corruption percentage (e.g., "10")
     pub corrupt: String,
@@ -137,7 +138,7 @@ pub struct CorruptParams {
 }
 
 /// Parameters for packet duplication
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct DuplicateParams {
     /// Duplication percentage
     pub duplicate: String,
@@ -149,7 +150,7 @@ pub struct DuplicateParams {
 // ---- New chaos type parameters ----
 
 /// Parameters for CPU stress (StressChaos)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct StressCpuParams {
     /// Number of CPU stress workers
     #[serde(default)]
@@ -160,7 +161,7 @@ pub struct StressCpuParams {
 }
 
 /// Parameters for pod kill (PodChaos)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct PodKillParams {
     /// Grace period in seconds before killing
     #[serde(default)]
@@ -168,7 +169,7 @@ pub struct PodKillParams {
 }
 
 /// Parameters for I/O delay (IOChaos)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct IoDelayParams {
     /// Delay to add to I/O operations (e.g., "100ms")
     pub delay: String,
@@ -184,7 +185,7 @@ pub struct IoDelayParams {
 }
 
 /// Parameters for HTTP abort (HTTPChaos)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct HttpAbortParams {
     /// HTTP status code to return (e.g., 500, 429)
     #[serde(default)]
@@ -201,7 +202,7 @@ pub struct HttpAbortParams {
 }
 
 /// Union of all chaos parameters
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(untagged)]
 #[derive(Default)]
 pub enum ChaosParams {
@@ -222,7 +223,7 @@ pub enum ChaosParams {
 }
 
 /// Target direction for network chaos
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ChaosDirection {
     /// Apply to outgoing traffic
@@ -245,7 +246,7 @@ impl std::fmt::Display for ChaosDirection {
 }
 
 /// Request to create a chaos condition
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateChaosRequest {
     /// Topology ID the chaos applies to
     pub topology_id: String,
@@ -267,7 +268,7 @@ pub struct CreateChaosRequest {
 }
 
 /// Request to update a chaos condition (only editable fields)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateChaosRequest {
     /// Direction of traffic to affect
     #[serde(default)]
@@ -280,7 +281,7 @@ pub struct UpdateChaosRequest {
 }
 
 /// Status of a chaos condition in the system
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChaosConditionStatus {
     /// Created but not yet applied to K8s
@@ -315,7 +316,7 @@ impl std::str::FromStr for ChaosConditionStatus {
 }
 
 /// A chaos condition that has been applied
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ChaosCondition {
     /// Unique ID
     pub id: String,

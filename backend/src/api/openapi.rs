@@ -53,40 +53,91 @@ use utoipa::OpenApi;
         // Diagnostic
         crate::api::diagnostic::run_diagnostic,
         crate::api::diagnostic::run_app_to_app_test,
+        // Applications
+        crate::api::applications::deploy,
+        crate::api::applications::list_by_node,
+        crate::api::applications::get,
+        crate::api::applications::uninstall,
+        crate::api::applications::logs,
         // Cluster
         crate::api::health::cluster_status,
+        crate::api::health::health_check,
+        // Live Metrics
+        crate::api::live_metrics::get_live_metrics,
+        crate::api::live_metrics::get_metrics_history,
+        crate::api::live_metrics::get_aggregated_metrics,
+        crate::api::live_metrics::get_metrics_by_app,
         // New v1 endpoints
         crate::api::chaos::affected_apps,
+        // Events
+        crate::api::events::list_events,
+        crate::api::events::create_event,
+        crate::api::events::event_stats,
+        crate::api::events::list_topology_events,
     ),
     components(
         schemas(
+            // Application schemas
+            crate::models::Application,
+            crate::models::AppStatus,
+            crate::helm::types::DeployAppRequest,
+            // Event schemas
+            crate::api::events::Event,
+            crate::api::events::CreateEventRequest,
+            crate::api::events::EventsResponse,
+            crate::api::events::EventSeverity,
+            crate::api::events::EventSourceType,
             // Topology schemas
-            TopologySchema,
-            NodeSchema,
-            LinkSchema,
-            PositionSchema,
-            NodeConfigSchema,
-            LinkPropertiesSchema,
-            CreateTopologyRequest,
-            UpdateTopologyRequest,
+            crate::models::Topology,
+            crate::models::Node,
+            crate::models::Link,
+            crate::models::Position,
+            crate::models::NodeConfig,
+            crate::models::EnvVar,
+            crate::models::LinkProperties,
+            crate::models::CreateTopologyRequest,
+            crate::models::UpdateTopologyRequest,
             // Deployment schemas
-            DeploymentStatusSchema,
-            NodeStatusSchema,
+            crate::api::deploy::DeploymentResponse,
+            crate::api::deploy::NodeStatusResponse,
             // Chaos schemas
-            ChaosConditionSchema,
-            CreateChaosRequest,
-            ChaosTypeSchema,
-            ChaosDirectionSchema,
-            ChaosParamsSchema,
+            crate::chaos::ChaosCondition,
+            crate::chaos::UpdateChaosRequest,
+            crate::chaos::ChaosConditionStatus,
+            crate::chaos::CreateChaosRequest,
+            crate::chaos::ChaosType,
+            crate::chaos::ChaosDirection,
+            crate::chaos::ChaosParams,
+            crate::chaos::DelayParams,
+            crate::chaos::LossParams,
+            crate::chaos::BandwidthParams,
+            crate::chaos::CorruptParams,
+            crate::chaos::DuplicateParams,
+            crate::chaos::StressCpuParams,
+            crate::chaos::PodKillParams,
+            crate::chaos::IoDelayParams,
+            crate::chaos::HttpAbortParams,
             // Preset schemas
             ChaosPresetSchema,
-            CreatePresetRequest,
+            crate::api::presets::CreatePresetRequest,
+            crate::api::presets::ApplyPresetRequest,
             // Diagnostic schemas
+            crate::api::diagnostic::AppToAppTestRequest,
             DiagnosticReportSchema,
             DiagnosticSummarySchema,
             ConnectivityResultSchema,
             // Cluster schemas
-            ClusterStatusSchema,
+            crate::api::health::ClusterStatusResponse,
+            crate::api::health::HealthResponse,
+            // Metrics schemas
+            crate::api::live_metrics::LiveMetricsSnapshot,
+            crate::api::live_metrics::NetworkMetric,
+            crate::api::live_metrics::NodeMetric,
+            crate::api::live_metrics::MetricsSummary,
+            crate::api::live_metrics::AggregatedMetrics,
+            crate::api::live_metrics::MetricDataPoint,
+            crate::api::live_metrics::MetricsByAppResponse,
+            crate::api::live_metrics::AppMetrics,
             // Common
             ErrorResponse,
         )
@@ -112,315 +163,9 @@ pub struct ErrorResponse {
 
 // --- Topology Schemas ---
 
-/// Network topology definition
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct TopologySchema {
-    /// Unique identifier
-    #[schema(example = "550e8400-e29b-41d4-a716-446655440000")]
-    pub id: String,
-    /// Topology name
-    #[schema(example = "My Network")]
-    pub name: String,
-    /// Optional description
-    #[schema(example = "A test network topology")]
-    pub description: Option<String>,
-    /// List of nodes in the topology
-    pub nodes: Vec<NodeSchema>,
-    /// List of links between nodes
-    pub links: Vec<LinkSchema>,
-    /// Creation timestamp
-    pub created_at: String,
-    /// Last update timestamp
-    pub updated_at: String,
-}
-
-/// Node in a topology
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct NodeSchema {
-    /// Unique node identifier
-    #[schema(example = "server-1")]
-    pub id: String,
-    /// Node display name
-    #[schema(example = "Web Server")]
-    pub name: String,
-    /// Position in the graph editor
-    pub position: PositionSchema,
-    /// Node configuration
-    pub config: Option<NodeConfigSchema>,
-}
-
-/// Position coordinates
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct PositionSchema {
-    /// X coordinate
-    #[schema(example = 100.0)]
-    pub x: f64,
-    /// Y coordinate
-    #[schema(example = 200.0)]
-    pub y: f64,
-}
-
-/// Node configuration options
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct NodeConfigSchema {
-    /// Container image to use
-    #[schema(example = "alpine:latest")]
-    pub image: Option<String>,
-    /// CPU limit
-    #[schema(example = "100m")]
-    pub cpu: Option<String>,
-    /// Memory limit
-    #[schema(example = "128Mi")]
-    pub memory: Option<String>,
-}
-
-/// Link between two nodes
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct LinkSchema {
-    /// Unique link identifier
-    #[schema(example = "link-1")]
-    pub id: String,
-    /// Source node ID
-    #[schema(example = "server-1")]
-    pub source: String,
-    /// Target node ID
-    #[schema(example = "server-2")]
-    pub target: String,
-    /// Link properties
-    pub properties: Option<LinkPropertiesSchema>,
-}
-
-/// Link properties
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct LinkPropertiesSchema {
-    /// Bandwidth limit
-    #[schema(example = "100mbps")]
-    pub bandwidth: Option<String>,
-    /// Latency
-    #[schema(example = "10ms")]
-    pub latency: Option<String>,
-}
-
-/// Request to create a new topology
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct CreateTopologyRequest {
-    /// Topology name
-    #[schema(example = "Production Network")]
-    pub name: String,
-    /// Optional description
-    pub description: Option<String>,
-    /// List of nodes
-    pub nodes: Vec<NodeSchema>,
-    /// List of links
-    pub links: Vec<LinkSchema>,
-}
-
-/// Request to update a topology
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct UpdateTopologyRequest {
-    /// Updated name
-    pub name: Option<String>,
-    /// Updated description
-    pub description: Option<String>,
-    /// Updated nodes
-    pub nodes: Option<Vec<NodeSchema>>,
-    /// Updated links
-    pub links: Option<Vec<LinkSchema>>,
-}
-
 // --- Deployment Schemas ---
 
-/// Deployment status for a topology
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct DeploymentStatusSchema {
-    /// Topology ID
-    pub topology_id: String,
-    /// Overall status: deploying, running, stopping, stopped, error
-    #[schema(example = "running")]
-    pub status: String,
-    /// Status message
-    pub message: Option<String>,
-    /// Status of each node
-    pub nodes: Vec<NodeStatusSchema>,
-}
-
-/// Status of a deployed node
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct NodeStatusSchema {
-    /// Node ID
-    #[schema(example = "server-1")]
-    pub id: String,
-    /// Node name
-    pub name: String,
-    /// Status: pending, running, error
-    #[schema(example = "running")]
-    pub status: String,
-    /// Kubernetes pod name
-    #[schema(example = "ns-abc123-server-1")]
-    pub pod_name: Option<String>,
-    /// Pod IP address
-    #[schema(example = "10.42.0.15")]
-    pub pod_ip: Option<String>,
-    /// Error message if any
-    pub message: Option<String>,
-}
-
 // --- Chaos Schemas ---
-
-/// Chaos condition applied to a topology
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct ChaosConditionSchema {
-    /// Unique condition ID
-    #[schema(example = "abc12345")]
-    pub id: String,
-    /// Topology ID
-    pub topology_id: String,
-    /// Source node ID
-    #[schema(example = "server-1")]
-    pub source_node_id: String,
-    /// Target node ID (optional for node-based chaos like stress-cpu, pod-kill)
-    pub target_node_id: Option<String>,
-    /// Type of chaos
-    pub chaos_type: ChaosTypeSchema,
-    /// Traffic direction
-    pub direction: ChaosDirectionSchema,
-    /// Duration (e.g., "60s", "5m")
-    pub duration: Option<String>,
-    /// Chaos parameters
-    pub params: ChaosParamsSchema,
-    /// Kubernetes resource name
-    pub k8s_name: Option<String>,
-    /// Status: pending, active, paused
-    #[schema(example = "active")]
-    pub status: String,
-    /// When chaos was activated (for countdown timer)
-    pub started_at: Option<String>,
-    /// Creation timestamp
-    pub created_at: String,
-    /// Last update timestamp
-    pub updated_at: String,
-}
-
-/// Request to create a chaos condition
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct CreateChaosRequest {
-    /// Topology ID
-    pub topology_id: String,
-    /// Source node ID
-    #[schema(example = "server-1")]
-    pub source_node_id: String,
-    /// Target node ID (optional - if not set, affects all traffic from source)
-    pub target_node_id: Option<String>,
-    /// Type of chaos to apply
-    pub chaos_type: ChaosTypeSchema,
-    /// Traffic direction (must be "to" if no target specified)
-    #[schema(example = "to")]
-    pub direction: ChaosDirectionSchema,
-    /// Duration (optional - if not set, runs until deleted)
-    #[schema(example = "60s")]
-    pub duration: Option<String>,
-    /// Chaos parameters specific to the chaos type
-    pub params: ChaosParamsSchema,
-}
-
-/// Type of chaos to apply
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ChaosTypeSchema {
-    // NetworkChaos types
-    /// Add network latency
-    Delay,
-    /// Cause packet loss
-    Loss,
-    /// Limit bandwidth
-    Bandwidth,
-    /// Corrupt packets
-    Corrupt,
-    /// Duplicate packets
-    Duplicate,
-    /// Network partition (block all traffic)
-    Partition,
-    // StressChaos
-    /// CPU stress on target pods
-    #[serde(rename = "stress-cpu")]
-    StressCpu,
-    // PodChaos
-    /// Kill target pods
-    #[serde(rename = "pod-kill")]
-    PodKill,
-    // IOChaos
-    /// Add latency to disk I/O
-    #[serde(rename = "io-delay")]
-    IoDelay,
-    // HTTPChaos
-    /// Abort HTTP requests with error codes
-    #[serde(rename = "http-abort")]
-    HttpAbort,
-}
-
-/// Traffic direction for chaos
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum ChaosDirectionSchema {
-    /// Outgoing traffic only
-    To,
-    /// Incoming traffic only
-    From,
-    /// Both directions (requires target)
-    Both,
-}
-
-/// Parameters for chaos conditions
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct ChaosParamsSchema {
-    // NetworkChaos params
-    /// Latency to add (for delay type)
-    #[schema(example = "100ms")]
-    pub latency: Option<String>,
-    /// Jitter for latency variation
-    #[schema(example = "20ms")]
-    pub jitter: Option<String>,
-    /// Packet loss percentage (for loss type)
-    #[schema(example = "10")]
-    pub loss: Option<String>,
-    /// Bandwidth rate limit (for bandwidth type)
-    #[schema(example = "1mbps")]
-    pub rate: Option<String>,
-    /// Corruption percentage (for corrupt type)
-    #[schema(example = "5")]
-    pub corrupt: Option<String>,
-    // StressChaos params
-    /// Number of CPU workers (for stress-cpu)
-    #[schema(example = 2)]
-    pub workers: Option<u32>,
-    /// CPU load percentage (for stress-cpu)
-    #[schema(example = 80)]
-    pub load: Option<u32>,
-    // PodChaos params
-    /// Grace period before killing pod (for pod-kill)
-    #[schema(example = 0)]
-    pub grace_period: Option<i64>,
-    // IOChaos params
-    /// I/O delay (for io-delay)
-    #[schema(example = "100ms")]
-    pub delay: Option<String>,
-    /// Path to affect (for io-delay)
-    #[schema(example = "/data")]
-    pub path: Option<String>,
-    /// Percentage of operations to affect
-    #[schema(example = 100)]
-    pub percent: Option<u32>,
-    // HTTPChaos params
-    /// HTTP status code to return (for http-abort)
-    #[schema(example = 500)]
-    pub code: Option<u16>,
-    /// HTTP method to match
-    #[schema(example = "GET")]
-    pub method: Option<String>,
-    /// HTTP port to intercept
-    #[schema(example = 8080)]
-    pub port: Option<u16>,
-}
 
 // --- Preset Schemas ---
 
@@ -525,13 +270,3 @@ pub struct ConnectivityResultSchema {
 }
 
 // --- Cluster Schemas ---
-
-/// Kubernetes cluster status
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct ClusterStatusSchema {
-    /// Whether connected to the cluster
-    pub connected: bool,
-    /// Status message
-    #[schema(example = "Kubernetes cluster connected")]
-    pub message: String,
-}

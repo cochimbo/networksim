@@ -119,7 +119,7 @@ pub struct ContainerPort {
         ("id" = String, Path, description = "Topology ID")
     ),
     responses(
-        (status = 200, description = "Diagnostic report", body = super::openapi::DiagnosticReportSchema),
+        (status = 200, description = "Diagnostic report", body = DiagnosticReportSchema),
         (status = 400, description = "No pods deployed for this topology"),
         (status = 404, description = "Topology not found"),
         (status = 500, description = "Internal server error")
@@ -620,7 +620,7 @@ pub async fn get_node_containers(
 // ============================================================================
 
 /// Request for app-to-app connectivity test
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct AppToAppTestRequest {
     /// Source application ID
     pub from_app_id: String,

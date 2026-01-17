@@ -60,7 +60,7 @@ struct PresetRow {
 }
 
 /// Create preset request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreatePresetRequest {
     pub name: String,
     pub description: Option<String>,
@@ -73,7 +73,7 @@ pub struct CreatePresetRequest {
 }
 
 /// Apply preset request
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct ApplyPresetRequest {
     pub source_node_id: String,
     pub target_node_id: Option<String>,
@@ -93,7 +93,7 @@ pub struct ApplyPresetRequest {
         ("category" = Option<String>, Query, description = "Filter by category")
     ),
     responses(
-        (status = 200, description = "List of all chaos presets", body = Vec<super::openapi::ChaosPresetSchema>),
+        (status = 200, description = "List of all chaos presets", body = Vec<ChaosPresetSchema>),
         (status = 500, description = "Internal server error")
     )
 )]
@@ -180,7 +180,7 @@ pub async fn list_presets(
         ("id" = String, Path, description = "Preset ID")
     ),
     responses(
-        (status = 200, description = "Preset found", body = super::openapi::ChaosPresetSchema),
+        (status = 200, description = "Preset found", body = ChaosPresetSchema),
         (status = 404, description = "Preset not found"),
         (status = 500, description = "Internal server error")
     )
@@ -223,9 +223,9 @@ pub async fn get_preset(
     post,
     path = "/api/presets",
     tag = "presets",
-    request_body = super::openapi::CreatePresetRequest,
+    request_body = CreatePresetRequest,
     responses(
-        (status = 200, description = "Preset created", body = super::openapi::ChaosPresetSchema),
+        (status = 200, description = "Preset created", body = ChaosPresetSchema),
         (status = 500, description = "Internal server error")
     )
 )]
