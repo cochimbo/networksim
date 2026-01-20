@@ -4,6 +4,7 @@ use uuid::Uuid;
 use utoipa::ToSchema;
 
 /// A network topology containing nodes and links
+/// Represents a network topology: nodes, links and metadata for visualization and deployment.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Topology {
     #[schema(example = "topology-1234")]
@@ -22,6 +23,7 @@ pub struct Topology {
 }
 
 /// A node in the network topology
+/// Single node in the topology with optional runtime configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Node {
     #[schema(example = "node-1")]
@@ -34,6 +36,7 @@ pub struct Node {
 }
 
 /// Position of a node on the canvas
+/// 2D canvas position for node visualization
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct Position {
     #[schema(example = 100.0)]
@@ -43,6 +46,7 @@ pub struct Position {
 }
 
 /// Configuration for a node
+/// Optional runtime configuration for the node (image, resources, env).
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct NodeConfig {
     #[serde(default)]
@@ -59,6 +63,7 @@ pub struct NodeConfig {
 }
 
 /// Environment variable
+/// Environment variable key/value pair for node containers
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EnvVar {
     #[schema(example = "APP_MODE")]
@@ -68,6 +73,7 @@ pub struct EnvVar {
 }
 
 /// A link between two nodes
+/// Logical link connecting two nodes in the topology with optional properties.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Link {
     #[schema(example = "link-1")]
@@ -81,6 +87,7 @@ pub struct Link {
 }
 
 /// Properties of a link
+/// Optional link-level properties like bandwidth and latency.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct LinkProperties {
     #[serde(default)]
@@ -92,6 +99,7 @@ pub struct LinkProperties {
 }
 
 /// Request to create a new topology
+/// Payload to create a topology with nodes and links.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateTopologyRequest {
     #[schema(example = "Office Network")]
@@ -106,6 +114,7 @@ pub struct CreateTopologyRequest {
 }
 
 /// Request to update an existing topology
+/// Payload to update topology properties or replace partial node/link lists.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateTopologyRequest {
     #[schema(example = "Office Network Updated")]

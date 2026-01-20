@@ -16,6 +16,7 @@ use crate::api::AppState;
 use crate::error::{AppError, AppResult};
 
 /// Event severity levels
+/// Severity level of the event (affects UI highlighting and alerts).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum EventSeverity {
@@ -37,6 +38,7 @@ impl std::fmt::Display for EventSeverity {
 }
 
 /// Event source types
+/// Type of object that produced the event (node, link, chaos, etc.).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum EventSourceType {
@@ -64,19 +66,41 @@ impl std::fmt::Display for EventSourceType {
 }
 
 /// System event
+/// Recorded event occurring in the system or a topology. Contains human-readable title and optional structured metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Event {
+    /// Database-assigned event identifier
+    #[schema(example = 1234)]
     pub id: i64,
+    /// Associated topology id if applicable
+    #[schema(example = "topology-1234")]
     pub topology_id: Option<String>,
+    /// High-level event type (e.g. `link.down`, `node.reboot`)
+    #[schema(example = "link.down")]
     pub event_type: String,
+    /// Optional subtype for finer classification
+    #[schema(example = "packet-loss")]
     pub event_subtype: Option<String>,
+    /// Severity as string (info|success|warning|error)
+    #[schema(example = "info")]
     pub severity: String,
+    /// Short human-readable title
+    #[schema(example = "Link between A and B is down")]
     pub title: String,
+    /// Longer optional description
+    #[schema(example = "Detected sustained packet loss on interface eth0 to eth1")]
     pub description: Option<String>,
+    /// Optional structured metadata as JSON object
     #[schema(value_type = Option<Object>)]
     pub metadata: Option<serde_json::Value>,
+    /// Source object type (node, link, etc.)
+    #[schema(example = "link")]
     pub source_type: Option<String>,
+    /// Identifier of the source object
+    #[schema(example = "node-1")]
     pub source_id: Option<String>,
+    /// Timestamp of event creation (RFC3339)
+    #[schema(example = "2025-01-01T12:00:00Z")]
     pub created_at: DateTime<Utc>,
 }
 
@@ -95,18 +119,36 @@ struct EventRow {
     created_at: String,
 }
 
-/// Create event request
+/// Request body to create an event
+/// Payload to create a new event associated to an optional topology or source object.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEventRequest {
+    /// Optional topology id to associate the event with
+    #[schema(example = "topology-1234")]
     pub topology_id: Option<String>,
+    /// High-level event type (required)
+    #[schema(example = "link.down")]
     pub event_type: String,
+    /// Optional subtype
+    #[schema(example = "packet-loss")]
     pub event_subtype: Option<String>,
+    /// Optional severity, defaults to `info`
+    #[schema(example = "warning")]
     pub severity: Option<String>,
+    /// Short title for the event (required)
+    #[schema(example = "Link down between A and B")]
     pub title: String,
+    /// Optional detailed description
+    #[schema(example = "The link experienced continuous packet loss for 10s")]
     pub description: Option<String>,
+    /// Optional JSON metadata object
     #[schema(value_type = Option<Object>)]
     pub metadata: Option<serde_json::Value>,
+    /// Optional source type (node, link, etc.)
+    #[schema(example = "link")]
     pub source_type: Option<String>,
+    /// Optional source identifier
+    #[schema(example = "link-1")]
     pub source_id: Option<String>,
 }
 
@@ -124,10 +166,15 @@ pub struct ListEventsQuery {
 }
 
 /// Events list response with pagination
+/// Paginated list of events matching the query
 #[derive(Debug, Serialize, ToSchema)]
 pub struct EventsResponse {
+    /// List of events
     pub events: Vec<Event>,
+    /// Total number of matching events
+    #[schema(example = 42)]
     pub total: i64,
+    /// Whether more pages are available
     pub has_more: bool,
 }
 

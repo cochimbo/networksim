@@ -207,6 +207,27 @@ async fn create_scenario(
     Path(topology_id): Path<String>,
     Json(payload): Json<CreateScenarioRequest>,
 ) -> Result<ApiResponse<Scenario>, AppError> {
+    // Basic validation
+    if payload.name.trim().is_empty() {
+        return Err(AppError::bad_request("name must be a non-empty string"));
+    }
+    if payload.total_duration <= 0 {
+        return Err(AppError::bad_request("total_duration must be greater than zero"));
+    }
+    if payload.steps.is_empty() {
+        return Err(AppError::bad_request("steps must contain at least one step"));
+    }
+    for (i, step) in payload.steps.iter().enumerate() {
+        if step.source_node_id.trim().is_empty() {
+            return Err(AppError::bad_request(&format!("steps[{}].source_node_id must be non-empty", i)));
+        }
+        if step.duration <= 0.0 {
+            return Err(AppError::bad_request(&format!("steps[{}].duration must be > 0", i)));
+        }
+        if step.start_at < 0.0 {
+            return Err(AppError::bad_request(&format!("steps[{}].start_at must be >= 0", i)));
+        }
+    }
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
     

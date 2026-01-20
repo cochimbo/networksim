@@ -480,6 +480,109 @@
         }
       }
     },
+    "/api/scenarios/{id}": {
+      "get": {
+        "tags": [
+          "scenarios"
+        ],
+        "operationId": "get_scenario",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Scenario ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scenario"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "scenarios"
+        ],
+        "operationId": "update_scenario",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Scenario ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScenarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Scenario updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "scenarios"
+        ],
+        "operationId": "delete_scenario",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Scenario ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scenario deleted"
+          }
+        }
+      }
+    },
+    "/api/scenarios/{id}/run": {
+      "post": {
+        "tags": [
+          "scenarios"
+        ],
+        "operationId": "run_scenario",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Scenario ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scenario execution started"
+          }
+        }
+      }
+    },
     "/api/topologies": {
       "get": {
         "tags": [
@@ -1654,6 +1757,63 @@
         }
       }
     },
+    "/api/topologies/{topology_id}/scenarios": {
+      "get": {
+        "tags": [
+          "scenarios"
+        ],
+        "operationId": "list_scenarios",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of scenarios"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "scenarios"
+        ],
+        "operationId": "create_scenario",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScenarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Scenario created"
+          }
+        }
+      }
+    },
     "/api/v1/chaos/{condition_id}/affected-apps": {
       "get": {
         "tags": [
@@ -2303,7 +2463,7 @@
       },
       "CreateEventRequest": {
         "type": "object",
-        "description": "Create event request",
+        "description": "Request body to create an event\nPayload to create a new event associated to an optional topology or source object.",
         "required": [
           "event_type",
           "title"
@@ -2311,36 +2471,53 @@
         "properties": {
           "description": {
             "type": "string",
+            "description": "Optional detailed description",
+            "example": "The link experienced continuous packet loss for 10s",
             "nullable": true
           },
           "event_subtype": {
             "type": "string",
+            "description": "Optional subtype",
+            "example": "packet-loss",
             "nullable": true
           },
           "event_type": {
-            "type": "string"
+            "type": "string",
+            "description": "High-level event type (required)",
+            "example": "link.down"
           },
           "metadata": {
             "type": "object",
+            "description": "Optional JSON metadata object",
             "nullable": true
           },
           "severity": {
             "type": "string",
+            "description": "Optional severity, defaults to `info`",
+            "example": "warning",
             "nullable": true
           },
           "source_id": {
             "type": "string",
+            "description": "Optional source identifier",
+            "example": "link-1",
             "nullable": true
           },
           "source_type": {
             "type": "string",
+            "description": "Optional source type (node, link, etc.)",
+            "example": "link",
             "nullable": true
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Short title for the event (required)",
+            "example": "Link down between A and B"
           },
           "topology_id": {
             "type": "string",
+            "description": "Optional topology id to associate the event with",
+            "example": "topology-1234",
             "nullable": true
           }
         }
@@ -2383,9 +2560,40 @@
           "params": {}
         }
       },
+      "CreateScenarioRequest": {
+        "type": "object",
+        "description": "Request to create a new scenario for a topology.",
+        "required": [
+          "name",
+          "total_duration",
+          "steps"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "example": "Optional description",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "example": "Baseline failure test"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScenarioStep"
+            }
+          },
+          "total_duration": {
+            "type": "integer",
+            "format": "int64",
+            "example": 60
+          }
+        }
+      },
       "CreateTopologyRequest": {
         "type": "object",
-        "description": "Request to create a new topology",
+        "description": "Request to create a new topology\nPayload to create a topology with nodes and links.",
         "properties": {
           "description": {
             "type": "string",
@@ -2616,7 +2824,7 @@
       },
       "EnvVar": {
         "type": "object",
-        "description": "Environment variable",
+        "description": "Environment variable\nEnvironment variable key/value pair for node containers",
         "required": [
           "name",
           "value"
@@ -2654,7 +2862,7 @@
       },
       "Event": {
         "type": "object",
-        "description": "System event",
+        "description": "System event\nRecorded event occurring in the system or a topology. Contains human-readable title and optional structured metadata.",
         "required": [
           "id",
           "event_type",
@@ -2665,50 +2873,71 @@
         "properties": {
           "created_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Timestamp of event creation (RFC3339)",
+            "example": "2025-01-01T12:00:00Z"
           },
           "description": {
             "type": "string",
+            "description": "Longer optional description",
+            "example": "Detected sustained packet loss on interface eth0 to eth1",
             "nullable": true
           },
           "event_subtype": {
             "type": "string",
+            "description": "Optional subtype for finer classification",
+            "example": "packet-loss",
             "nullable": true
           },
           "event_type": {
-            "type": "string"
+            "type": "string",
+            "description": "High-level event type (e.g. `link.down`, `node.reboot`)",
+            "example": "link.down"
           },
           "id": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Database-assigned event identifier",
+            "example": 1234
           },
           "metadata": {
             "type": "object",
+            "description": "Optional structured metadata as JSON object",
             "nullable": true
           },
           "severity": {
-            "type": "string"
+            "type": "string",
+            "description": "Severity as string (info|success|warning|error)",
+            "example": "info"
           },
           "source_id": {
             "type": "string",
+            "description": "Identifier of the source object",
+            "example": "node-1",
             "nullable": true
           },
           "source_type": {
             "type": "string",
+            "description": "Source object type (node, link, etc.)",
+            "example": "link",
             "nullable": true
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Short human-readable title",
+            "example": "Link between A and B is down"
           },
           "topology_id": {
             "type": "string",
+            "description": "Associated topology id if applicable",
+            "example": "topology-1234",
             "nullable": true
           }
         }
       },
       "EventSeverity": {
         "type": "string",
-        "description": "Event severity levels",
+        "description": "Event severity levels\nSeverity level of the event (affects UI highlighting and alerts).",
         "enum": [
           "info",
           "success",
@@ -2718,7 +2947,7 @@
       },
       "EventSourceType": {
         "type": "string",
-        "description": "Event source types",
+        "description": "Event source types\nType of object that produced the event (node, link, chaos, etc.).",
         "enum": [
           "node",
           "link",
@@ -2731,7 +2960,7 @@
       },
       "EventsResponse": {
         "type": "object",
-        "description": "Events list response with pagination",
+        "description": "Events list response with pagination\nPaginated list of events matching the query",
         "required": [
           "events",
           "total",
@@ -2742,14 +2971,18 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Event"
-            }
+            },
+            "description": "List of events"
           },
           "has_more": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether more pages are available"
           },
           "total": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Total number of matching events",
+            "example": 42
           }
         }
       },
@@ -2833,7 +3066,7 @@
       },
       "Link": {
         "type": "object",
-        "description": "A link between two nodes",
+        "description": "A link between two nodes\nLogical link connecting two nodes in the topology with optional properties.",
         "required": [
           "id",
           "source",
@@ -2859,7 +3092,7 @@
       },
       "LinkProperties": {
         "type": "object",
-        "description": "Properties of a link",
+        "description": "Properties of a link\nOptional link-level properties like bandwidth and latency.",
         "properties": {
           "bandwidth": {
             "type": "string",
@@ -3131,7 +3364,7 @@
       },
       "Node": {
         "type": "object",
-        "description": "A node in the network topology",
+        "description": "A node in the network topology\nSingle node in the topology with optional runtime configuration.",
         "required": [
           "id",
           "name",
@@ -3156,7 +3389,7 @@
       },
       "NodeConfig": {
         "type": "object",
-        "description": "Configuration for a node",
+        "description": "Configuration for a node\nOptional runtime configuration for the node (image, resources, env).",
         "properties": {
           "cpu": {
             "type": "string",
@@ -3297,7 +3530,7 @@
       },
       "Position": {
         "type": "object",
-        "description": "Position of a node on the canvas",
+        "description": "Position of a node on the canvas\n2D canvas position for node visualization",
         "required": [
           "x",
           "y"
@@ -3312,6 +3545,110 @@
             "type": "number",
             "format": "double",
             "example": 200.0
+          }
+        }
+      },
+      "Scenario": {
+        "type": "object",
+        "description": "A test scenario composed of ordered chaos steps to run against a topology.",
+        "required": [
+          "id",
+          "topology_id",
+          "name",
+          "total_duration",
+          "steps",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "example": "2025-01-01T12:00:00Z"
+          },
+          "description": {
+            "type": "string",
+            "example": "Simulates intermittent packet loss between two nodes",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "example": "scenario-1234"
+          },
+          "name": {
+            "type": "string",
+            "example": "Baseline failure test"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScenarioStep"
+            },
+            "description": "Ordered steps that make up the scenario"
+          },
+          "topology_id": {
+            "type": "string",
+            "example": "topology-1234"
+          },
+          "total_duration": {
+            "type": "integer",
+            "format": "int64",
+            "example": 60
+          },
+          "updated_at": {
+            "type": "string",
+            "example": "2025-01-01T12:05:00Z"
+          }
+        }
+      },
+      "ScenarioStep": {
+        "type": "object",
+        "description": "Single step inside a scenario, describing a chaos action to apply.",
+        "required": [
+          "id",
+          "type",
+          "sourceNodeId",
+          "startAt",
+          "duration",
+          "params",
+          "laneId"
+        ],
+        "properties": {
+          "duration": {
+            "type": "number",
+            "format": "double",
+            "description": "Duration in seconds",
+            "example": 10.0
+          },
+          "id": {
+            "type": "string",
+            "example": "step-1"
+          },
+          "laneId": {
+            "type": "string",
+            "example": "lane-1"
+          },
+          "params": {
+            "description": "Step-specific parameters as JSON"
+          },
+          "sourceNodeId": {
+            "type": "string",
+            "description": "Source node id for the action",
+            "example": "node-1"
+          },
+          "startAt": {
+            "type": "number",
+            "format": "double",
+            "description": "Start time (seconds) relative to scenario start",
+            "example": 0.0
+          },
+          "targetNodeId": {
+            "type": "string",
+            "description": "Optional target node id for the action",
+            "example": "node-2",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/ChaosType"
           }
         }
       },
@@ -3337,7 +3674,7 @@
       },
       "Topology": {
         "type": "object",
-        "description": "A network topology containing nodes and links",
+        "description": "A network topology containing nodes and links\nRepresents a network topology: nodes, links and metadata for visualization and deployment.",
         "required": [
           "id",
           "name",
@@ -3404,9 +3741,36 @@
           }
         }
       },
+      "UpdateScenarioRequest": {
+        "type": "object",
+        "description": "Partial update for an existing scenario.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "example": "Updated scenario name",
+            "nullable": true
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScenarioStep"
+            },
+            "nullable": true
+          },
+          "total_duration": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
       "UpdateTopologyRequest": {
         "type": "object",
-        "description": "Request to update an existing topology",
+        "description": "Request to update an existing topology\nPayload to update topology properties or replace partial node/link lists.",
         "properties": {
           "description": {
             "type": "string",
