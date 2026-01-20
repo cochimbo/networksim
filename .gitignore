@@ -89,3 +89,7 @@ backend/.venv/
 
 # Hypothesis / Schemathesis cache and examples
 .hypothesis/
+
+# Hypothesis / Schemathesis artifacts
+.hypothesis/
+backend/schemathesis_reports/
