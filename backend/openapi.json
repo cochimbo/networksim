@@ -1,0 +1,3470 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "NetworkSim API",
+    "description": "Network Topology Simulator with Chaos Engineering capabilities.\n\n## Features\n- Create and manage network topologies\n- Deploy topologies to Kubernetes\n- Apply chaos engineering (delay, loss, partition, etc.)\n- Monitor network metrics and events\n- Run diagnostic tests",
+    "contact": {
+      "name": "NetworkSim Team"
+    },
+    "license": {
+      "name": "MIT"
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/api/chaos": {
+      "post": {
+        "tags": [
+          "chaos"
+        ],
+        "summary": "Create a chaos condition (saves to DB but does NOT apply to K8s yet)",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChaosRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Chaos condition created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChaosCondition"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology or node not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/cluster/status": {
+      "get": {
+        "tags": [
+          "cluster"
+        ],
+        "summary": "Get Kubernetes cluster connection status",
+        "operationId": "cluster_status",
+        "responses": {
+          "200": {
+            "description": "Cluster status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClusterStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "List events with filtering",
+        "operationId": "list_events",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Create a new event",
+        "operationId": "create_event",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Event created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/events/stats": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Get event statistics",
+        "operationId": "event_stats",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/presets": {
+      "get": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "List all presets with optional pagination and filtering",
+        "description": "GET /api/presets",
+        "operationId": "list_presets",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number (1-indexed)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Items per page (max 100)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Filter by category",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of all chaos presets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChaosPresetSchema"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "Create a custom preset",
+        "description": "POST /api/presets",
+        "operationId": "create_preset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePresetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Preset created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChaosPresetSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/presets/{id}": {
+      "get": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "Get a specific preset",
+        "description": "GET /api/presets/:id",
+        "operationId": "get_preset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Preset ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preset found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChaosPresetSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Preset not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "presets"
+        ],
+        "summary": "Delete a custom preset (cannot delete built-in presets)",
+        "description": "DELETE /api/presets/:id",
+        "operationId": "delete_preset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Preset ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Preset deleted"
+          },
+          "400": {
+            "description": "Cannot delete built-in presets"
+          },
+          "404": {
+            "description": "Preset not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies": {
+      "get": {
+        "tags": [
+          "topologies"
+        ],
+        "summary": "List all topologies with optional pagination",
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number (1-indexed)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Items per page (max 100)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of all topologies",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Topology"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "topologies"
+        ],
+        "summary": "Create a new topology",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTopologyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Topology created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Topology"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid topology data"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{id}": {
+      "get": {
+        "tags": [
+          "topologies"
+        ],
+        "summary": "Get a topology by ID",
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Topology found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Topology"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "topologies"
+        ],
+        "summary": "Update a topology",
+        "operationId": "update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTopologyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Topology updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Topology"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "topologies"
+        ],
+        "summary": "Delete a topology",
+        "operationId": "delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Topology deleted"
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{id}/deploy": {
+      "post": {
+        "tags": [
+          "topologies"
+        ],
+        "summary": "Deploy a topology to K3s",
+        "description": "POST /api/topologies/:id/deploy",
+        "operationId": "deploy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deployment started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot deploy empty topology"
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "topologies"
+        ],
+        "summary": "Destroy a deployment",
+        "description": "DELETE /api/topologies/:id/deploy",
+        "operationId": "destroy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deployment destroyed"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{id}/diagnostic": {
+      "get": {
+        "tags": [
+          "tests"
+        ],
+        "summary": "Run network diagnostic for a deployed topology",
+        "description": "GET /api/topologies/:id/diagnostic",
+        "operationId": "run_diagnostic",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diagnostic report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticReportSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No pods deployed for this topology"
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{id}/events": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Get events for a specific topology",
+        "operationId": "list_topology_events",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "topology_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "source_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of topology events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{id}/metrics/aggregated": {
+      "get": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "Get aggregated metrics (for charts)",
+        "description": "GET /api/topologies/:id/metrics/aggregated",
+        "operationId": "get_aggregated_metrics",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "source_node",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "target_node",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated metrics for charts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregatedMetrics"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{id}/metrics/history": {
+      "get": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "Get historical network metrics",
+        "description": "GET /api/topologies/:id/metrics/history",
+        "operationId": "get_metrics_history",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "source_node",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "target_node",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historical metrics list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NetworkMetric"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{id}/metrics/live": {
+      "get": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "Get live metrics snapshot for a topology",
+        "description": "GET /api/topologies/:id/metrics/live",
+        "operationId": "get_live_metrics",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Live metrics snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveMetricsSnapshot"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{id}/status": {
+      "get": {
+        "tags": [
+          "topologies"
+        ],
+        "summary": "Get deployment status",
+        "description": "GET /api/topologies/:id/status",
+        "operationId": "status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deployment status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{topology_id}/apps/{app_id}": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Get application details",
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "app_id",
+            "in": "path",
+            "description": "Application ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Application not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Uninstall an application",
+        "operationId": "uninstall",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "app_id",
+            "in": "path",
+            "description": "Application ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application uninstalled"
+          },
+          "404": {
+            "description": "Application not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{topology_id}/apps/{app_id}/logs": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Get application logs",
+        "operationId": "logs",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "app_id",
+            "in": "path",
+            "description": "Application ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application logs"
+          },
+          "404": {
+            "description": "Application not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{topology_id}/chaos": {
+      "get": {
+        "tags": [
+          "chaos"
+        ],
+        "summary": "List all chaos conditions for a topology (from DB)",
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of chaos conditions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChaosCondition"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chaos"
+        ],
+        "summary": "Delete all chaos conditions for a topology (from K8s and DB)",
+        "operationId": "delete_all",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All chaos conditions deleted"
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{topology_id}/chaos/{condition_id}": {
+      "delete": {
+        "tags": [
+          "chaos"
+        ],
+        "summary": "Delete a chaos condition (removes from K8s and DB)",
+        "operationId": "delete",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "condition_id",
+            "in": "path",
+            "description": "Chaos condition ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chaos condition deleted"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{topology_id}/chaos/{condition_id}/start": {
+      "post": {
+        "tags": [
+          "chaos"
+        ],
+        "summary": "Start (activate) a chaos condition - applies it to K8s",
+        "operationId": "start",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "condition_id",
+            "in": "path",
+            "description": "Chaos condition ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chaos condition started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChaosCondition"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Condition not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{topology_id}/chaos/{condition_id}/stop": {
+      "post": {
+        "tags": [
+          "chaos"
+        ],
+        "summary": "Stop (pause) a chaos condition - removes from K8s but keeps in DB",
+        "operationId": "stop",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "condition_id",
+            "in": "path",
+            "description": "Chaos condition ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chaos condition stopped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChaosCondition"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Condition not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{topology_id}/metrics/by-app": {
+      "get": {
+        "tags": [
+          "metrics"
+        ],
+        "summary": "Get metrics aggregated by application",
+        "description": "GET /api/topologies/:topology_id/metrics/by-app",
+        "operationId": "get_metrics_by_app",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metrics grouped by application",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsByAppResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/topologies/{topology_id}/nodes/{node_id}/apps": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "List all applications for a node",
+        "operationId": "list_by_node",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "path",
+            "description": "Node ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of applications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Application"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Topology or node not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Deploy an application to a node",
+        "operationId": "deploy",
+        "parameters": [
+          {
+            "name": "topology_id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "node_id",
+            "in": "path",
+            "description": "Node ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployAppRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "App deployed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "404": {
+            "description": "Topology or node not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/chaos/{condition_id}/affected-apps": {
+      "get": {
+        "tags": [
+          "chaos"
+        ],
+        "summary": "Get applications affected by a chaos condition",
+        "description": "GET /api/v1/chaos/:condition_id/affected-apps",
+        "operationId": "affected_apps",
+        "parameters": [
+          {
+            "name": "condition_id",
+            "in": "path",
+            "description": "Chaos condition ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of affected applications"
+          },
+          "404": {
+            "description": "Condition not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/api/v1/topologies/{id}/tests/app-to-app": {
+      "post": {
+        "tags": [
+          "tests"
+        ],
+        "summary": "Run an app-to-app connectivity test",
+        "description": "POST /api/v1/topologies/:id/tests/app-to-app",
+        "operationId": "run_app_to_app_test",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Topology ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppToAppTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Test result"
+          },
+          "400": {
+            "description": "Invalid test parameters"
+          },
+          "404": {
+            "description": "Application not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "System health check",
+        "operationId": "health_check",
+        "responses": {
+          "200": {
+            "description": "System is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AggregatedMetrics": {
+        "type": "object",
+        "description": "Aggregated metrics response",
+        "required": [
+          "interval",
+          "data_points"
+        ],
+        "properties": {
+          "data_points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetricDataPoint"
+            }
+          },
+          "interval": {
+            "type": "string"
+          }
+        }
+      },
+      "AppMetrics": {
+        "type": "object",
+        "description": "Metrics grouped by application",
+        "required": [
+          "app_id",
+          "app_name",
+          "node_id",
+          "sample_count",
+          "is_affected_by_chaos",
+          "chaos_types"
+        ],
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "app_name": {
+            "type": "string"
+          },
+          "avg_latency_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "avg_packet_loss": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "chaos_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "is_affected_by_chaos": {
+            "type": "boolean"
+          },
+          "max_latency_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "min_latency_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "sample_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AppStatus": {
+        "type": "string",
+        "description": "Estado de una aplicación Helm",
+        "enum": [
+          "pending",
+          "deploying",
+          "deployed",
+          "failed",
+          "uninstalling"
+        ]
+      },
+      "AppToAppTestRequest": {
+        "type": "object",
+        "description": "Request for app-to-app connectivity test",
+        "required": [
+          "from_app_id",
+          "to_app_id"
+        ],
+        "properties": {
+          "from_app_id": {
+            "type": "string",
+            "description": "Source application ID"
+          },
+          "path": {
+            "type": "string",
+            "description": "HTTP path for HTTP tests (default: \"/\")",
+            "nullable": true
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Target port for TCP/HTTP tests (optional)",
+            "nullable": true,
+            "minimum": 0
+          },
+          "test_type": {
+            "type": "string",
+            "description": "Test type: \"http\", \"tcp\", or \"ping\""
+          },
+          "timeout_secs": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Timeout in seconds (default: 5)",
+            "minimum": 0
+          },
+          "to_app_id": {
+            "type": "string",
+            "description": "Target application ID"
+          }
+        }
+      },
+      "Application": {
+        "type": "object",
+        "description": "Modelo de base de datos para aplicaciones desplegadas con Helm",
+        "required": [
+          "id",
+          "topology_id",
+          "node_selector",
+          "image_name",
+          "namespace",
+          "status",
+          "release_name",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "image_name": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "node_selector": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "release_name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppStatus"
+          },
+          "topology_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "values": {
+            "nullable": true
+          }
+        }
+      },
+      "ApplyPresetRequest": {
+        "type": "object",
+        "description": "Apply preset request",
+        "required": [
+          "source_node_id"
+        ],
+        "properties": {
+          "duration": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_node_id": {
+            "type": "string"
+          },
+          "target_node_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BandwidthParams": {
+        "type": "object",
+        "description": "Parameters for bandwidth limiting",
+        "required": [
+          "rate"
+        ],
+        "properties": {
+          "buffer": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Buffer size in bytes",
+            "nullable": true,
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Limit in bytes",
+            "nullable": true,
+            "minimum": 0
+          },
+          "rate": {
+            "type": "string",
+            "description": "Rate limit (e.g., \"1mbps\", \"100kbps\")"
+          }
+        }
+      },
+      "ChaosCondition": {
+        "type": "object",
+        "description": "A chaos condition that has been applied",
+        "required": [
+          "id",
+          "topology_id",
+          "source_node_id",
+          "chaos_type",
+          "direction",
+          "params",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "chaos_type": {
+            "$ref": "#/components/schemas/ChaosType"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When created"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/ChaosDirection"
+          },
+          "duration": {
+            "type": "string",
+            "description": "Duration",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "description": "Unique ID"
+          },
+          "k8s_name": {
+            "type": "string",
+            "description": "Kubernetes resource name (when active)",
+            "nullable": true
+          },
+          "params": {
+            "description": "Parameters"
+          },
+          "source_node_id": {
+            "type": "string",
+            "description": "Source node ID"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the chaos was started (activated) - for countdown timer",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ChaosConditionStatus"
+          },
+          "target_node_id": {
+            "type": "string",
+            "description": "Target node ID (if specific)",
+            "nullable": true
+          },
+          "topology_id": {
+            "type": "string",
+            "description": "Topology ID"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When last updated"
+          }
+        }
+      },
+      "ChaosConditionStatus": {
+        "type": "string",
+        "description": "Status of a chaos condition in the system",
+        "enum": [
+          "pending",
+          "active",
+          "paused"
+        ]
+      },
+      "ChaosDirection": {
+        "type": "string",
+        "description": "Target direction for network chaos",
+        "enum": [
+          "to",
+          "from",
+          "both"
+        ]
+      },
+      "ChaosParams": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/DelayParams"
+          },
+          {
+            "$ref": "#/components/schemas/LossParams"
+          },
+          {
+            "$ref": "#/components/schemas/BandwidthParams"
+          },
+          {
+            "$ref": "#/components/schemas/CorruptParams"
+          },
+          {
+            "$ref": "#/components/schemas/DuplicateParams"
+          },
+          {
+            "$ref": "#/components/schemas/StressCpuParams"
+          },
+          {
+            "$ref": "#/components/schemas/PodKillParams"
+          },
+          {
+            "$ref": "#/components/schemas/IoDelayParams"
+          },
+          {
+            "$ref": "#/components/schemas/HttpAbortParams"
+          },
+          {
+            "type": "object",
+            "default": null,
+            "nullable": true
+          }
+        ],
+        "description": "Union of all chaos parameters"
+      },
+      "ChaosPresetSchema": {
+        "type": "object",
+        "description": "Predefined chaos preset",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "category",
+          "icon",
+          "chaos_type",
+          "direction",
+          "params",
+          "is_builtin"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Category for grouping",
+            "example": "latency"
+          },
+          "chaos_type": {
+            "type": "string",
+            "description": "Chaos type"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description",
+            "example": "Add 200ms latency with 50ms jitter"
+          },
+          "direction": {
+            "type": "string",
+            "description": "Direction"
+          },
+          "duration": {
+            "type": "string",
+            "description": "Duration",
+            "nullable": true
+          },
+          "icon": {
+            "type": "string",
+            "description": "Icon emoji",
+            "example": "🐢"
+          },
+          "id": {
+            "type": "string",
+            "description": "Unique preset ID",
+            "example": "preset-high-latency"
+          },
+          "is_builtin": {
+            "type": "boolean",
+            "description": "Whether this is a built-in preset"
+          },
+          "name": {
+            "type": "string",
+            "description": "Preset name",
+            "example": "High Latency"
+          },
+          "params": {
+            "description": "Chaos parameters"
+          }
+        }
+      },
+      "ChaosType": {
+        "type": "string",
+        "description": "Types of chaos conditions that can be applied",
+        "enum": [
+          "delay",
+          "loss",
+          "bandwidth",
+          "corrupt",
+          "duplicate",
+          "partition",
+          "stress-cpu",
+          "pod-kill",
+          "io-delay",
+          "http-abort"
+        ]
+      },
+      "ClusterStatusResponse": {
+        "type": "object",
+        "required": [
+          "connected",
+          "message"
+        ],
+        "properties": {
+          "connected": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ConnectivityResultSchema": {
+        "type": "object",
+        "description": "Result of a connectivity test between two nodes",
+        "required": [
+          "from_node",
+          "to_node",
+          "expected",
+          "actual",
+          "status"
+        ],
+        "properties": {
+          "actual": {
+            "type": "string",
+            "description": "Actual connectivity: connected, blocked, unknown, error",
+            "example": "connected"
+          },
+          "expected": {
+            "type": "string",
+            "description": "Expected connectivity: allow or deny",
+            "example": "allow"
+          },
+          "from_node": {
+            "type": "string",
+            "description": "Source node ID"
+          },
+          "latency_ms": {
+            "type": "number",
+            "format": "double",
+            "description": "Latency in milliseconds",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "Test status: pass, fail, warning, skipped",
+            "example": "pass"
+          },
+          "to_node": {
+            "type": "string",
+            "description": "Target node ID"
+          }
+        }
+      },
+      "CorruptParams": {
+        "type": "object",
+        "description": "Parameters for packet corruption",
+        "required": [
+          "corrupt"
+        ],
+        "properties": {
+          "correlation": {
+            "type": "string",
+            "description": "Correlation percentage",
+            "nullable": true
+          },
+          "corrupt": {
+            "type": "string",
+            "description": "Corruption percentage (e.g., \"10\")"
+          }
+        }
+      },
+      "CreateChaosRequest": {
+        "type": "object",
+        "description": "Request to create a chaos condition",
+        "required": [
+          "topology_id",
+          "source_node_id",
+          "chaos_type",
+          "params"
+        ],
+        "properties": {
+          "chaos_type": {
+            "$ref": "#/components/schemas/ChaosType"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/ChaosDirection"
+          },
+          "duration": {
+            "type": "string",
+            "description": "Duration (e.g., \"60s\", \"5m\") - if not set, runs until deleted",
+            "nullable": true
+          },
+          "params": {
+            "description": "Parameters specific to the chaos type"
+          },
+          "source_node_id": {
+            "type": "string",
+            "description": "Source node ID (where chaos originates)"
+          },
+          "target_node_id": {
+            "type": "string",
+            "description": "Target node ID (optional - if not set, applies to all traffic)",
+            "nullable": true
+          },
+          "topology_id": {
+            "type": "string",
+            "description": "Topology ID the chaos applies to"
+          }
+        }
+      },
+      "CreateEventRequest": {
+        "type": "object",
+        "description": "Create event request",
+        "required": [
+          "event_type",
+          "title"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "event_subtype": {
+            "type": "string",
+            "nullable": true
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "topology_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CreatePresetRequest": {
+        "type": "object",
+        "description": "Create preset request",
+        "required": [
+          "name",
+          "chaos_type",
+          "params"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "chaos_type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "direction": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration": {
+            "type": "string",
+            "nullable": true
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "params": {}
+        }
+      },
+      "CreateTopologyRequest": {
+        "type": "object",
+        "description": "Request to create a new topology",
+        "properties": {
+          "description": {
+            "type": "string",
+            "example": "Small office topology with 3 nodes",
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            }
+          },
+          "name": {
+            "type": "string",
+            "example": "Office Network",
+            "nullable": true
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            }
+          }
+        }
+      },
+      "DelayParams": {
+        "type": "object",
+        "description": "Parameters for delay chaos",
+        "required": [
+          "latency"
+        ],
+        "properties": {
+          "correlation": {
+            "type": "string",
+            "description": "Correlation percentage (0-100)",
+            "nullable": true
+          },
+          "jitter": {
+            "type": "string",
+            "description": "Random jitter (e.g., \"10ms\")",
+            "nullable": true
+          },
+          "latency": {
+            "type": "string",
+            "description": "Latency to add (e.g., \"100ms\", \"1s\")"
+          }
+        }
+      },
+      "DeployAppRequest": {
+        "type": "object",
+        "description": "Request para desplegar una aplicación",
+        "required": [
+          "chart",
+          "node_selector"
+        ],
+        "properties": {
+          "chart": {
+            "type": "string"
+          },
+          "chart_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "cpu_limit": {
+            "type": "string",
+            "nullable": true
+          },
+          "cpu_request": {
+            "type": "string",
+            "nullable": true
+          },
+          "envvalues": {
+            "type": "object",
+            "nullable": true
+          },
+          "healthCheck": {
+            "type": "object",
+            "nullable": true
+          },
+          "memory_limit": {
+            "type": "string",
+            "nullable": true
+          },
+          "memory_request": {
+            "type": "string",
+            "nullable": true
+          },
+          "node_selector": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "replicas": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "values": {
+            "nullable": true
+          },
+          "volumes": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "nullable": true
+          }
+        }
+      },
+      "DeploymentResponse": {
+        "type": "object",
+        "description": "Response for deployment operations",
+        "required": [
+          "topology_id",
+          "status",
+          "nodes"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeStatusResponse"
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "topology_id": {
+            "type": "string"
+          }
+        }
+      },
+      "DiagnosticReportSchema": {
+        "type": "object",
+        "description": "Network diagnostic report",
+        "required": [
+          "topology_id",
+          "timestamp",
+          "summary",
+          "connectivity_tests"
+        ],
+        "properties": {
+          "connectivity_tests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConnectivityResultSchema"
+            },
+            "description": "Individual connectivity test results"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DiagnosticSummarySchema"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Timestamp of the diagnostic"
+          },
+          "topology_id": {
+            "type": "string",
+            "description": "Topology ID"
+          }
+        }
+      },
+      "DiagnosticSummarySchema": {
+        "type": "object",
+        "description": "Diagnostic summary statistics",
+        "required": [
+          "total_nodes",
+          "total_tests",
+          "passed_tests",
+          "failed_tests",
+          "success_rate"
+        ],
+        "properties": {
+          "failed_tests": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Tests that failed",
+            "minimum": 0
+          },
+          "passed_tests": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Tests that passed",
+            "minimum": 0
+          },
+          "success_rate": {
+            "type": "number",
+            "format": "double",
+            "description": "Success rate percentage",
+            "example": 100.0
+          },
+          "total_nodes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total number of nodes",
+            "minimum": 0
+          },
+          "total_tests": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Total tests run",
+            "minimum": 0
+          }
+        }
+      },
+      "DuplicateParams": {
+        "type": "object",
+        "description": "Parameters for packet duplication",
+        "required": [
+          "duplicate"
+        ],
+        "properties": {
+          "correlation": {
+            "type": "string",
+            "description": "Correlation percentage",
+            "nullable": true
+          },
+          "duplicate": {
+            "type": "string",
+            "description": "Duplication percentage"
+          }
+        }
+      },
+      "EnvVar": {
+        "type": "object",
+        "description": "Environment variable",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "APP_MODE"
+          },
+          "value": {
+            "type": "string",
+            "example": "production"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Error response returned by the API",
+        "required": [
+          "error",
+          "status"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status code",
+            "minimum": 0
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "description": "System event",
+        "required": [
+          "id",
+          "event_type",
+          "severity",
+          "title",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "event_subtype": {
+            "type": "string",
+            "nullable": true
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "severity": {
+            "type": "string"
+          },
+          "source_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "source_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "topology_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EventSeverity": {
+        "type": "string",
+        "description": "Event severity levels",
+        "enum": [
+          "info",
+          "success",
+          "warning",
+          "error"
+        ]
+      },
+      "EventSourceType": {
+        "type": "string",
+        "description": "Event source types",
+        "enum": [
+          "node",
+          "link",
+          "chaos",
+          "deployment",
+          "application",
+          "system",
+          "test"
+        ]
+      },
+      "EventsResponse": {
+        "type": "object",
+        "description": "Events list response with pagination",
+        "required": [
+          "events",
+          "total",
+          "has_more"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "has_more": {
+            "type": "boolean"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "HttpAbortParams": {
+        "type": "object",
+        "description": "Parameters for HTTP abort (HTTPChaos)",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status code to return (e.g., 500, 429)",
+            "nullable": true,
+            "minimum": 0
+          },
+          "method": {
+            "type": "string",
+            "description": "HTTP method to match (GET, POST, etc.)",
+            "nullable": true
+          },
+          "path": {
+            "type": "string",
+            "description": "Path pattern to match (e.g., \"/api/*\")",
+            "nullable": true
+          },
+          "port": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Port to intercept",
+            "nullable": true,
+            "minimum": 0
+          }
+        }
+      },
+      "IoDelayParams": {
+        "type": "object",
+        "description": "Parameters for I/O delay (IOChaos)",
+        "required": [
+          "delay"
+        ],
+        "properties": {
+          "delay": {
+            "type": "string",
+            "description": "Delay to add to I/O operations (e.g., \"100ms\")"
+          },
+          "methods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "I/O methods to affect (read, write, etc.)",
+            "nullable": true
+          },
+          "path": {
+            "type": "string",
+            "description": "Path to affect (default: \"/\")",
+            "nullable": true
+          },
+          "percent": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Percentage of operations to delay (0-100)",
+            "nullable": true,
+            "minimum": 0
+          }
+        }
+      },
+      "Link": {
+        "type": "object",
+        "description": "A link between two nodes",
+        "required": [
+          "id",
+          "source",
+          "target"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "link-1"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/LinkProperties"
+          },
+          "source": {
+            "type": "string",
+            "example": "node-1"
+          },
+          "target": {
+            "type": "string",
+            "example": "node-2"
+          }
+        }
+      },
+      "LinkProperties": {
+        "type": "object",
+        "description": "Properties of a link",
+        "properties": {
+          "bandwidth": {
+            "type": "string",
+            "example": "100mbit",
+            "nullable": true
+          },
+          "latency": {
+            "type": "string",
+            "example": "20ms",
+            "nullable": true
+          }
+        }
+      },
+      "LiveMetricsSnapshot": {
+        "type": "object",
+        "description": "Live metrics snapshot",
+        "required": [
+          "topology_id",
+          "timestamp",
+          "network_metrics",
+          "node_metrics",
+          "summary"
+        ],
+        "properties": {
+          "network_metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NetworkMetric"
+            }
+          },
+          "node_metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeMetric"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/MetricsSummary"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "topology_id": {
+            "type": "string"
+          }
+        }
+      },
+      "LossParams": {
+        "type": "object",
+        "description": "Parameters for packet loss chaos",
+        "required": [
+          "loss"
+        ],
+        "properties": {
+          "correlation": {
+            "type": "string",
+            "description": "Correlation percentage",
+            "nullable": true
+          },
+          "loss": {
+            "type": "string",
+            "description": "Loss percentage (e.g., \"25\" for 25%)"
+          }
+        }
+      },
+      "MetricDataPoint": {
+        "type": "object",
+        "required": [
+          "timestamp",
+          "sample_count"
+        ],
+        "properties": {
+          "avg_latency_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "avg_packet_loss": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "max_latency_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "min_latency_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "sample_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MetricsByAppResponse": {
+        "type": "object",
+        "description": "Response for metrics by app endpoint",
+        "required": [
+          "topology_id",
+          "timestamp",
+          "apps"
+        ],
+        "properties": {
+          "apps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppMetrics"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "topology_id": {
+            "type": "string"
+          }
+        }
+      },
+      "MetricsSummary": {
+        "type": "object",
+        "required": [
+          "total_nodes",
+          "total_pairs",
+          "connected_pairs",
+          "blocked_pairs",
+          "linked_connected",
+          "linked_blocked",
+          "unlinked_blocked",
+          "total_packet_loss_events"
+        ],
+        "properties": {
+          "avg_latency_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "blocked_pairs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "connected_pairs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "linked_blocked": {
+            "type": "integer",
+            "description": "Pairs with links that are blocked (problem - should be connected)",
+            "minimum": 0
+          },
+          "linked_connected": {
+            "type": "integer",
+            "description": "Pairs with links that are connected (expected behavior)",
+            "minimum": 0
+          },
+          "max_latency_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "total_nodes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_packet_loss_events": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_pairs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unlinked_blocked": {
+            "type": "integer",
+            "description": "Pairs without links that are blocked (expected behavior)",
+            "minimum": 0
+          }
+        }
+      },
+      "NetworkMetric": {
+        "type": "object",
+        "description": "Network metrics between two nodes",
+        "required": [
+          "id",
+          "topology_id",
+          "source_node_id",
+          "target_node_id",
+          "is_connected",
+          "measured_at"
+        ],
+        "properties": {
+          "bandwidth_bps": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "chaos_conditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Active chaos conditions affecting this metric",
+            "nullable": true
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "is_connected": {
+            "type": "boolean"
+          },
+          "jitter_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "latency_ms": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "measured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "packet_loss_percent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "source_app_id": {
+            "type": "string",
+            "description": "Optional: Source application ID (for app-specific metrics)",
+            "nullable": true
+          },
+          "source_app_name": {
+            "type": "string",
+            "description": "Optional: Source application name",
+            "nullable": true
+          },
+          "source_node_id": {
+            "type": "string"
+          },
+          "target_app_id": {
+            "type": "string",
+            "description": "Optional: Target application ID",
+            "nullable": true
+          },
+          "target_app_name": {
+            "type": "string",
+            "description": "Optional: Target application name",
+            "nullable": true
+          },
+          "target_node_id": {
+            "type": "string"
+          },
+          "topology_id": {
+            "type": "string"
+          }
+        }
+      },
+      "Node": {
+        "type": "object",
+        "description": "A node in the network topology",
+        "required": [
+          "id",
+          "name",
+          "position"
+        ],
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/NodeConfig"
+          },
+          "id": {
+            "type": "string",
+            "example": "node-1"
+          },
+          "name": {
+            "type": "string",
+            "example": "Router A"
+          },
+          "position": {
+            "$ref": "#/components/schemas/Position"
+          }
+        }
+      },
+      "NodeConfig": {
+        "type": "object",
+        "description": "Configuration for a node",
+        "properties": {
+          "cpu": {
+            "type": "string",
+            "example": "500m",
+            "nullable": true
+          },
+          "env": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvVar"
+            },
+            "nullable": true
+          },
+          "image": {
+            "type": "string",
+            "example": "nginx:latest",
+            "nullable": true
+          },
+          "memory": {
+            "type": "string",
+            "example": "256Mi",
+            "nullable": true
+          }
+        }
+      },
+      "NodeMetric": {
+        "type": "object",
+        "description": "Node-level metrics",
+        "required": [
+          "id",
+          "topology_id",
+          "node_id",
+          "status",
+          "measured_at"
+        ],
+        "properties": {
+          "cpu_usage_percent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "measured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "memory_limit_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "memory_usage_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "pod_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "rx_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "rx_packets": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "topology_id": {
+            "type": "string"
+          },
+          "tx_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "tx_packets": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "NodeStatusResponse": {
+        "type": "object",
+        "description": "Status of a single node in a deployment",
+        "required": [
+          "id",
+          "name",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "pod_ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "pod_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "PodKillParams": {
+        "type": "object",
+        "description": "Parameters for pod kill (PodChaos)",
+        "properties": {
+          "grace_period": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grace period in seconds before killing",
+            "nullable": true
+          }
+        }
+      },
+      "Position": {
+        "type": "object",
+        "description": "Position of a node on the canvas",
+        "required": [
+          "x",
+          "y"
+        ],
+        "properties": {
+          "x": {
+            "type": "number",
+            "format": "double",
+            "example": 100.0
+          },
+          "y": {
+            "type": "number",
+            "format": "double",
+            "example": 200.0
+          }
+        }
+      },
+      "StressCpuParams": {
+        "type": "object",
+        "description": "Parameters for CPU stress (StressChaos)",
+        "properties": {
+          "load": {
+            "type": "integer",
+            "format": "int32",
+            "description": "CPU load percentage (0-100)",
+            "nullable": true,
+            "minimum": 0
+          },
+          "workers": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of CPU stress workers",
+            "nullable": true,
+            "minimum": 0
+          }
+        }
+      },
+      "Topology": {
+        "type": "object",
+        "description": "A network topology containing nodes and links",
+        "required": [
+          "id",
+          "name",
+          "nodes",
+          "links",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-01-01T12:00:00Z"
+          },
+          "description": {
+            "type": "string",
+            "example": "Small office topology with 3 nodes",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "example": "topology-1234"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            }
+          },
+          "name": {
+            "type": "string",
+            "example": "Office Network"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-01-01T12:00:00Z"
+          }
+        }
+      },
+      "UpdateChaosRequest": {
+        "type": "object",
+        "description": "Request to update a chaos condition (only editable fields)",
+        "required": [
+          "params"
+        ],
+        "properties": {
+          "direction": {
+            "$ref": "#/components/schemas/ChaosDirection"
+          },
+          "duration": {
+            "type": "string",
+            "description": "Duration (e.g., \"60s\", \"5m\") - if not set, runs until deleted",
+            "nullable": true
+          },
+          "params": {
+            "description": "Parameters specific to the chaos type"
+          }
+        }
+      },
+      "UpdateTopologyRequest": {
+        "type": "object",
+        "description": "Request to update an existing topology",
+        "properties": {
+          "description": {
+            "type": "string",
+            "example": "Updated description",
+            "nullable": true
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            },
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "example": "Office Network Updated",
+            "nullable": true
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            },
+            "nullable": true
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "topologies",
+      "description": "Topology management - create, update, delete, deploy"
+    },
+    {
+      "name": "chaos",
+      "description": "Chaos engineering - apply network conditions"
+    },
+    {
+      "name": "presets",
+      "description": "Chaos presets - predefined chaos configurations"
+    },
+    {
+      "name": "metrics",
+      "description": "Live metrics and monitoring"
+    },
+    {
+      "name": "events",
+      "description": "Event timeline and logging"
+    },
+    {
+      "name": "tests",
+      "description": "Network diagnostic tests"
+    },
+    {
+      "name": "applications",
+      "description": "Application deployment on nodes"
+    },
+    {
+      "name": "cluster",
+      "description": "Kubernetes cluster status"
+    }
+  ]
+}
