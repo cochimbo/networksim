@@ -11,6 +11,25 @@ use crate::error::{AppError, AppResult};
 use crate::k8s::{DeploymentManager, DeploymentState, DeploymentStatus as K8sDeploymentStatus};
 use utoipa::ToSchema;
 
+fn is_valid_k8s_label(value: &str) -> bool {
+    if value.is_empty() {
+        return false;
+    }
+    let bytes = value.as_bytes();
+    // first and last must be alphanumeric
+    let is_alnum = |b: u8| (b'A'..=b'Z').contains(&b) || (b'a'..=b'z').contains(&b) || (b'0'..=b'9').contains(&b);
+    if !is_alnum(bytes[0]) || !is_alnum(bytes[bytes.len() - 1]) {
+        return false;
+    }
+    for &b in bytes {
+        match b {
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' => {}
+            _ => return false,
+        }
+    }
+    true
+}
+
 /// Response for deployment operations
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DeploymentResponse {
@@ -169,6 +188,11 @@ pub async fn destroy(
     Path(id): Path<String>,
 ) -> AppResult<Json<serde_json::Value>> {
     info!(topology_id = %id, "Destroying deployment");
+
+    // Validate topology id to avoid invalid label selectors being sent to k8s
+    if !is_valid_k8s_label(&id) {
+        return Err(AppError::bad_request("invalid topology id: must start and end with an alphanumeric character and contain only alphanumeric, '-', '_' or '.'"));
+    }
 
     // Mark all applications as Pending (don't delete them)
     let applications = state.db.list_applications(&id).await?;

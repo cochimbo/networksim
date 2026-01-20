@@ -1,20 +1,22 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use crate::chaos::ChaosType;
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
 pub struct Scenario {
     pub id: String,
     pub topology_id: String,
     pub name: String,
     pub description: Option<String>,
     pub total_duration: i64,
+    #[schema(value_type = Vec<ScenarioStep>)]
     pub steps: sqlx::types::Json<Vec<ScenarioStep>>,
     pub created_at: String,
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ScenarioStep {
     pub id: String,
     #[serde(rename = "type")]
@@ -32,7 +34,7 @@ pub struct ScenarioStep {
     pub lane_id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateScenarioRequest {
     pub name: String,
     #[serde(default)]
@@ -41,7 +43,7 @@ pub struct CreateScenarioRequest {
     pub steps: Vec<ScenarioStep>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateScenarioRequest {
     #[serde(default)]
     pub name: Option<String>,

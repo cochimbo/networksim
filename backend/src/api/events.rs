@@ -151,49 +151,65 @@ pub async fn list_events(
     let limit = query.limit.unwrap_or(100).min(500);
     let offset = query.offset.unwrap_or(0);
 
-    // Build dynamic query
-    let mut sql = String::from(
-        "SELECT id, topology_id, event_type, event_subtype, severity, title, description, metadata, source_type, source_id, created_at FROM events WHERE 1=1"
-    );
+    // Build parameterized queries using `sqlx::QueryBuilder` to avoid SQL
+    // injection and quoting issues when interpolating user-supplied values.
+
+    // Build parameterized queries using '?' placeholders and bind values
     let mut count_sql = String::from("SELECT COUNT(*) as count FROM events WHERE 1=1");
+    let mut list_sql = String::from("SELECT id, topology_id, event_type, event_subtype, severity, title, description, metadata, source_type, source_id, created_at FROM events WHERE 1=1");
+    let mut binds: Vec<String> = Vec::new();
 
     if let Some(ref tid) = query.topology_id {
-        sql.push_str(&format!(" AND topology_id = '{}'", tid));
-        count_sql.push_str(&format!(" AND topology_id = '{}'", tid));
+        count_sql.push_str(" AND topology_id = ?");
+        list_sql.push_str(" AND topology_id = ?");
+        binds.push(tid.clone());
     }
     if let Some(ref et) = query.event_type {
-        sql.push_str(&format!(" AND event_type = '{}'", et));
-        count_sql.push_str(&format!(" AND event_type = '{}'", et));
+        count_sql.push_str(" AND event_type = ?");
+        list_sql.push_str(" AND event_type = ?");
+        binds.push(et.clone());
     }
     if let Some(ref sev) = query.severity {
-        sql.push_str(&format!(" AND severity = '{}'", sev));
-        count_sql.push_str(&format!(" AND severity = '{}'", sev));
+        count_sql.push_str(" AND severity = ?");
+        list_sql.push_str(" AND severity = ?");
+        binds.push(sev.clone());
     }
     if let Some(ref st) = query.source_type {
-        sql.push_str(&format!(" AND source_type = '{}'", st));
-        count_sql.push_str(&format!(" AND source_type = '{}'", st));
+        count_sql.push_str(" AND source_type = ?");
+        list_sql.push_str(" AND source_type = ?");
+        binds.push(st.clone());
     }
     if let Some(ref since) = query.since {
-        sql.push_str(&format!(" AND created_at >= '{}'", since));
-        count_sql.push_str(&format!(" AND created_at >= '{}'", since));
+        count_sql.push_str(" AND created_at >= ?");
+        list_sql.push_str(" AND created_at >= ?");
+        binds.push(since.clone());
     }
     if let Some(ref until) = query.until {
-        sql.push_str(&format!(" AND created_at <= '{}'", until));
-        count_sql.push_str(&format!(" AND created_at <= '{}'", until));
+        count_sql.push_str(" AND created_at <= ?");
+        list_sql.push_str(" AND created_at <= ?");
+        binds.push(until.clone());
     }
 
-    sql.push_str(" ORDER BY created_at DESC");
-    sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+    list_sql.push_str(" ORDER BY created_at DESC");
+    list_sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
 
-    // Get total count
-    let count_row: (i64,) = sqlx::query_as(&count_sql)
+    // Get total count (bind values in same order)
+    let mut count_q = sqlx::query_as::<_, (i64,)>(&count_sql);
+    for b in &binds {
+        count_q = count_q.bind(b);
+    }
+    let count_row: (i64,) = count_q
         .fetch_one(state.db.pool())
         .await
         .map_err(|e| AppError::internal(&format!("Failed to count events: {}", e)))?;
     let total = count_row.0;
 
     // Get events
-    let rows: Vec<EventRow> = sqlx::query_as(&sql)
+    let mut list_q = sqlx::query_as::<_, EventRow>(&list_sql);
+    for b in &binds {
+        list_q = list_q.bind(b);
+    }
+    let rows: Vec<EventRow> = list_q
         .fetch_all(state.db.pool())
         .await
         .map_err(|e| AppError::internal(&format!("Failed to list events: {}", e)))?;
@@ -255,6 +271,7 @@ pub async fn list_topology_events(
     request_body = CreateEventRequest,
     responses(
         (status = 200, description = "Event created", body = Event),
+        (status = 400, description = "Bad request"),
         (status = 500, description = "Internal server error")
     )
 )]
@@ -265,6 +282,37 @@ pub async fn create_event(
     let now = Utc::now();
     let metadata_str = request.metadata.as_ref().map(|m| serde_json::to_string(&m).unwrap_or_default());
     let severity = request.severity.unwrap_or_else(|| "info".to_string());
+
+    // Input validation: require non-empty event_type and title
+    if request.event_type.trim().is_empty() {
+        return Err(AppError::bad_request("event_type must be a non-empty string"));
+    }
+    if request.title.trim().is_empty() {
+        return Err(AppError::bad_request("title must be a non-empty string"));
+    }
+
+    // Validate severity if provided
+    let sev_lower = severity.to_lowercase();
+    match sev_lower.as_str() {
+        "info" | "success" | "warning" | "error" => {}
+        _ => return Err(AppError::bad_request("severity must be one of: info, success, warning, error")),
+    }
+
+    // Validate topology_id when present: it must be non-empty and exist in the DB
+    if let Some(ref tid) = request.topology_id {
+        if tid.trim().is_empty() {
+            return Err(AppError::bad_request("topology_id must be a non-empty string if provided"));
+        }
+        // Check existence
+        let exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM topologies WHERE id = ? LIMIT 1")
+            .bind(tid)
+            .fetch_optional(state.db.pool())
+            .await
+            .map_err(|e| AppError::internal(&format!("Failed to validate topology_id: {}", e)))?;
+        if exists.is_none() {
+            return Err(AppError::bad_request("topology_id does not exist"));
+        }
+    }
 
     let result = sqlx::query(
         r#"

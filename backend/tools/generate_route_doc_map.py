@@ -42,15 +42,17 @@ for path, handler in routes:
     if m:
         modname, func = m.group(1), m.group(2)
     else:
-        m2 = re.search(r'api::([a-z0-9_]+)::([a-zA-Z0-9_]+)', handler)
-        if m2:
-            modname, func = m2.group(1), m2.group(2)
+        # Try generic module::function patterns (e.g. health::health_check)
+        parts = handler.split("::")
+        if len(parts) >= 2:
+            modname, func = parts[-2], parts[-1]
         else:
             modname, func = None, handler
 
     documented = False
     file_path = None
     if modname:
+        # Prefer direct module file, fall back to module/mod.rs
         candidate = api_dir / f"{modname}.rs"
         if not candidate.exists():
             candidate = api_dir / modname / 'mod.rs'
@@ -63,12 +65,34 @@ for path, handler in routes:
                 fn_pos = mfn.start()
                 prefix = txt[:fn_pos]
                 lines = prefix.splitlines()
-                lookback = '\n'.join(lines[-15:]) if lines else ''
+                lookback = '\n'.join(lines[-30:]) if lines else ''
                 if '#[utoipa::path' in lookback:
                     documented = True
             else:
                 if f'fn {func}' in txt and '#[utoipa::path' in txt:
                     documented = True
+    else:
+        # If module not detected, search all api files for the function name
+        for candidate in api_dir.glob('*.rs'):
+            txt = candidate.read_text()
+            if re.search(r'(?:pub\s+)?(?:async\s+)?fn\s+' + re.escape(func) + r'\b', txt):
+                file_path = str(candidate.relative_to(repo))
+                # look backwards from function for utoipa path
+                mfn = re.search(r'(?:pub\s+)?(?:async\s+)?fn\s+' + re.escape(func) + r'\b', txt)
+                if mfn:
+                    fn_pos = mfn.start()
+                    prefix = txt[:fn_pos]
+                    lines = prefix.splitlines()
+                    lookback = '\n'.join(lines[-30:]) if lines else ''
+                    if '#[utoipa::path' in lookback:
+                        documented = True
+                # If not found via lookback, check file-level utoipa presence
+                if not documented and '#[utoipa::path' in txt:
+                    documented = True
+                if file_path:
+                    # set module to filename stem for record
+                    modname = candidate.stem
+                    break
 
     results.append({
         'path': path,

@@ -1,0 +1,7 @@
+#!/home/cochimbo/networksim/backend/.venv/bin/python
+import sys
+from schemathesis.cli import schemathesis
+if __name__ == '__main__':
+    if sys.argv[0].endswith('.exe'):
+        sys.argv[0] = sys.argv[0][:-4]
+    sys.exit(schemathesis())

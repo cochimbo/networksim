@@ -1,0 +1,4 @@
+# file: /home/cochimbo/networksim/backend/.venv/bin/schemathesis
+# hypothesis_version: 6.150.2
+
+['.exe', '__main__']

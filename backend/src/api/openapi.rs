@@ -74,6 +74,13 @@ use utoipa::OpenApi;
         crate::api::events::create_event,
         crate::api::events::event_stats,
         crate::api::events::list_topology_events,
+        // Scenarios
+        crate::api::scenarios::list_scenarios,
+        crate::api::scenarios::create_scenario,
+        crate::api::scenarios::get_scenario,
+        crate::api::scenarios::update_scenario,
+        crate::api::scenarios::delete_scenario,
+        crate::api::scenarios::run_scenario,
     ),
     components(
         schemas(
@@ -140,6 +147,11 @@ use utoipa::OpenApi;
             crate::api::live_metrics::AppMetrics,
             // Common
             ErrorResponse,
+            // Scenarios
+            crate::models::scenarios::Scenario,
+            crate::models::scenarios::ScenarioStep,
+            crate::models::scenarios::CreateScenarioRequest,
+            crate::models::scenarios::UpdateScenarioRequest,
         )
     )
 )]
