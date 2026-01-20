@@ -6,20 +6,27 @@ use utoipa::ToSchema;
 /// A network topology containing nodes and links
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Topology {
+    #[schema(example = "topology-1234")]
     pub id: String,
+    #[schema(example = "Office Network")]
     pub name: String,
     #[serde(default)]
+    #[schema(example = "Small office topology with 3 nodes")]
     pub description: Option<String>,
     pub nodes: Vec<Node>,
     pub links: Vec<Link>,
+    #[schema(example = "2025-01-01T12:00:00Z")]
     pub created_at: DateTime<Utc>,
+    #[schema(example = "2025-01-01T12:00:00Z")]
     pub updated_at: DateTime<Utc>,
 }
 
 /// A node in the network topology
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Node {
+    #[schema(example = "node-1")]
     pub id: String,
+    #[schema(example = "Router A")]
     pub name: String,
     pub position: Position,
     #[serde(default)]
@@ -29,7 +36,9 @@ pub struct Node {
 /// Position of a node on the canvas
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct Position {
+    #[schema(example = 100.0)]
     pub x: f64,
+    #[schema(example = 200.0)]
     pub y: f64,
 }
 
@@ -37,10 +46,13 @@ pub struct Position {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct NodeConfig {
     #[serde(default)]
+    #[schema(example = "nginx:latest")]
     pub image: Option<String>,
     #[serde(default)]
+    #[schema(example = "500m")]
     pub cpu: Option<String>,
     #[serde(default)]
+    #[schema(example = "256Mi")]
     pub memory: Option<String>,
     #[serde(default)]
     pub env: Option<Vec<EnvVar>>,
@@ -49,15 +61,20 @@ pub struct NodeConfig {
 /// Environment variable
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct EnvVar {
+    #[schema(example = "APP_MODE")]
     pub name: String,
+    #[schema(example = "production")]
     pub value: String,
 }
 
 /// A link between two nodes
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Link {
+    #[schema(example = "link-1")]
     pub id: String,
+    #[schema(example = "node-1")]
     pub source: String,
+    #[schema(example = "node-2")]
     pub target: String,
     #[serde(default)]
     pub properties: LinkProperties,
@@ -67,16 +84,20 @@ pub struct Link {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct LinkProperties {
     #[serde(default)]
+    #[schema(example = "100mbit")]
     pub bandwidth: Option<String>,
     #[serde(default)]
+    #[schema(example = "20ms")]
     pub latency: Option<String>,
 }
 
 /// Request to create a new topology
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateTopologyRequest {
+    #[schema(example = "Office Network")]
     pub name: Option<String>,
     #[serde(default)]
+    #[schema(example = "Small office topology with 3 nodes")]
     pub description: Option<String>,
     #[serde(default)]
     pub nodes: Vec<Node>,
@@ -87,8 +108,10 @@ pub struct CreateTopologyRequest {
 /// Request to update an existing topology
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateTopologyRequest {
+    #[schema(example = "Office Network Updated")]
     pub name: Option<String>,
     #[serde(default)]
+    #[schema(example = "Updated description")]
     pub description: Option<String>,
     #[serde(default)]
     pub nodes: Option<Vec<Node>>,
