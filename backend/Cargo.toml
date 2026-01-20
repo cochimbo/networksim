@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Backend API for NetworkSim - Network Topology Simulator"
 authors = ["NetworkSim Team"]
+default-run = "networksim-backend"
 
 [dependencies]
 # Web framework
