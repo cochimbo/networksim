@@ -83,3 +83,6 @@ k3s.yaml
 # Generated Secrets
 certs/
 kubeconfig.yaml
+
+# Ignore Python venv
+backend/.venv/
