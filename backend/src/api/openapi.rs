@@ -34,10 +34,12 @@ use utoipa::OpenApi;
         crate::api::topologies::get,
         crate::api::topologies::update,
         crate::api::topologies::delete,
+        crate::api::topologies::duplicate,
         // Deploy
         crate::api::deploy::deploy,
         crate::api::deploy::destroy,
         crate::api::deploy::status,
+        crate::api::deploy::get_active_deployment,
         // Chaos
         crate::api::chaos::list,
         crate::api::chaos::create,
@@ -45,20 +47,29 @@ use utoipa::OpenApi;
         crate::api::chaos::stop,
         crate::api::chaos::delete,
         crate::api::chaos::delete_all,
+        crate::api::chaos::start_all,
+        crate::api::chaos::stop_all,
+        crate::api::chaos::update,
         // Presets
         crate::api::presets::list_presets,
         crate::api::presets::get_preset,
         crate::api::presets::create_preset,
         crate::api::presets::delete_preset,
+        crate::api::presets::apply_preset,
         // Diagnostic
         crate::api::diagnostic::run_diagnostic,
         crate::api::diagnostic::run_app_to_app_test,
+        crate::api::diagnostic::get_node_containers,
         // Applications
         crate::api::applications::deploy,
         crate::api::applications::list_by_node,
         crate::api::applications::get,
         crate::api::applications::uninstall,
         crate::api::applications::logs,
+        crate::api::applications::deploy_topology,
+        crate::api::applications::create_draft,
+        crate::api::applications::list_by_topology,
+        crate::api::applications::update_application,
         // Cluster
         crate::api::health::cluster_status,
         crate::api::health::health_check,
@@ -67,6 +78,10 @@ use utoipa::OpenApi;
         crate::api::live_metrics::get_metrics_history,
         crate::api::live_metrics::get_aggregated_metrics,
         crate::api::live_metrics::get_metrics_by_app,
+        // Metrics / Prometheus
+        crate::api::metrics::metrics_handler,
+        // WebSocket (note: ws endpoints may not render in Swagger UI)
+        crate::api::ws::ws_handler,
         // New v1 endpoints
         crate::api::chaos::affected_apps,
         // Events
@@ -74,6 +89,41 @@ use utoipa::OpenApi;
         crate::api::events::create_event,
         crate::api::events::event_stats,
         crate::api::events::list_topology_events,
+        // Registry
+        crate::api::registry::list_registries,
+        crate::api::registry::create_registry,
+        crate::api::registry::get_default_registry,
+        crate::api::registry::get_registry,
+        crate::api::registry::update_registry,
+        crate::api::registry::delete_registry,
+        crate::api::registry::test_registry,
+        // Test runner
+        crate::api::test_runner::list_tests,
+        crate::api::test_runner::start_test,
+        crate::api::test_runner::get_test,
+        crate::api::test_runner::cancel_test,
+        // Templates
+        crate::api::templates::list,
+        crate::api::templates::get,
+        crate::api::templates::generate,
+        // Volumes
+        crate::api::volumes::list_pvcs,
+        crate::api::volumes::create_pvc,
+        crate::api::volumes::delete_pvc,
+        crate::api::volumes::list_config_maps,
+        crate::api::volumes::create_config_map,
+        crate::api::volumes::delete_config_map,
+        crate::api::volumes::upload_file_to_config_map,
+        // Reports
+        crate::api::reports::generate_report,
+        crate::api::reports::generate_html_report,
+        // Scenarios
+        crate::api::scenarios::list_scenarios,
+        crate::api::scenarios::create_scenario,
+        crate::api::scenarios::get_scenario,
+        crate::api::scenarios::update_scenario,
+        crate::api::scenarios::delete_scenario,
+        crate::api::scenarios::run_scenario,
     ),
     components(
         schemas(
