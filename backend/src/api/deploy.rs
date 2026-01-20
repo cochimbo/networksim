@@ -299,6 +299,15 @@ pub async fn status(
 /// Get active deployment (if any)
 ///
 /// GET /api/deployments/active
+#[utoipa::path(
+    get,
+    path = "/api/deployments/active",
+    tag = "deploy",
+    responses(
+        (status = 200, description = "Active deployments list"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn get_active_deployment(
     State(state): State<AppState>,
 ) -> AppResult<Json<Option<DeploymentResponse>>> {

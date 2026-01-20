@@ -437,6 +437,20 @@ async fn test_pod_connectivity(
 /// Get container information for a specific node/pod
 ///
 /// GET /api/topologies/:topology_id/nodes/:node_id/containers
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/nodes/{node_id}/containers",
+    tag = "tests",
+    params(
+        ("topology_id" = String, Path, description = "Topology ID"),
+        ("node_id" = String, Path, description = "Node ID")
+    ),
+    responses(
+        (status = 200, description = "Container list"),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn get_node_containers(
     State(state): State<AppState>,
     Path((topology_id, node_id)): Path<(String, String)>,

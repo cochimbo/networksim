@@ -518,6 +518,13 @@ pub async fn logs(
 }
 
 /// Deploy an application to multiple nodes in a topology
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{topology_id}/apps",
+    tag = "applications",
+    params(("topology_id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "Application deployed to topology"))
+)]
 pub async fn deploy_topology(
     State(state): State<AppState>,
     Path(topology_id): Path<Uuid>,
@@ -714,6 +721,13 @@ pub async fn deploy_topology(
 }
 
 /// Create an application draft (save values/env without attempting k8s deployment)
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{topology_id}/apps/draft",
+    tag = "applications",
+    params(("topology_id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "Draft application created"))
+)]
 pub async fn create_draft(
     State(state): State<AppState>,
     Path(topology_id): Path<Uuid>,
@@ -758,6 +772,16 @@ pub struct UpdateAppValuesRequest {
 }
 
 /// Update an existing application's values (env, etc.)
+#[utoipa::path(
+    put,
+    path = "/api/topologies/{topology_id}/apps/{app_id}",
+    tag = "applications",
+    params(
+        ("topology_id" = String, Path, description = "Topology ID"),
+        ("app_id" = String, Path, description = "Application ID")
+    ),
+    responses((status = 200, description = "Application updated"))
+)]
 pub async fn update_application(
     State(state): State<AppState>,
     Path((topology_id, app_id)): Path<(Uuid, Uuid)>,
@@ -844,6 +868,13 @@ pub async fn deploy_application_to_node(
 }
 
 /// List all applications for a topology
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/apps",
+    tag = "applications",
+    params(("topology_id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "List of applications"))
+)]
 pub async fn list_by_topology(
     State(state): State<AppState>,
     Path(topology_id): Path<Uuid>,
@@ -854,6 +885,21 @@ pub async fn list_by_topology(
 }
 
 /// Check the runtime status of an application
+/// GET /api/topologies/:topology_id/apps/:app_id/status
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/apps/{app_id}/status",
+    tag = "applications",
+    params(
+        ("topology_id" = Uuid, Path, description = "Topology ID"),
+        ("app_id" = Uuid, Path, description = "Application ID")
+    ),
+    responses(
+        (status = 200, description = "Application status", body = Object),
+        (status = 404, description = "Application not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn status(
     State(state): State<AppState>,
     Path((_topology_id, app_id)): Path<(Uuid, Uuid)>,

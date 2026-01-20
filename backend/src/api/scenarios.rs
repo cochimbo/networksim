@@ -19,6 +19,13 @@ pub fn router() -> Router<AppState> {
         .route("/api/scenarios/:id/run", post(run_scenario))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/scenarios/{id}/run",
+    tag = "scenarios",
+    params(("id" = String, Path, description = "Scenario ID")),
+    responses((status = 200, description = "Scenario execution started"))
+)]
 async fn run_scenario(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -139,6 +146,13 @@ async fn execute_scenario_logic(state: AppState, scenario: Scenario) -> Result<(
     Ok(())
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/scenarios",
+    tag = "scenarios",
+    params(("topology_id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "List of scenarios"))
+)]
 async fn list_scenarios(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -157,6 +171,13 @@ async fn list_scenarios(
     Ok(ApiResponse::success(scenarios))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/scenarios/{id}",
+    tag = "scenarios",
+    params(("id" = String, Path, description = "Scenario ID")),
+    responses((status = 200, description = "Scenario"))
+)]
 async fn get_scenario(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -174,6 +195,13 @@ async fn get_scenario(
     Ok(ApiResponse::success(scenario))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{topology_id}/scenarios",
+    tag = "scenarios",
+    params(("topology_id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "Scenario created"))
+)]
 async fn create_scenario(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -213,6 +241,13 @@ async fn create_scenario(
     Ok(ApiResponse::success(scenario))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/scenarios/{id}",
+    tag = "scenarios",
+    params(("id" = String, Path, description = "Scenario ID")),
+    responses((status = 200, description = "Scenario updated"))
+)]
 async fn update_scenario(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -261,6 +296,13 @@ async fn update_scenario(
     Ok(ApiResponse::success(scenario))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/scenarios/{id}",
+    tag = "scenarios",
+    params(("id" = String, Path, description = "Scenario ID")),
+    responses((status = 200, description = "Scenario deleted"))
+)]
 async fn delete_scenario(
     State(state): State<AppState>,
     Path(id): Path<String>,

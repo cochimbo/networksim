@@ -1,6 +1,12 @@
 use axum::response::IntoResponse;
 
 /// Prometheus metrics endpoint
+#[utoipa::path(
+    get,
+    path = "/metrics",
+    tag = "metrics",
+    responses((status = 200, description = "Prometheus metrics"))
+)]
 pub async fn metrics_handler() -> impl IntoResponse {
     // TODO: Implement proper metrics in Phase 8
     // For now, return basic placeholder

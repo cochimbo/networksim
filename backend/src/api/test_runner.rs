@@ -113,6 +113,13 @@ pub struct ListTestsQuery {
 /// List test runs for a topology
 ///
 /// GET /api/topologies/:id/tests
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{id}/tests",
+    tag = "tests",
+    params(("id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "List of test runs"))
+)]
 pub async fn list_tests(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -147,6 +154,16 @@ pub async fn list_tests(
 /// Get a specific test run
 ///
 /// GET /api/topologies/:topology_id/tests/:test_id
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/tests/{test_id}",
+    tag = "tests",
+    params(
+        ("topology_id" = String, Path, description = "Topology ID"),
+        ("test_id" = String, Path, description = "Test ID")
+    ),
+    responses((status = 200, description = "Test run details"))
+)]
 pub async fn get_test(
     State(state): State<AppState>,
     Path((topology_id, test_id)): Path<(String, String)>,
@@ -167,6 +184,13 @@ pub async fn get_test(
 /// Start a new test run
 ///
 /// POST /api/topologies/:id/tests
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{id}/tests",
+    tag = "tests",
+    params(("id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "Started test run"))
+)]
 pub async fn start_test(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -251,6 +275,16 @@ pub async fn start_test(
 /// Cancel a running test
 ///
 /// POST /api/topologies/:topology_id/tests/:test_id/cancel
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{topology_id}/tests/{test_id}/cancel",
+    tag = "tests",
+    params(
+        ("topology_id" = String, Path, description = "Topology ID"),
+        ("test_id" = String, Path, description = "Test ID")
+    ),
+    responses((status = 200, description = "Cancelled test run"))
+)]
 pub async fn cancel_test(
     State(state): State<AppState>,
     Path((topology_id, test_id)): Path<(String, String)>,

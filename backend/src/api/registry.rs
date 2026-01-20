@@ -114,6 +114,12 @@ pub struct UpdateRegistryRequest {
 }
 
 /// List all registries
+#[utoipa::path(
+    get,
+    path = "/api/registries",
+    tag = "registry",
+    responses((status = 200, description = "List registries"))
+)]
 pub async fn list_registries(
     State(state): State<AppState>,
 ) -> AppResult<Json<Vec<RegistryResponse>>> {
@@ -133,6 +139,13 @@ pub async fn list_registries(
 }
 
 /// Get a registry by ID
+#[utoipa::path(
+    get,
+    path = "/api/registries/{id}",
+    tag = "registry",
+    params(("id" = String, Path, description = "Registry ID")),
+    responses((status = 200, description = "Registry"))
+)]
 pub async fn get_registry(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -150,6 +163,12 @@ pub async fn get_registry(
 }
 
 /// Create a new registry
+#[utoipa::path(
+    post,
+    path = "/api/registries",
+    tag = "registry",
+    responses((status = 200, description = "Created registry"))
+)]
 pub async fn create_registry(
     State(state): State<AppState>,
     Json(req): Json<CreateRegistryRequest>,
@@ -216,6 +235,13 @@ pub async fn create_registry(
 }
 
 /// Update a registry
+#[utoipa::path(
+    put,
+    path = "/api/registries/{id}",
+    tag = "registry",
+    params(("id" = String, Path, description = "Registry ID")),
+    responses((status = 200, description = "Updated registry"))
+)]
 pub async fn update_registry(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -295,6 +321,13 @@ pub async fn update_registry(
 }
 
 /// Delete a registry
+#[utoipa::path(
+    delete,
+    path = "/api/registries/{id}",
+    tag = "registry",
+    params(("id" = String, Path, description = "Registry ID")),
+    responses((status = 200, description = "Deleted"))
+)]
 pub async fn delete_registry(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -328,6 +361,12 @@ pub async fn delete_registry(
 }
 
 /// Get the default registry
+#[utoipa::path(
+    get,
+    path = "/api/registries/default",
+    tag = "registry",
+    responses((status = 200, description = "Default registry"))
+)]
 pub async fn get_default_registry(
     State(state): State<AppState>,
 ) -> AppResult<Json<RegistryResponse>> {
@@ -343,6 +382,13 @@ pub async fn get_default_registry(
 }
 
 /// Test registry connection
+#[utoipa::path(
+    post,
+    path = "/api/registries/{id}/test",
+    tag = "registry",
+    params(("id" = String, Path, description = "Registry ID")),
+    responses((status = 200, description = "Test result"))
+)]
 pub async fn test_registry(
     State(state): State<AppState>,
     Path(id): Path<String>,
