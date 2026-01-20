@@ -86,3 +86,6 @@ kubeconfig.yaml
 
 # Ignore Python venv
 backend/.venv/
+
+# Hypothesis / Schemathesis cache and examples
+.hypothesis/
