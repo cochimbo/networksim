@@ -1,3 +1,4 @@
+
 ======================= Schemathesis test session starts =======================
 Schema location: file:///home/cochimbo/networksim/backend/openapi.json
 Base URL: http://localhost:8080
