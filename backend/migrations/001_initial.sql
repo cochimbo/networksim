@@ -55,12 +55,15 @@ CREATE TABLE IF NOT EXISTS chaos_conditions (
 
 CREATE TABLE IF NOT EXISTS scenarios (
     id TEXT PRIMARY KEY NOT NULL,
-    description TEXT,
     topology_id TEXT,
-    events TEXT NOT NULL,
+    name TEXT,
+    description TEXT,
+    events TEXT,
+    steps TEXT,
+    total_duration INTEGER NOT NULL DEFAULT 60,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    FOREIGN KEY (topology_id) REFERENCES topologies(id) ON DELETE SET NULL
+    FOREIGN KEY (topology_id) REFERENCES topologies(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_deployments_topology ON deployments(topology_id);

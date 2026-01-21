@@ -40,6 +40,12 @@ pub struct CreateConfigMapRequest {
 // Handlers for PVCs
 
 /// List all PersistentVolumeClaims
+#[utoipa::path(
+    get,
+    path = "/api/volumes/pvc",
+    tag = "volumes",
+    responses((status = 200, description = "List PVCs"))
+)]
 pub async fn list_pvcs(State(state): State<AppState>) -> AppResult<Json<Vec<PvcDto>>> {
     let k8s = state.k8s.read().await.clone().ok_or_else(|| {
         AppError::BadRequest("K8s client not available".to_string())
@@ -69,6 +75,12 @@ pub async fn list_pvcs(State(state): State<AppState>) -> AppResult<Json<Vec<PvcD
 }
 
 /// Create a new PVC
+#[utoipa::path(
+    post,
+    path = "/api/volumes/pvc",
+    tag = "volumes",
+    responses((status = 200, description = "Created PVC"))
+)]
 pub async fn create_pvc(
     State(state): State<AppState>,
     Json(req): Json<CreatePvcRequest>,
@@ -115,6 +127,13 @@ pub async fn create_pvc(
 }
 
 /// Delete a PVC
+#[utoipa::path(
+    delete,
+    path = "/api/volumes/pvc/{name}",
+    tag = "volumes",
+    params(("name" = String, Path, description = "PVC name")),
+    responses((status = 200, description = "Deleted PVC"))
+)]
 pub async fn delete_pvc(
     State(state): State<AppState>,
     Path(name): Path<String>,
@@ -132,6 +151,12 @@ pub async fn delete_pvc(
 // Handlers for ConfigMaps
 
 /// List ConfigMaps (Configuration Groups)
+#[utoipa::path(
+    get,
+    path = "/api/volumes/config",
+    tag = "volumes",
+    responses((status = 200, description = "List ConfigMaps"))
+)]
 pub async fn list_config_maps(State(state): State<AppState>) -> AppResult<Json<Vec<ConfigMapDto>>> {
     let k8s = state.k8s.read().await.clone().ok_or_else(|| {
         AppError::BadRequest("K8s client not available".to_string())
@@ -161,6 +186,12 @@ pub async fn list_config_maps(State(state): State<AppState>) -> AppResult<Json<V
 }
 
 /// Create a new ConfigMap (Group)
+#[utoipa::path(
+    post,
+    path = "/api/volumes/config",
+    tag = "volumes",
+    responses((status = 200, description = "Created ConfigMap"))
+)]
 pub async fn create_config_map(
     State(state): State<AppState>,
     Json(req): Json<CreateConfigMapRequest>,
@@ -196,6 +227,13 @@ pub async fn create_config_map(
 }
 
 /// Delete a ConfigMap
+#[utoipa::path(
+    delete,
+    path = "/api/volumes/config/{name}",
+    tag = "volumes",
+    params(("name" = String, Path, description = "ConfigMap name")),
+    responses((status = 200, description = "Deleted ConfigMap"))
+)]
 pub async fn delete_config_map(
     State(state): State<AppState>,
     Path(name): Path<String>,
@@ -210,6 +248,13 @@ pub async fn delete_config_map(
 }
 
 /// Upload file to ConfigMap
+#[utoipa::path(
+    post,
+    path = "/api/volumes/config/{name}/files",
+    tag = "volumes",
+    params(("name" = String, Path, description = "ConfigMap name")),
+    responses((status = 200, description = "File uploaded"))
+)]
 pub async fn upload_file_to_config_map(
     State(state): State<AppState>,
     Path(name): Path<String>,

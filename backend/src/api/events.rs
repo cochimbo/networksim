@@ -16,6 +16,7 @@ use crate::api::AppState;
 use crate::error::{AppError, AppResult};
 
 /// Event severity levels
+/// Severity level of the event (affects UI highlighting and alerts).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum EventSeverity {
@@ -37,6 +38,7 @@ impl std::fmt::Display for EventSeverity {
 }
 
 /// Event source types
+/// Type of object that produced the event (node, link, chaos, etc.).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum EventSourceType {
@@ -64,19 +66,41 @@ impl std::fmt::Display for EventSourceType {
 }
 
 /// System event
+/// Recorded event occurring in the system or a topology. Contains human-readable title and optional structured metadata.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Event {
+    /// Database-assigned event identifier
+    #[schema(example = 1234)]
     pub id: i64,
+    /// Associated topology id if applicable
+    #[schema(example = "topology-1234")]
     pub topology_id: Option<String>,
+    /// High-level event type (e.g. `link.down`, `node.reboot`)
+    #[schema(example = "link.down")]
     pub event_type: String,
+    /// Optional subtype for finer classification
+    #[schema(example = "packet-loss")]
     pub event_subtype: Option<String>,
+    /// Severity as string (info|success|warning|error)
+    #[schema(example = "info")]
     pub severity: String,
+    /// Short human-readable title
+    #[schema(example = "Link between A and B is down")]
     pub title: String,
+    /// Longer optional description
+    #[schema(example = "Detected sustained packet loss on interface eth0 to eth1")]
     pub description: Option<String>,
+    /// Optional structured metadata as JSON object
     #[schema(value_type = Option<Object>)]
     pub metadata: Option<serde_json::Value>,
+    /// Source object type (node, link, etc.)
+    #[schema(example = "link")]
     pub source_type: Option<String>,
+    /// Identifier of the source object
+    #[schema(example = "node-1")]
     pub source_id: Option<String>,
+    /// Timestamp of event creation (RFC3339)
+    #[schema(example = "2025-01-01T12:00:00Z")]
     pub created_at: DateTime<Utc>,
 }
 
@@ -95,18 +119,36 @@ struct EventRow {
     created_at: String,
 }
 
-/// Create event request
+/// Request body to create an event
+/// Payload to create a new event associated to an optional topology or source object.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEventRequest {
+    /// Optional topology id to associate the event with
+    #[schema(example = "topology-1234")]
     pub topology_id: Option<String>,
+    /// High-level event type (required)
+    #[schema(example = "link.down")]
     pub event_type: String,
+    /// Optional subtype
+    #[schema(example = "packet-loss")]
     pub event_subtype: Option<String>,
+    /// Optional severity, defaults to `info`
+    #[schema(example = "warning")]
     pub severity: Option<String>,
+    /// Short title for the event (required)
+    #[schema(example = "Link down between A and B")]
     pub title: String,
+    /// Optional detailed description
+    #[schema(example = "The link experienced continuous packet loss for 10s")]
     pub description: Option<String>,
+    /// Optional JSON metadata object
     #[schema(value_type = Option<Object>)]
     pub metadata: Option<serde_json::Value>,
+    /// Optional source type (node, link, etc.)
+    #[schema(example = "link")]
     pub source_type: Option<String>,
+    /// Optional source identifier
+    #[schema(example = "link-1")]
     pub source_id: Option<String>,
 }
 
@@ -124,10 +166,15 @@ pub struct ListEventsQuery {
 }
 
 /// Events list response with pagination
+/// Paginated list of events matching the query
 #[derive(Debug, Serialize, ToSchema)]
 pub struct EventsResponse {
+    /// List of events
     pub events: Vec<Event>,
+    /// Total number of matching events
+    #[schema(example = 42)]
     pub total: i64,
+    /// Whether more pages are available
     pub has_more: bool,
 }
 
@@ -151,49 +198,65 @@ pub async fn list_events(
     let limit = query.limit.unwrap_or(100).min(500);
     let offset = query.offset.unwrap_or(0);
 
-    // Build dynamic query
-    let mut sql = String::from(
-        "SELECT id, topology_id, event_type, event_subtype, severity, title, description, metadata, source_type, source_id, created_at FROM events WHERE 1=1"
-    );
+    // Build parameterized queries using `sqlx::QueryBuilder` to avoid SQL
+    // injection and quoting issues when interpolating user-supplied values.
+
+    // Build parameterized queries using '?' placeholders and bind values
     let mut count_sql = String::from("SELECT COUNT(*) as count FROM events WHERE 1=1");
+    let mut list_sql = String::from("SELECT id, topology_id, event_type, event_subtype, severity, title, description, metadata, source_type, source_id, created_at FROM events WHERE 1=1");
+    let mut binds: Vec<String> = Vec::new();
 
     if let Some(ref tid) = query.topology_id {
-        sql.push_str(&format!(" AND topology_id = '{}'", tid));
-        count_sql.push_str(&format!(" AND topology_id = '{}'", tid));
+        count_sql.push_str(" AND topology_id = ?");
+        list_sql.push_str(" AND topology_id = ?");
+        binds.push(tid.clone());
     }
     if let Some(ref et) = query.event_type {
-        sql.push_str(&format!(" AND event_type = '{}'", et));
-        count_sql.push_str(&format!(" AND event_type = '{}'", et));
+        count_sql.push_str(" AND event_type = ?");
+        list_sql.push_str(" AND event_type = ?");
+        binds.push(et.clone());
     }
     if let Some(ref sev) = query.severity {
-        sql.push_str(&format!(" AND severity = '{}'", sev));
-        count_sql.push_str(&format!(" AND severity = '{}'", sev));
+        count_sql.push_str(" AND severity = ?");
+        list_sql.push_str(" AND severity = ?");
+        binds.push(sev.clone());
     }
     if let Some(ref st) = query.source_type {
-        sql.push_str(&format!(" AND source_type = '{}'", st));
-        count_sql.push_str(&format!(" AND source_type = '{}'", st));
+        count_sql.push_str(" AND source_type = ?");
+        list_sql.push_str(" AND source_type = ?");
+        binds.push(st.clone());
     }
     if let Some(ref since) = query.since {
-        sql.push_str(&format!(" AND created_at >= '{}'", since));
-        count_sql.push_str(&format!(" AND created_at >= '{}'", since));
+        count_sql.push_str(" AND created_at >= ?");
+        list_sql.push_str(" AND created_at >= ?");
+        binds.push(since.clone());
     }
     if let Some(ref until) = query.until {
-        sql.push_str(&format!(" AND created_at <= '{}'", until));
-        count_sql.push_str(&format!(" AND created_at <= '{}'", until));
+        count_sql.push_str(" AND created_at <= ?");
+        list_sql.push_str(" AND created_at <= ?");
+        binds.push(until.clone());
     }
 
-    sql.push_str(" ORDER BY created_at DESC");
-    sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+    list_sql.push_str(" ORDER BY created_at DESC");
+    list_sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
 
-    // Get total count
-    let count_row: (i64,) = sqlx::query_as(&count_sql)
+    // Get total count (bind values in same order)
+    let mut count_q = sqlx::query_as::<_, (i64,)>(&count_sql);
+    for b in &binds {
+        count_q = count_q.bind(b);
+    }
+    let count_row: (i64,) = count_q
         .fetch_one(state.db.pool())
         .await
         .map_err(|e| AppError::internal(&format!("Failed to count events: {}", e)))?;
     let total = count_row.0;
 
     // Get events
-    let rows: Vec<EventRow> = sqlx::query_as(&sql)
+    let mut list_q = sqlx::query_as::<_, EventRow>(&list_sql);
+    for b in &binds {
+        list_q = list_q.bind(b);
+    }
+    let rows: Vec<EventRow> = list_q
         .fetch_all(state.db.pool())
         .await
         .map_err(|e| AppError::internal(&format!("Failed to list events: {}", e)))?;
@@ -255,6 +318,7 @@ pub async fn list_topology_events(
     request_body = CreateEventRequest,
     responses(
         (status = 200, description = "Event created", body = Event),
+        (status = 400, description = "Bad request"),
         (status = 500, description = "Internal server error")
     )
 )]
@@ -265,6 +329,37 @@ pub async fn create_event(
     let now = Utc::now();
     let metadata_str = request.metadata.as_ref().map(|m| serde_json::to_string(&m).unwrap_or_default());
     let severity = request.severity.unwrap_or_else(|| "info".to_string());
+
+    // Input validation: require non-empty event_type and title
+    if request.event_type.trim().is_empty() {
+        return Err(AppError::bad_request("event_type must be a non-empty string"));
+    }
+    if request.title.trim().is_empty() {
+        return Err(AppError::bad_request("title must be a non-empty string"));
+    }
+
+    // Validate severity if provided
+    let sev_lower = severity.to_lowercase();
+    match sev_lower.as_str() {
+        "info" | "success" | "warning" | "error" => {}
+        _ => return Err(AppError::bad_request("severity must be one of: info, success, warning, error")),
+    }
+
+    // Validate topology_id when present: it must be non-empty and exist in the DB
+    if let Some(ref tid) = request.topology_id {
+        if tid.trim().is_empty() {
+            return Err(AppError::bad_request("topology_id must be a non-empty string if provided"));
+        }
+        // Check existence
+        let exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM topologies WHERE id = ? LIMIT 1")
+            .bind(tid)
+            .fetch_optional(state.db.pool())
+            .await
+            .map_err(|e| AppError::internal(&format!("Failed to validate topology_id: {}", e)))?;
+        if exists.is_none() {
+            return Err(AppError::bad_request("topology_id does not exist"));
+        }
+    }
 
     let result = sqlx::query(
         r#"

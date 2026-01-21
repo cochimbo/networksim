@@ -34,28 +34,22 @@ cd networksim
 ```bash
 # Instalación automática (Docker, K3d, Calico, Chaos Mesh)
 ./scripts/setup.sh
-
-# O solo cluster sin dependencias del sistema
-./scripts/setup.sh --skip-deps
 ```
 
 ### 3. Compilar el backend
 
 ```bash
-cd backend
 cargo build --release
 ```
 
 ### 4. Instalar dependencias del frontend
 
 ```bash
-cd frontend
 npm install
 ```
 
 ## Ejecutar
 
-### Opción 1: Script de inicio
 
 ```bash
 ./start.sh          # Iniciar todo
@@ -66,19 +60,14 @@ npm install
 
 ### Opción 2: Manual
 
-```bash
 # Terminal 1 - Backend
 cd backend
 KUBECONFIG=/etc/rancher/k3s/k3s.yaml ./target/release/networksim-backend
 
 # Terminal 2 - Frontend
-cd frontend
 npm run dev
-```
 
-### Opción 3: Producción (Docker Compose)
 
-Para ejecutar la versión optimizada para producción (contenedores Docker):
 
 ```bash
 ./scripts/start-prod.sh

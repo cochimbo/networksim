@@ -328,6 +328,21 @@ pub async fn delete_preset(
 /// Apply a preset to a topology (creates chaos condition)
 ///
 /// POST /api/topologies/:topology_id/presets/:preset_id/apply
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{topology_id}/presets/{preset_id}/apply",
+    tag = "presets",
+    params(
+        ("topology_id" = String, Path, description = "Topology ID"),
+        ("preset_id" = String, Path, description = "Preset ID")
+    ),
+    request_body = ApplyPresetRequest,
+    responses(
+        (status = 200, description = "Preset applied"),
+        (status = 404, description = "Preset not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn apply_preset(
     State(state): State<AppState>,
     Path((topology_id, preset_id)): Path<(String, String)>,

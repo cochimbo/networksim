@@ -13,6 +13,12 @@ use crate::api::AppState;
 use crate::api::Event;
 
 /// WebSocket handler
+#[utoipa::path(
+    get,
+    path = "/ws/events",
+    tag = "events",
+    responses((status = 101, description = "WebSocket upgrade"))
+)]
 pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }

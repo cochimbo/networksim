@@ -446,21 +446,31 @@ pub async fn get_metrics_history(
         "SELECT id, topology_id, source_node_id, target_node_id, latency_ms, packet_loss_percent, bandwidth_bps, jitter_ms, is_connected, measured_at FROM network_metrics WHERE topology_id = ? AND measured_at >= ?"
     );
 
-    if let Some(ref source) = query.source_node {
-        sql.push_str(&format!(" AND source_node_id = '{}'", source));
+    if query.source_node.is_some() {
+        sql.push_str(" AND source_node_id = ?");
     }
-    if let Some(ref target) = query.target_node {
-        sql.push_str(&format!(" AND target_node_id = '{}'", target));
+    if query.target_node.is_some() {
+        sql.push_str(" AND target_node_id = ?");
     }
-    if let Some(ref until) = query.until {
-        sql.push_str(&format!(" AND measured_at <= '{}'", until));
+    if query.until.is_some() {
+        sql.push_str(" AND measured_at <= ?");
     }
 
     sql.push_str(&format!(" ORDER BY measured_at DESC LIMIT {}", limit));
 
-    let rows: Vec<NetworkMetricRow> = sqlx::query_as(&sql)
-        .bind(&topology_id)
-        .bind(&since)
+    let mut q = sqlx::query_as::<_, NetworkMetricRow>(&sql);
+    q = q.bind(&topology_id).bind(&since);
+    if let Some(ref source) = query.source_node {
+        q = q.bind(source);
+    }
+    if let Some(ref target) = query.target_node {
+        q = q.bind(target);
+    }
+    if let Some(ref until) = query.until {
+        q = q.bind(until);
+    }
+
+    let rows: Vec<NetworkMetricRow> = q
         .fetch_all(state.db.pool())
         .await
         .map_err(|e| AppError::internal(&format!("Failed to get metrics: {}", e)))?;

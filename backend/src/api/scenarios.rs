@@ -19,6 +19,13 @@ pub fn router() -> Router<AppState> {
         .route("/api/scenarios/:id/run", post(run_scenario))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/scenarios/{id}/run",
+    tag = "scenarios",
+    params(("id" = String, Path, description = "Scenario ID")),
+    responses((status = 200, description = "Scenario execution started"))
+)]
 async fn run_scenario(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -139,6 +146,13 @@ async fn execute_scenario_logic(state: AppState, scenario: Scenario) -> Result<(
     Ok(())
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/topologies/{topology_id}/scenarios",
+    tag = "scenarios",
+    params(("topology_id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "List of scenarios"))
+)]
 async fn list_scenarios(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -157,6 +171,13 @@ async fn list_scenarios(
     Ok(ApiResponse::success(scenarios))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/scenarios/{id}",
+    tag = "scenarios",
+    params(("id" = String, Path, description = "Scenario ID")),
+    responses((status = 200, description = "Scenario"))
+)]
 async fn get_scenario(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -174,11 +195,49 @@ async fn get_scenario(
     Ok(ApiResponse::success(scenario))
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{topology_id}/scenarios",
+    tag = "scenarios",
+    params(("topology_id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "Scenario created"))
+)]
 async fn create_scenario(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
     Json(payload): Json<CreateScenarioRequest>,
 ) -> Result<ApiResponse<Scenario>, AppError> {
+    // Basic validation
+    if payload.name.trim().is_empty() {
+        return Err(AppError::bad_request("name must be a non-empty string"));
+    }
+    if payload.total_duration <= 0 {
+        return Err(AppError::bad_request("total_duration must be greater than zero"));
+    }
+    if payload.steps.is_empty() {
+        return Err(AppError::bad_request("steps must contain at least one step"));
+    }
+    for (i, step) in payload.steps.iter().enumerate() {
+        if step.source_node_id.trim().is_empty() {
+            return Err(AppError::bad_request(&format!("steps[{}].source_node_id must be non-empty", i)));
+        }
+        if step.duration <= 0.0 {
+            return Err(AppError::bad_request(&format!("steps[{}].duration must be > 0", i)));
+        }
+        if step.start_at < 0.0 {
+            return Err(AppError::bad_request(&format!("steps[{}].start_at must be >= 0", i)));
+        }
+    }
+
+    // Ensure topology exists
+    let topo_exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM topologies WHERE id = ? LIMIT 1")
+        .bind(&topology_id)
+        .fetch_optional(state.db.pool())
+        .await
+        .map_err(|e| AppError::internal(&format!("Failed to validate topology_id: {}", e)))?;
+    if topo_exists.is_none() {
+        return Err(AppError::NotFound("Topology not found".to_string()));
+    }
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
     
@@ -213,6 +272,13 @@ async fn create_scenario(
     Ok(ApiResponse::success(scenario))
 }
 
+#[utoipa::path(
+    put,
+    path = "/api/scenarios/{id}",
+    tag = "scenarios",
+    params(("id" = String, Path, description = "Scenario ID")),
+    responses((status = 200, description = "Scenario updated"))
+)]
 async fn update_scenario(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -261,6 +327,13 @@ async fn update_scenario(
     Ok(ApiResponse::success(scenario))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/scenarios/{id}",
+    tag = "scenarios",
+    params(("id" = String, Path, description = "Scenario ID")),
+    responses((status = 200, description = "Scenario deleted"))
+)]
 async fn delete_scenario(
     State(state): State<AppState>,
     Path(id): Path<String>,

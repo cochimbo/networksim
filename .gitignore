@@ -83,3 +83,30 @@ k3s.yaml
 # Generated Secrets
 certs/
 kubeconfig.yaml
+
+# Ignore Python venv
+backend/.venv/
+
+# Common Python virtualenv and cache patterns
+.venv/
+venv/
+**/.venv/
+**/venv/
+/.venv
+
+# Python caches
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+
+# Virtualenv wrappers and pipenv
+.venv-requirements.txt
+.venv/*
+
+# Hypothesis / Schemathesis cache and examples
+.hypothesis/
+
+# Hypothesis / Schemathesis artifacts
+.hypothesis/
+backend/schemathesis_reports/
+backend/schemathesis_report.txt

@@ -279,6 +279,16 @@ pub async fn stop(
 }
 
 /// Update a chaos condition (only editable fields)
+#[utoipa::path(
+    put,
+    path = "/api/topologies/{id}/chaos/{condition_id}",
+    tag = "chaos",
+    params(
+        ("id" = String, Path, description = "Topology ID"),
+        ("condition_id" = String, Path, description = "Condition ID")
+    ),
+    responses((status = 200, description = "Updated"))
+)]
 pub async fn update(
     State(state): State<AppState>,
     Path((topology_id, condition_id)): Path<(String, String)>,
@@ -349,6 +359,13 @@ pub async fn update(
 }
 
 /// Start all chaos conditions for a topology
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{id}/chaos/start",
+    tag = "chaos",
+    params(("id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "Started all chaos conditions"))
+)]
 pub async fn start_all(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,
@@ -417,6 +434,13 @@ pub async fn start_all(
 }
 
 /// Stop all chaos conditions for a topology
+#[utoipa::path(
+    post,
+    path = "/api/topologies/{id}/chaos/stop",
+    tag = "chaos",
+    params(("id" = String, Path, description = "Topology ID")),
+    responses((status = 200, description = "Stopped all chaos conditions"))
+)]
 pub async fn stop_all(
     State(state): State<AppState>,
     Path(topology_id): Path<String>,

@@ -1,0 +1,1146 @@
+[
+  {
+    "path": "/health",
+    "handler": "api::health::health_check",
+    "module": "health",
+    "function": "health_check",
+    "file": "src/api/health.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/cluster/status",
+    "handler": "api::health::cluster_status",
+    "module": "health",
+    "function": "cluster_status",
+    "file": "src/api/health.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies",
+    "handler": "api::topologies::list",
+    "module": "topologies",
+    "function": "list",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies",
+    "handler": "api::topologies::create",
+    "module": "topologies",
+    "function": "create",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id",
+    "handler": "api::topologies::get",
+    "module": "topologies",
+    "function": "get",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id",
+    "handler": "api::topologies::update",
+    "module": "topologies",
+    "function": "update",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id",
+    "handler": "api::topologies::delete",
+    "module": "topologies",
+    "function": "delete",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/duplicate",
+    "handler": "api::topologies::duplicate",
+    "module": "topologies",
+    "function": "duplicate",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/deploy",
+    "handler": "api::deploy::deploy",
+    "module": "deploy",
+    "function": "deploy",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/deploy",
+    "handler": "api::deploy::destroy",
+    "module": "deploy",
+    "function": "destroy",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/status",
+    "handler": "api::deploy::status",
+    "module": "deploy",
+    "function": "status",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/chaos",
+    "handler": "api::chaos::list",
+    "module": "chaos",
+    "function": "list",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/chaos",
+    "handler": "api::chaos::delete_all",
+    "module": "chaos",
+    "function": "delete_all",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/chaos/stop",
+    "handler": "api::chaos::stop_all",
+    "module": "chaos",
+    "function": "stop_all",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/chaos",
+    "handler": "api::chaos::create",
+    "module": "chaos",
+    "function": "create",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps",
+    "handler": "api::applications::deploy_topology",
+    "module": "applications",
+    "function": "deploy_topology",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/draft",
+    "handler": "api::applications::create_draft",
+    "module": "applications",
+    "function": "create_draft",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps",
+    "handler": "api::applications::list_by_topology",
+    "module": "applications",
+    "function": "list_by_topology",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id",
+    "handler": "api::applications::update_application",
+    "module": "applications",
+    "function": "update_application",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/nodes/:node_id/apps",
+    "handler": "api::applications::deploy",
+    "module": "applications",
+    "function": "deploy",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/nodes/:node_id/apps",
+    "handler": "api::applications::list_by_node",
+    "module": "applications",
+    "function": "list_by_node",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id",
+    "handler": "api::applications::get",
+    "module": "applications",
+    "function": "get",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id",
+    "handler": "api::applications::uninstall",
+    "module": "applications",
+    "function": "uninstall",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id/logs",
+    "handler": "api::applications::logs",
+    "module": "applications",
+    "function": "logs",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id/status",
+    "handler": "api::applications::status",
+    "module": "applications",
+    "function": "status",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/ws/events",
+    "handler": "api::ws::ws_handler",
+    "module": "ws",
+    "function": "ws_handler",
+    "file": "src/api/ws.rs",
+    "documented": true
+  },
+  {
+    "path": "/metrics",
+    "handler": "api::metrics::metrics_handler",
+    "module": "metrics",
+    "function": "metrics_handler",
+    "file": "src/api/metrics.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/events",
+    "handler": "api::events::list_events",
+    "module": "events",
+    "function": "list_events",
+    "file": "src/api/events.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/events",
+    "handler": "api::events::create_event",
+    "module": "events",
+    "function": "create_event",
+    "file": "src/api/events.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/events/stats",
+    "handler": "api::events::event_stats",
+    "module": "events",
+    "function": "event_stats",
+    "file": "src/api/events.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/presets",
+    "handler": "api::presets::list_presets",
+    "module": "presets",
+    "function": "list_presets",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/presets",
+    "handler": "api::presets::create_preset",
+    "module": "presets",
+    "function": "create_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/presets/:id",
+    "handler": "api::presets::get_preset",
+    "module": "presets",
+    "function": "get_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/presets/:id",
+    "handler": "api::presets::delete_preset",
+    "module": "presets",
+    "function": "delete_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries",
+    "handler": "api::registry::list_registries",
+    "module": "registry",
+    "function": "list_registries",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries",
+    "handler": "api::registry::create_registry",
+    "module": "registry",
+    "function": "create_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/default",
+    "handler": "api::registry::get_default_registry",
+    "module": "registry",
+    "function": "get_default_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/:id",
+    "handler": "api::registry::get_registry",
+    "module": "registry",
+    "function": "get_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/:id",
+    "handler": "api::registry::update_registry",
+    "module": "registry",
+    "function": "update_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/:id",
+    "handler": "api::registry::delete_registry",
+    "module": "registry",
+    "function": "delete_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/:id/test",
+    "handler": "api::registry::test_registry",
+    "module": "registry",
+    "function": "test_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/tests",
+    "handler": "api::test_runner::list_tests",
+    "module": "test_runner",
+    "function": "list_tests",
+    "file": "src/api/test_runner.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/tests",
+    "handler": "api::test_runner::start_test",
+    "module": "test_runner",
+    "function": "start_test",
+    "file": "src/api/test_runner.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies",
+    "handler": "api::topologies::list",
+    "module": "topologies",
+    "function": "list",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies",
+    "handler": "api::topologies::create",
+    "module": "topologies",
+    "function": "create",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id",
+    "handler": "api::topologies::get",
+    "module": "topologies",
+    "function": "get",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id",
+    "handler": "api::topologies::update",
+    "module": "topologies",
+    "function": "update",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id",
+    "handler": "api::topologies::delete",
+    "module": "topologies",
+    "function": "delete",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/deploy",
+    "handler": "api::deploy::deploy",
+    "module": "deploy",
+    "function": "deploy",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/deploy",
+    "handler": "api::deploy::destroy",
+    "module": "deploy",
+    "function": "destroy",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/status",
+    "handler": "api::deploy::status",
+    "module": "deploy",
+    "function": "status",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/chaos",
+    "handler": "api::chaos::list",
+    "module": "chaos",
+    "function": "list",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/chaos",
+    "handler": "api::chaos::delete_all",
+    "module": "chaos",
+    "function": "delete_all",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/chaos",
+    "handler": "api::chaos::create",
+    "module": "chaos",
+    "function": "create",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/presets",
+    "handler": "api::presets::list_presets",
+    "module": "presets",
+    "function": "list_presets",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/presets",
+    "handler": "api::presets::create_preset",
+    "module": "presets",
+    "function": "create_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/presets/:id",
+    "handler": "api::presets::get_preset",
+    "module": "presets",
+    "function": "get_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/presets/:id",
+    "handler": "api::presets::delete_preset",
+    "module": "presets",
+    "function": "delete_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/cluster/status",
+    "handler": "api::health::cluster_status",
+    "module": "health",
+    "function": "cluster_status",
+    "file": "src/api/health.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/templates",
+    "handler": "api::templates::list",
+    "module": "templates",
+    "function": "list",
+    "file": "src/api/templates.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/templates/:template_id",
+    "handler": "api::templates::get",
+    "module": "templates",
+    "function": "get",
+    "file": "src/api/templates.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/templates/:template_id/generate",
+    "handler": "api::templates::generate",
+    "module": "templates",
+    "function": "generate",
+    "file": "src/api/templates.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/pvc",
+    "handler": "api::volumes::list_pvcs",
+    "module": "volumes",
+    "function": "list_pvcs",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/pvc",
+    "handler": "api::volumes::create_pvc",
+    "module": "volumes",
+    "function": "create_pvc",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/pvc/:name",
+    "handler": "api::volumes::delete_pvc",
+    "module": "volumes",
+    "function": "delete_pvc",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/config",
+    "handler": "api::volumes::list_config_maps",
+    "module": "volumes",
+    "function": "list_config_maps",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/config",
+    "handler": "api::volumes::create_config_map",
+    "module": "volumes",
+    "function": "create_config_map",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/config/:name",
+    "handler": "api::volumes::delete_config_map",
+    "module": "volumes",
+    "function": "delete_config_map",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/config/:name/files",
+    "handler": "api::volumes::upload_file_to_config_map",
+    "module": "volumes",
+    "function": "upload_file_to_config_map",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/report",
+    "handler": "api::reports::generate_report",
+    "module": "reports",
+    "function": "generate_report",
+    "file": "src/api/reports.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/report/html",
+    "handler": "api::reports::generate_html_report",
+    "module": "reports",
+    "function": "generate_html_report",
+    "file": "src/api/reports.rs",
+    "documented": true
+  },
+  {
+    "path": "/health",
+    "handler": "health::health_check",
+    "module": "health",
+    "function": "health_check",
+    "file": "src/api/health.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/cluster/status",
+    "handler": "health::cluster_status",
+    "module": "health",
+    "function": "cluster_status",
+    "file": "src/api/health.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies",
+    "handler": "topologies::list",
+    "module": "topologies",
+    "function": "list",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies",
+    "handler": "topologies::create",
+    "module": "topologies",
+    "function": "create",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id",
+    "handler": "topologies::get",
+    "module": "topologies",
+    "function": "get",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id",
+    "handler": "topologies::update",
+    "module": "topologies",
+    "function": "update",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id",
+    "handler": "topologies::delete",
+    "module": "topologies",
+    "function": "delete",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/duplicate",
+    "handler": "topologies::duplicate",
+    "module": "topologies",
+    "function": "duplicate",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/deploy",
+    "handler": "deploy::deploy",
+    "module": "deploy",
+    "function": "deploy",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/deploy",
+    "handler": "deploy::destroy",
+    "module": "deploy",
+    "function": "destroy",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/status",
+    "handler": "deploy::status",
+    "module": "deploy",
+    "function": "status",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/chaos",
+    "handler": "chaos::list",
+    "module": "chaos",
+    "function": "list",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/chaos",
+    "handler": "chaos::delete_all",
+    "module": "chaos",
+    "function": "delete_all",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/chaos/stop",
+    "handler": "chaos::stop_all",
+    "module": "chaos",
+    "function": "stop_all",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/chaos",
+    "handler": "chaos::create",
+    "module": "chaos",
+    "function": "create",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps",
+    "handler": "applications::deploy_topology",
+    "module": "applications",
+    "function": "deploy_topology",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/draft",
+    "handler": "applications::create_draft",
+    "module": "applications",
+    "function": "create_draft",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps",
+    "handler": "applications::list_by_topology",
+    "module": "applications",
+    "function": "list_by_topology",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id",
+    "handler": "applications::update_application",
+    "module": "applications",
+    "function": "update_application",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/nodes/:node_id/apps",
+    "handler": "applications::deploy",
+    "module": "applications",
+    "function": "deploy",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/nodes/:node_id/apps",
+    "handler": "applications::list_by_node",
+    "module": "applications",
+    "function": "list_by_node",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id",
+    "handler": "applications::get",
+    "module": "applications",
+    "function": "get",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id",
+    "handler": "applications::uninstall",
+    "module": "applications",
+    "function": "uninstall",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id/logs",
+    "handler": "applications::logs",
+    "module": "applications",
+    "function": "logs",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:topology_id/apps/:app_id/status",
+    "handler": "applications::status",
+    "module": "applications",
+    "function": "status",
+    "file": "src/api/applications.rs",
+    "documented": true
+  },
+  {
+    "path": "/ws/events",
+    "handler": "ws::ws_handler",
+    "module": "ws",
+    "function": "ws_handler",
+    "file": "src/api/ws.rs",
+    "documented": true
+  },
+  {
+    "path": "/metrics",
+    "handler": "metrics::metrics_handler",
+    "module": "metrics",
+    "function": "metrics_handler",
+    "file": "src/api/metrics.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/events",
+    "handler": "events::list_events",
+    "module": "events",
+    "function": "list_events",
+    "file": "src/api/events.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/events",
+    "handler": "events::create_event",
+    "module": "events",
+    "function": "create_event",
+    "file": "src/api/events.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/events/stats",
+    "handler": "events::event_stats",
+    "module": "events",
+    "function": "event_stats",
+    "file": "src/api/events.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/presets",
+    "handler": "presets::list_presets",
+    "module": "presets",
+    "function": "list_presets",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/presets",
+    "handler": "presets::create_preset",
+    "module": "presets",
+    "function": "create_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/presets/:id",
+    "handler": "presets::get_preset",
+    "module": "presets",
+    "function": "get_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/presets/:id",
+    "handler": "presets::delete_preset",
+    "module": "presets",
+    "function": "delete_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries",
+    "handler": "registry::list_registries",
+    "module": "registry",
+    "function": "list_registries",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries",
+    "handler": "registry::create_registry",
+    "module": "registry",
+    "function": "create_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/default",
+    "handler": "registry::get_default_registry",
+    "module": "registry",
+    "function": "get_default_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/:id",
+    "handler": "registry::get_registry",
+    "module": "registry",
+    "function": "get_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/:id",
+    "handler": "registry::update_registry",
+    "module": "registry",
+    "function": "update_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/:id",
+    "handler": "registry::delete_registry",
+    "module": "registry",
+    "function": "delete_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/registries/:id/test",
+    "handler": "registry::test_registry",
+    "module": "registry",
+    "function": "test_registry",
+    "file": "src/api/registry.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/tests",
+    "handler": "test_runner::list_tests",
+    "module": "test_runner",
+    "function": "list_tests",
+    "file": "src/api/test_runner.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/tests",
+    "handler": "test_runner::start_test",
+    "module": "test_runner",
+    "function": "start_test",
+    "file": "src/api/test_runner.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies",
+    "handler": "topologies::list",
+    "module": "topologies",
+    "function": "list",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies",
+    "handler": "topologies::create",
+    "module": "topologies",
+    "function": "create",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id",
+    "handler": "topologies::get",
+    "module": "topologies",
+    "function": "get",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id",
+    "handler": "topologies::update",
+    "module": "topologies",
+    "function": "update",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id",
+    "handler": "topologies::delete",
+    "module": "topologies",
+    "function": "delete",
+    "file": "src/api/topologies.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/deploy",
+    "handler": "deploy::deploy",
+    "module": "deploy",
+    "function": "deploy",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/deploy",
+    "handler": "deploy::destroy",
+    "module": "deploy",
+    "function": "destroy",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/status",
+    "handler": "deploy::status",
+    "module": "deploy",
+    "function": "status",
+    "file": "src/api/deploy.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/chaos",
+    "handler": "chaos::list",
+    "module": "chaos",
+    "function": "list",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/topologies/:id/chaos",
+    "handler": "chaos::delete_all",
+    "module": "chaos",
+    "function": "delete_all",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/chaos",
+    "handler": "chaos::create",
+    "module": "chaos",
+    "function": "create",
+    "file": "src/api/chaos.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/presets",
+    "handler": "presets::list_presets",
+    "module": "presets",
+    "function": "list_presets",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/presets",
+    "handler": "presets::create_preset",
+    "module": "presets",
+    "function": "create_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/presets/:id",
+    "handler": "presets::get_preset",
+    "module": "presets",
+    "function": "get_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/presets/:id",
+    "handler": "presets::delete_preset",
+    "module": "presets",
+    "function": "delete_preset",
+    "file": "src/api/presets.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/v1/cluster/status",
+    "handler": "health::cluster_status",
+    "module": "health",
+    "function": "cluster_status",
+    "file": "src/api/health.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/templates",
+    "handler": "templates::list",
+    "module": "templates",
+    "function": "list",
+    "file": "src/api/templates.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/templates/:template_id",
+    "handler": "templates::get",
+    "module": "templates",
+    "function": "get",
+    "file": "src/api/templates.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/templates/:template_id/generate",
+    "handler": "templates::generate",
+    "module": "templates",
+    "function": "generate",
+    "file": "src/api/templates.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/pvc",
+    "handler": "volumes::list_pvcs",
+    "module": "volumes",
+    "function": "list_pvcs",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/pvc",
+    "handler": "volumes::create_pvc",
+    "module": "volumes",
+    "function": "create_pvc",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/pvc/:name",
+    "handler": "volumes::delete_pvc",
+    "module": "volumes",
+    "function": "delete_pvc",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/config",
+    "handler": "volumes::list_config_maps",
+    "module": "volumes",
+    "function": "list_config_maps",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/config",
+    "handler": "volumes::create_config_map",
+    "module": "volumes",
+    "function": "create_config_map",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/config/:name",
+    "handler": "volumes::delete_config_map",
+    "module": "volumes",
+    "function": "delete_config_map",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/volumes/config/:name/files",
+    "handler": "volumes::upload_file_to_config_map",
+    "module": "volumes",
+    "function": "upload_file_to_config_map",
+    "file": "src/api/volumes.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/report",
+    "handler": "reports::generate_report",
+    "module": "reports",
+    "function": "generate_report",
+    "file": "src/api/reports.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/topologies/:id/report/html",
+    "handler": "reports::generate_html_report",
+    "module": "reports",
+    "function": "generate_html_report",
+    "file": "src/api/reports.rs",
+    "documented": true
+  },
+  {
+    "path": "/api/scenarios/:id/run",
+    "handler": "run_scenario",
+    "module": "scenarios",
+    "function": "run_scenario",
+    "file": "src/api/scenarios.rs",
+    "documented": true
+  }
+]
