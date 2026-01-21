@@ -109,3 +109,4 @@ __pycache__/
 # Hypothesis / Schemathesis artifacts
 .hypothesis/
 backend/schemathesis_reports/
+backend/schemathesis_report.txt
