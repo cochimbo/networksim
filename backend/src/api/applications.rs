@@ -59,6 +59,18 @@ pub async fn deploy(
     tracing::info!("📝 Creating application record with details: id={}, deployment_name={}, namespace={}, topology_id={}, node_selector=[{}]",
                    app_id, deployment_name, namespace, topology_id, node_id);
 
+    // Validate topology exists and node is part of the topology
+    let topology = state
+        .db
+        .get_topology(&topology_id.to_string())
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Topology {} not found", topology_id)))?;
+
+    if !topology.nodes.iter().any(|n| n.id == node_id) {
+        tracing::warn!("Node {} not found in topology {}", node_id, topology_id);
+        return Err(AppError::NotFound(format!("Node {} not found in topology {}", node_id, topology_id)));
+    }
+
     // Construct consolidated values object
     let mut values_map = serde_json::Map::new();
     

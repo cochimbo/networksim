@@ -228,6 +228,16 @@ async fn create_scenario(
             return Err(AppError::bad_request(&format!("steps[{}].start_at must be >= 0", i)));
         }
     }
+
+    // Ensure topology exists
+    let topo_exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM topologies WHERE id = ? LIMIT 1")
+        .bind(&topology_id)
+        .fetch_optional(state.db.pool())
+        .await
+        .map_err(|e| AppError::internal(&format!("Failed to validate topology_id: {}", e)))?;
+    if topo_exists.is_none() {
+        return Err(AppError::NotFound("Topology not found".to_string()));
+    }
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
     
