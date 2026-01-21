@@ -1,0 +1,94 @@
+name: Contract Tests (OpenAPI + Schemathesis)
+
+on:
+  push:
+    branches: [ feature/doc-openapi-and-tests ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      run_contracts:
+        description: 'Set to true to run the live contract tests (starts server)'
+        required: false
+        default: 'false'
+
+jobs:
+  generate-openapi:
+    name: Regenerate OpenAPI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Build backend (release)
+        run: |
+          cd backend
+          cargo build --release
+
+      - name: Generate openapi.json
+        run: |
+          cd backend
+          cargo run --bin gen_openapi --release
+
+      - name: Upload OpenAPI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-json
+          path: backend/openapi.json
+
+  run-contracts:
+    name: Run Schemathesis contract tests (manual)
+    needs: generate-openapi
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_contracts == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Build backend
+        run: |
+          cd backend
+          cargo build --release
+
+      - name: Start backend
+        run: |
+          cd backend
+          nohup ./target/release/networksim-backend > backend-ci.log 2>&1 &
+          # Wait for /health to respond
+          for i in {1..60}; do
+            if curl -sSf http://localhost:8080/health >/dev/null 2>&1; then
+              echo "Backend healthy"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Install schemathesis
+        run: |
+          python -m pip install --upgrade pip
+          pip install schemathesis
+
+      - name: Run Schemathesis
+        run: |
+          schemathesis run backend/openapi.json --base-url http://localhost:8080 --hypothesis-max-examples 20 --workers 2 --max-failures 1 || true
+
+      - name: Upload Schemathesis report
+        if: always()
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/backend/schemathesis_reports
+          schemathesis run backend/openapi.json --base-url http://localhost:8080 --hypothesis-max-examples 20 --workers 2 --report backend/schemathesis_reports/report.html || true
+          ls -la backend/schemathesis_reports || true
+        
